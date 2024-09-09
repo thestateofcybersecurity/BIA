@@ -1,9 +1,15 @@
 import React, { useState } from 'react'
-import { Box, Button, FormControl, FormLabel, Input, VStack, Text } from '@chakra-ui/react'
+import { Box, Button, FormControl, FormLabel, Input, VStack, Text, Select } from '@chakra-ui/react'
 import axios from 'axios'
+import { ProcessDependency } from '@/types/ProcessDependency'
 
-export default function RecoveryObjectives() {
+interface RecoveryObjectivesProps {
+  processes: ProcessDependency[]
+}
+
+export default function RecoveryObjectives({ processes }: RecoveryObjectivesProps) {
   const [formData, setFormData] = useState({
+    processId: '',
     expectedRTO: '',
     actualRTO: '',
     expectedRPO: '',
@@ -11,7 +17,7 @@ export default function RecoveryObjectives() {
   })
   const [gaps, setGaps] = useState({ rtoGap: 0, rpoGap: 0 })
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData({ ...formData, [name]: value })
   }
@@ -30,6 +36,15 @@ export default function RecoveryObjectives() {
     <Box>
       <form onSubmit={handleSubmit}>
         <VStack spacing={4} align="stretch">
+          <FormControl>
+            <FormLabel>Process/Dependency</FormLabel>
+            <Select name="processId" value={formData.processId} onChange={handleInputChange} required>
+              <option value="">Select a process</option>
+              {processes.map((process) => (
+                <option key={process.id} value={process.id}>{process.processFunction}</option>
+              ))}
+            </Select>
+          </FormControl>
           <FormControl>
             <FormLabel>Expected RTO (hours)</FormLabel>
             <Input type="number" name="expectedRTO" value={formData.expectedRTO} onChange={handleInputChange} required />
