@@ -44,11 +44,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Login error:', error)
       if (axios.isAxiosError(error)) {
-        const axiosError = error as AxiosError
+        const axiosError = error as AxiosError<{ message?: string }>
         if (axiosError.response) {
           // The request was made and the server responded with a status code
           // that falls out of the range of 2xx
-          setError(`Server error: ${axiosError.response.status} - ${axiosError.response.data.message || 'Unknown error'}`)
+          const errorMessage = axiosError.response.data?.message || 'Unknown error'
+          setError(`Server error: ${axiosError.response.status} - ${errorMessage}`)
         } else if (axiosError.request) {
           // The request was made but no response was received
           setError('No response received from server. Please check your internet connection.')
