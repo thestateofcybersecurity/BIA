@@ -16,8 +16,13 @@ export function authenticateToken(handler: (_req: AuthenticatedRequest, _res: Ne
       return res.status(401).json({ message: 'Unauthorized' })
     }
 
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET is not defined')
+    }
+
     try {
-      const user = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string }
+      const user = jwt.verify(token, jwtSecret) as { userId: string }
       req.user = user
       return handler(req, res)
     } catch (error) {
