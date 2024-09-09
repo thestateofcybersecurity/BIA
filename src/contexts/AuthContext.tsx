@@ -9,8 +9,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
-  login: async (_email: string, _password: string) => {},
-  logout: () => {},
+  login: async (_email: string, _password: string) => {
+    console.warn('login not implemented')
+  },
+  logout: () => {
+    console.warn('logout not implemented')
+  },
 })
 
 export const useAuth = () => useContext(AuthContext)
