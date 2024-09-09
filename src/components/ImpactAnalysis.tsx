@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Button, FormControl, FormLabel, Input, VStack, Select,
+  Box, Button, FormControl, FormLabel, VStack, Select,
   Table, Thead, Tbody, Tr, Th, Td
 } from '@chakra-ui/react';
 import axios from 'axios';
