@@ -3,6 +3,8 @@ export interface ProcessDependency {
   processFunction: string;
   description: string;
   processOwner: string;
+  clientFacingAvailabilityRequirements: string;
+  additionalAvailabilityRequirements: string;
   peoplePrimary: string;
   peopleAlternatives: string;
   itPrimary: string;
