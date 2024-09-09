@@ -29,22 +29,22 @@ const Introduction: React.FC = () => {
           
           <ListItem>
             <Text fontWeight="bold">4. Recovery - RTO Gaps:</Text>
-            <Text>This tab outlines gaps in the organization's ability to recover business processes in an acceptable amount of time. It lists the unique top-level processes and dependencies, sorted by acceptable RTO, and calculates the gap between acceptable and achievable RTO.</Text>
+            <Text>This tab outlines gaps in the organization&apos;s ability to recover business processes in an acceptable amount of time. It lists the unique top-level processes and dependencies, sorted by acceptable RTO, and calculates the gap between acceptable and achievable RTO.</Text>
           </ListItem>
           
           <ListItem>
             <Text fontWeight="bold">5. Recovery - RPO Gaps:</Text>
-            <Text>This tab outlines gaps in the organization's ability to guard against data loss in the event of a disaster event. It lists the unique top-level processes and dependencies, sorted by acceptable RPO, and calculates the gap between acceptable and achievable RPO.</Text>
+            <Text>This tab outlines gaps in the organization&apos;s ability to guard against data loss in the event of a disaster event. It lists the unique top-level processes and dependencies, sorted by acceptable RPO, and calculates the gap between acceptable and achievable RPO.</Text>
           </ListItem>
           
           <ListItem>
             <Text fontWeight="bold">6. Repatriation - RTO Gaps:</Text>
-            <Text>This tab outlines gaps in the organization's ability to repatriate business processes to the primary location in an acceptable amount of time. It provides the same analysis for your failback capability (i.e. returning to your primary site).</Text>
+            <Text>This tab outlines gaps in the organization&apos;s ability to repatriate business processes to the primary location in an acceptable amount of time. It provides the same analysis for your failback capability (i.e. returning to your primary site).</Text>
           </ListItem>
           
           <ListItem>
             <Text fontWeight="bold">7. Repatriation - RPO Gaps:</Text>
-            <Text>This tab outlines gaps in the organization's ability to guard against data loss during a repatriation exercise following a disaster. It provides the same analysis for your failback capability (i.e. returning to your primary site).</Text>
+            <Text>This tab outlines gaps in the organization&apos;s ability to guard against data loss during a repatriation exercise following a disaster. It provides the same analysis for your failback capability (i.e. returning to your primary site).</Text>
           </ListItem>
         </UnorderedList>
       </VStack>
