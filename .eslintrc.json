@@ -2,9 +2,9 @@
   "extends": [
     "next/core-web-vitals",
     "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
     "plugin:react/recommended",
     "plugin:react-hooks/recommended",
-    "plugin:@typescript-eslint/recommended",
     "prettier"
   ],
   "parser": "@typescript-eslint/parser",
@@ -16,7 +16,7 @@
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
     "@typescript-eslint/no-empty-function": ["error", { "allow": ["arrowFunctions"] }],
     "@typescript-eslint/no-non-null-assertion": "warn",
-    "no-var": "error"
+    "prefer-const": "error"
   },
   "settings": {
     "react": {
