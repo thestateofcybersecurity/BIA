@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Button, Table, Thead, Tbody, Tr, Th, Td, Input, VStack,
   useToast
 } from '@chakra-ui/react';
 import axios from 'axios';
-import { ProcessDependency } from '@/types/ProcessDependency'
 
 interface ProcessDependency {
   id: number;
@@ -47,11 +46,7 @@ const ProcessesAndDependencies: React.FC = () => {
   });
   const toast = useToast();
 
-  useEffect(() => {
-    fetchProcesses();
-  }, []);
-
-  const fetchProcesses = async () => {
+  const fetchProcesses = useCallback(async () => {
     try {
       const response = await axios.get('/api/processes');
       setProcesses(response.data);
@@ -65,7 +60,11 @@ const ProcessesAndDependencies: React.FC = () => {
         isClosable: true,
       });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchProcesses();
+  }, [fetchProcesses]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
