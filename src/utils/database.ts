@@ -32,6 +32,10 @@ export async function connectToDatabase(): Promise<mongoose.Connection> {
       bufferCommands: false,
     }
 
+    if (!MONGODB_URI) {
+      throw new Error('MONGODB_URI is not defined')
+    }
+
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
       return mongoose.connection
     })
