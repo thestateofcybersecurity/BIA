@@ -7,7 +7,7 @@ interface AuthenticatedRequest extends NextApiRequest {
   }
 }
 
-export function authenticateToken(handler: (req: AuthenticatedRequest, res: NextApiResponse) => Promise<void>) {
+export function authenticateToken(handler: (_req: AuthenticatedRequest, _res: NextApiResponse) => Promise<void>) {
   return async (req: AuthenticatedRequest, res: NextApiResponse) => {
     const authHeader = req.headers['authorization']
     const token = authHeader && authHeader.split(' ')[1]
