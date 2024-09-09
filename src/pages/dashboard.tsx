@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from '@/contexts/AuthContext'
 import { Box, Button, Heading, VStack, Tabs, TabList, TabPanels, Tab, TabPanel } from '@chakra-ui/react'
@@ -9,7 +9,7 @@ import axios from 'axios'
 
 export default function Dashboard() {
   const { isAuthenticated, logout } = useAuth()
-  const [findings, setFindings] = useState(null)
+  // const [findings, setFindings] = useState(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -21,14 +21,14 @@ export default function Dashboard() {
   const handleExportFindings = async () => {
     try {
       const response = await axios.get('/api/export-findings')
-      setFindings(response.data)
+      // setFindings(response.data)
       // Here you could trigger a download of the findings or display them in a modal
       console.log('Findings:', response.data)
     } catch (error) {
       console.error('Error exporting findings:', error)
     }
   }
-
+  
   return (
     <Box maxWidth="800px" margin="auto" mt={8}>
       <VStack spacing={4} align="stretch">
