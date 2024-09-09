@@ -36,8 +36,6 @@ const ProcessesAndDependencies: React.FC<ProcessesAndDependenciesProps> = ({ pro
   const [editingProcess, setEditingProcess] = useState<ProcessDependency | null>(null);
   const toast = useToast();
 
-  // Remove the unused handleInputChange function
-
   const handleAddProcess = async () => {
     try {
       const response = await axios.post('/api/processes', newProcess);
