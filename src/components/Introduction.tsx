@@ -1,6 +1,5 @@
 import React from 'react';
 import { Box, Heading, Text, UnorderedList, ListItem, VStack } from '@chakra-ui/react';
-import { ProcessDependency } from '@/types/ProcessDependency'
 
 const Introduction: React.FC = () => {
   return (
