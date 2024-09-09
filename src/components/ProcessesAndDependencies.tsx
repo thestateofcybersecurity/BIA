@@ -4,6 +4,7 @@ import {
   useToast
 } from '@chakra-ui/react';
 import axios from 'axios';
+import { ProcessDependency } from '@/types/ProcessDependency'
 
 interface ProcessDependency {
   id: number;
