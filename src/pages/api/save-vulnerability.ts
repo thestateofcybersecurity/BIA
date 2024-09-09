@@ -1,4 +1,4 @@
-import { NextApiResponse } from 'next'
+import { NextApiRequest, NextApiResponse } from 'next'
 import { connectToDatabase } from '@/utils/database'
 import { Vulnerability } from '@/models/Vulnerability'
 import { authenticateToken } from '@/utils/auth'
