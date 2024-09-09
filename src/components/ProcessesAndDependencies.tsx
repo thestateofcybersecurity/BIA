@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box, Button, Table, Thead, Tbody, Tr, Th, Td, Input, VStack,
   useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton
@@ -36,10 +36,7 @@ const ProcessesAndDependencies: React.FC<ProcessesAndDependenciesProps> = ({ pro
   const [editingProcess, setEditingProcess] = useState<ProcessDependency | null>(null);
   const toast = useToast();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setNewProcess(prev => ({ ...prev, [name]: value }));
-  };
+  // Remove the unused handleInputChange function
 
   const handleAddProcess = async () => {
     try {
