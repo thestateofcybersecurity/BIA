@@ -12,7 +12,8 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await axios.post('/api/register', { email, password })
+      const response = await axios.post('/api/register', { email, password })
+      console.log('Registration response:', response.data)
       toast({
         title: "Account created.",
         description: "We've created your account for you.",
@@ -23,9 +24,13 @@ export default function Register() {
       router.push('/login')
     } catch (error) {
       console.error('Registration failed:', error)
+      let errorMessage = 'Unable to create your account.'
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage = error.response.data.message || errorMessage
+      }
       toast({
         title: "An error occurred.",
-        description: "Unable to create your account.",
+        description: errorMessage,
         status: "error",
         duration: 9000,
         isClosable: true,
