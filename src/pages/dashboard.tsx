@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Box, Button, Heading, VStack, Tabs, TabList, TabPanels, Tab, TabPanel } from '@chakra-ui/react'
 import Introduction from '@/components/Introduction'
 import ProcessesAndDependencies from '@/components/ProcessesAndDependencies'
+import ScoringCriteria from '@/components/ScoringCriteria'
 import ImpactAnalysis from '@/components/ImpactAnalysis'
 import VulnerabilityScoring from '@/components/VulnerabilityScoring'
 import RecoveryObjectives from '@/components/RecoveryObjectives'
@@ -36,6 +37,7 @@ export default function Dashboard() {
     try {
       const response = await axios.get('/api/export-findings')
       console.log('Findings:', response.data)
+      // Here you could trigger a download of the findings or display them in a modal
     } catch (error) {
       console.error('Error exporting findings:', error)
     }
@@ -50,6 +52,7 @@ export default function Dashboard() {
           <TabList>
             <Tab>Introduction</Tab>
             <Tab>Processes and Dependencies</Tab>
+            <Tab>Scoring Criteria</Tab>
             <Tab>Impact Analysis</Tab>
             <Tab>Vulnerability Scoring</Tab>
             <Tab>Recovery Objectives</Tab>
@@ -59,7 +62,10 @@ export default function Dashboard() {
               <Introduction />
             </TabPanel>
             <TabPanel>
-              <ProcessesAndDependencies />
+              <ProcessesAndDependencies processes={processes} setProcesses={setProcesses} />
+            </TabPanel>
+            <TabPanel>
+              <ScoringCriteria />
             </TabPanel>
             <TabPanel>
               <ImpactAnalysis processes={processes} />
