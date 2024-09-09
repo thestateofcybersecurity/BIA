@@ -1,75 +1,133 @@
-import React, { useState } from 'react'
-import { Box, Button, FormControl, FormLabel, Input, VStack, Text, Select } from '@chakra-ui/react'
-import axios from 'axios'
-import { ProcessDependency } from '@/types/ProcessDependency'
+import React, { useState, useEffect } from 'react';
+import {
+  Box, Button, FormControl, FormLabel, Input, VStack, Text, Select,
+  Table, Thead, Tbody, Tr, Th, Td
+} from '@chakra-ui/react';
+import axios from 'axios';
+import { ProcessDependency } from '@/types/ProcessDependency';
 
 interface ImpactAnalysisProps {
-  processes: ProcessDependency[]
+  processes: ProcessDependency[];
+}
+
+interface ImpactAnalysis {
+  id: number;
+  processFunction: string;
+  description: string;
+  processOwner: string;
+  clientFacingAvailabilityRequirements: string;
+  additionalAvailabilityRequirements: string;
+  criticalityRating: string;
+  totalCostOfDowntimePer24Hours: number;
+  totalImpactOnGoodwillComplianceAndSafety: number;
+  lossOfRevenue: number;
+  lossOfProductivity: number;
+  increasedOperatingCosts: number;
+  financialPenalties: number;
+  impactOnCustomers: number;
+  impactOnInternalStaff: number;
+  impactOnBusinessPartners: number;
+  compliance: number;
+  healthOrSafetyRisk: number;
+  dependencies: string;
+  acceptableDowntimeRTO: number;
+  acceptableDataLossRPO: number;
+  actualCurrentDowntimeRTA: number;
+  actualCurrentDataLossRPA: number;
+  acceptableRepatriationDowntimeRTO: number;
+  acceptableRepatriationDataLossRPO: number;
+  actualRepatriationDowntimeRTA: number;
+  actualRepatriationDataLossRPA: number;
 }
 
 export default function ImpactAnalysis({ processes }: ImpactAnalysisProps) {
-  const [formData, setFormData] = useState({
-    processId: '',
-    financialImpact: '',
-    reputationImpact: '',
-    operationalImpact: '',
-    downtimeHours: '',
-    costPerHour: '',
-  })
-  const [totalImpact, setTotalImpact] = useState(0)
+  const [impactAnalyses, setImpactAnalyses] = useState<ImpactAnalysis[]>([]);
+  const [currentAnalysis, setCurrentAnalysis] = useState<ImpactAnalysis | null>(null);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
-  }
+  useEffect(() => {
+    fetchImpactAnalyses();
+  }, []);
+
+  const fetchImpactAnalyses = async () => {
+    try {
+      const response = await axios.get('/api/impact-analyses');
+      setImpactAnalyses(response.data);
+    } catch (error) {
+      console.error('Error fetching impact analyses:', error);
+    }
+  };
+
+  const handleInputChange = (field: keyof ImpactAnalysis, value: string | number) => {
+    if (currentAnalysis) {
+      setCurrentAnalysis({ ...currentAnalysis, [field]: value });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const response = await axios.post('/api/save-impact', formData)
-      setTotalImpact(response.data.totalImpact)
-    } catch (error) {
-      console.error('Error saving impact analysis:', error)
+    e.preventDefault();
+    if (currentAnalysis) {
+      try {
+        if (currentAnalysis.id) {
+          await axios.put(`/api/impact-analyses/${currentAnalysis.id}`, currentAnalysis);
+        } else {
+          await axios.post('/api/impact-analyses', currentAnalysis);
+        }
+        fetchImpactAnalyses();
+        setCurrentAnalysis(null);
+      } catch (error) {
+        console.error('Error saving impact analysis:', error);
+      }
     }
-  }
+  };
 
   return (
     <Box>
       <form onSubmit={handleSubmit}>
         <VStack spacing={4} align="stretch">
           <FormControl>
-            <FormLabel>Process/Dependency</FormLabel>
-            <Select name="processId" value={formData.processId} onChange={handleInputChange} required>
+            <FormLabel>Process/Function</FormLabel>
+            <Select
+              value={currentAnalysis?.processFunction || ''}
+              onChange={(e) => handleInputChange('processFunction', e.target.value)}
+              required
+            >
               <option value="">Select a process</option>
               {processes.map((process) => (
-                <option key={process.id} value={process.id}>{process.processFunction}</option>
+                <option key={process.id} value={process.processFunction}>
+                  {process.processFunction}
+                </option>
               ))}
             </Select>
           </FormControl>
-          <FormControl>
-            <FormLabel>Financial Impact ($)</FormLabel>
-            <Input type="number" name="financialImpact" value={formData.financialImpact} onChange={handleInputChange} required />
-          </FormControl>
-          <FormControl>
-            <FormLabel>Reputation Impact (0-4)</FormLabel>
-            <Input type="number" name="reputationImpact" min="0" max="4" value={formData.reputationImpact} onChange={handleInputChange} required />
-          </FormControl>
-          <FormControl>
-            <FormLabel>Operational Impact (0-4)</FormLabel>
-            <Input type="number" name="operationalImpact" min="0" max="4" value={formData.operationalImpact} onChange={handleInputChange} required />
-          </FormControl>
-          <FormControl>
-            <FormLabel>Downtime (hours)</FormLabel>
-            <Input type="number" name="downtimeHours" value={formData.downtimeHours} onChange={handleInputChange} required />
-          </FormControl>
-          <FormControl>
-            <FormLabel>Cost Per Hour of Downtime ($)</FormLabel>
-            <Input type="number" name="costPerHour" value={formData.costPerHour} onChange={handleInputChange} required />
-          </FormControl>
-          <Button type="submit" colorScheme="blue">Submit</Button>
+          {/* Add more form fields for all the properties in the ImpactAnalysis interface */}
+          <Button type="submit" colorScheme="blue">
+            {currentAnalysis?.id ? 'Update' : 'Create'} Impact Analysis
+          </Button>
         </VStack>
       </form>
-      <Text mt={4}>Total Impact: ${totalImpact.toFixed(2)}</Text>
+
+      <Table variant="simple" mt={8}>
+        <Thead>
+          <Tr>
+            <Th>Process/Function</Th>
+            <Th>Criticality Rating</Th>
+            <Th>Total Cost of Downtime (24h)</Th>
+            <Th>Actions</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
+          {impactAnalyses.map((analysis) => (
+            <Tr key={analysis.id}>
+              <Td>{analysis.processFunction}</Td>
+              <Td>{analysis.criticalityRating}</Td>
+              <Td>${analysis.totalCostOfDowntimePer24Hours.toFixed(2)}</Td>
+              <Td>
+                <Button onClick={() => setCurrentAnalysis(analysis)}>Edit</Button>
+              </Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </Table>
     </Box>
-  )
+  );
 }
