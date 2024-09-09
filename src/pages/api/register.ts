@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next'
+import type { NextApiRequest, NextApiResponse } from 'next'
 import bcrypt from 'bcryptjs'
 import { connectToDatabase } from '@/utils/database'
 import { User } from '@/models/User'
@@ -12,6 +12,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await connectToDatabase()
 
     const { email, password } = req.body
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' })
+    }
 
     const existingUser = await User.findOne({ email })
     if (existingUser) {
