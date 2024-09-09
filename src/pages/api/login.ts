@@ -24,7 +24,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Invalid credentials' })
     }
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET!, { expiresIn: '1h' })
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET is not defined')
+    }
+
+    const token = jwt.sign({ userId: user._id }, jwtSecret, { expiresIn: '1h' })
 
     res.status(200).json({ token })
   } catch (error) {
