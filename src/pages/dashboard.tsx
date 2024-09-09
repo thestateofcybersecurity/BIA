@@ -8,11 +8,12 @@ import ImpactAnalysis from '@/components/ImpactAnalysis'
 import VulnerabilityScoring from '@/components/VulnerabilityScoring'
 import RecoveryObjectives from '@/components/RecoveryObjectives'
 import axios from 'axios'
+import { ProcessDependency } from '@/types/ProcessDependency'
 
 export default function Dashboard() {
   const { isAuthenticated, logout } = useAuth()
   const router = useRouter()
-  const [processes, setProcesses] = useState([])
+  const [processes, setProcesses] = useState<ProcessDependency[]>([])
 
   useEffect(() => {
     if (!isAuthenticated) {
