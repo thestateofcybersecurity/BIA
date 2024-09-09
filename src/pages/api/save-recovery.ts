@@ -1,4 +1,4 @@
-import { NextApiResponse } from 'next'
+import { NextApiRequest, NextApiResponse } from 'next'
 import { connectToDatabase } from '@/utils/database'
 import { Recovery } from '@/models/Recovery'
 import { authenticateToken } from '@/utils/auth'
