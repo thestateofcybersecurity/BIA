@@ -1,9 +1,15 @@
 import React, { useState } from 'react'
-import { Box, Button, FormControl, FormLabel, Input, VStack, Text } from '@chakra-ui/react'
+import { Box, Button, FormControl, FormLabel, Input, VStack, Text, Select } from '@chakra-ui/react'
 import axios from 'axios'
+import { ProcessDependency } from '@/types/ProcessDependency'
 
-export default function ImpactAnalysis() {
+interface ImpactAnalysisProps {
+  processes: ProcessDependency[]
+}
+
+export default function ImpactAnalysis({ processes }: ImpactAnalysisProps) {
   const [formData, setFormData] = useState({
+    processId: '',
     financialImpact: '',
     reputationImpact: '',
     operationalImpact: '',
@@ -12,7 +18,7 @@ export default function ImpactAnalysis() {
   })
   const [totalImpact, setTotalImpact] = useState(0)
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData({ ...formData, [name]: value })
   }
@@ -31,6 +37,15 @@ export default function ImpactAnalysis() {
     <Box>
       <form onSubmit={handleSubmit}>
         <VStack spacing={4} align="stretch">
+          <FormControl>
+            <FormLabel>Process/Dependency</FormLabel>
+            <Select name="processId" value={formData.processId} onChange={handleInputChange} required>
+              <option value="">Select a process</option>
+              {processes.map((process) => (
+                <option key={process.id} value={process.id}>{process.processFunction}</option>
+              ))}
+            </Select>
+          </FormControl>
           <FormControl>
             <FormLabel>Financial Impact ($)</FormLabel>
             <Input type="number" name="financialImpact" value={formData.financialImpact} onChange={handleInputChange} required />
