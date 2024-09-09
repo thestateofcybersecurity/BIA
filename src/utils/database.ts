@@ -6,6 +6,13 @@ if (!MONGODB_URI) {
   throw new Error('Please define the MONGODB_URI environment variable inside .env.local')
 }
 
+declare global {
+  var mongoose: {
+    conn: mongoose.Connection | null
+    promise: Promise<mongoose.Connection> | null
+  } | undefined
+}
+
 let cached = global.mongoose
 
 if (!cached) {
@@ -13,17 +20,17 @@ if (!cached) {
 }
 
 export async function connectToDatabase() {
-  if (cached.conn) {
+  if (cached?.conn) {
     return cached.conn
   }
 
-  if (!cached.promise) {
+  if (!cached?.promise) {
     const opts = {
       bufferCommands: false,
     }
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose
+      return mongoose.connection
     })
   }
 
