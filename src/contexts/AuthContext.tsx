@@ -26,9 +26,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [])
 
-  const login = async (email: string, password: string) => {
+  const login = async (_email: string, _password: string) => {
     try {
-      const response = await axios.post('/api/login', { email, password })
+      const response = await axios.post('/api/login', { email: _email, password: _password })
       const { token } = response.data
       localStorage.setItem('token', token)
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
