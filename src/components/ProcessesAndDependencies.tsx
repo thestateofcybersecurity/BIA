@@ -1,36 +1,24 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Button, Table, Thead, Tbody, Tr, Th, Td, Input, VStack,
-  useToast
+  useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton
 } from '@chakra-ui/react';
 import axios from 'axios';
+import { ProcessDependency } from '@/types/ProcessDependency';
 
-interface ProcessDependency {
-  id: number;
-  processFunction: string;
-  description: string;
-  processOwner: string;
-  peoplePrimary: string;
-  peopleAlternatives: string;
-  itPrimary: string;
-  itAlternatives: string;
-  devicesPrimary: string;
-  devicesAlternatives: string;
-  facilityPrimary: string;
-  facilityAlternatives: string;
-  suppliersPrimary: string;
-  suppliersAlternatives: string;
-  additionalPrimary: string;
-  additionalAlternatives: string;
+interface ProcessesAndDependenciesProps {
+  processes: ProcessDependency[];
+  setProcesses: React.Dispatch<React.SetStateAction<ProcessDependency[]>>;
 }
 
-const ProcessesAndDependencies: React.FC = () => {
-  const [processes, setProcesses] = useState<ProcessDependency[]>([]);
+const ProcessesAndDependencies: React.FC<ProcessesAndDependenciesProps> = ({ processes, setProcesses }) => {
   const [newProcess, setNewProcess] = useState<ProcessDependency>({
     id: 0,
     processFunction: '',
     description: '',
     processOwner: '',
+    clientFacingAvailabilityRequirements: '',
+    additionalAvailabilityRequirements: '',
     peoplePrimary: '',
     peopleAlternatives: '',
     itPrimary: '',
@@ -44,27 +32,9 @@ const ProcessesAndDependencies: React.FC = () => {
     additionalPrimary: '',
     additionalAlternatives: '',
   });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProcess, setEditingProcess] = useState<ProcessDependency | null>(null);
   const toast = useToast();
-
-  const fetchProcesses = useCallback(async () => {
-    try {
-      const response = await axios.get('/api/processes');
-      setProcesses(response.data);
-    } catch (error) {
-      console.error('Error fetching processes:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch processes',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchProcesses();
-  }, [fetchProcesses]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -80,6 +50,8 @@ const ProcessesAndDependencies: React.FC = () => {
         processFunction: '',
         description: '',
         processOwner: '',
+        clientFacingAvailabilityRequirements: '',
+        additionalAvailabilityRequirements: '',
         peoplePrimary: '',
         peopleAlternatives: '',
         itPrimary: '',
@@ -112,6 +84,37 @@ const ProcessesAndDependencies: React.FC = () => {
     }
   };
 
+  const handleEditProcess = (process: ProcessDependency) => {
+    setEditingProcess(process);
+    setIsModalOpen(true);
+  };
+
+  const handleUpdateProcess = async () => {
+    if (!editingProcess) return;
+
+    try {
+      const response = await axios.put(`/api/processes/${editingProcess.id}`, editingProcess);
+      setProcesses(prev => prev.map(p => p.id === editingProcess.id ? response.data : p));
+      setIsModalOpen(false);
+      toast({
+        title: 'Success',
+        description: 'Process updated successfully',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error updating process:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update process',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
   return (
     <VStack spacing={4} align="stretch">
       <Box overflowX="auto">
@@ -122,18 +125,9 @@ const ProcessesAndDependencies: React.FC = () => {
               <Th>Process/Function</Th>
               <Th>Description</Th>
               <Th>Process Owner</Th>
-              <Th>People Primary</Th>
-              <Th>People Alternatives</Th>
-              <Th>IT Primary</Th>
-              <Th>IT Alternatives</Th>
-              <Th>Devices Primary</Th>
-              <Th>Devices Alternatives</Th>
-              <Th>Facility Primary</Th>
-              <Th>Facility Alternatives</Th>
-              <Th>Suppliers Primary</Th>
-              <Th>Suppliers Alternatives</Th>
-              <Th>Additional Primary</Th>
-              <Th>Additional Alternatives</Th>
+              <Th>Client-Facing Availability Requirements</Th>
+              <Th>Additional Availability Requirements</Th>
+              <Th>Actions</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -143,42 +137,63 @@ const ProcessesAndDependencies: React.FC = () => {
                 <Td>{process.processFunction}</Td>
                 <Td>{process.description}</Td>
                 <Td>{process.processOwner}</Td>
-                <Td>{process.peoplePrimary}</Td>
-                <Td>{process.peopleAlternatives}</Td>
-                <Td>{process.itPrimary}</Td>
-                <Td>{process.itAlternatives}</Td>
-                <Td>{process.devicesPrimary}</Td>
-                <Td>{process.devicesAlternatives}</Td>
-                <Td>{process.facilityPrimary}</Td>
-                <Td>{process.facilityAlternatives}</Td>
-                <Td>{process.suppliersPrimary}</Td>
-                <Td>{process.suppliersAlternatives}</Td>
-                <Td>{process.additionalPrimary}</Td>
-                <Td>{process.additionalAlternatives}</Td>
+                <Td>{process.clientFacingAvailabilityRequirements}</Td>
+                <Td>{process.additionalAvailabilityRequirements}</Td>
+                <Td>
+                  <Button onClick={() => handleEditProcess(process)}>Edit</Button>
+                </Td>
               </Tr>
             ))}
-            <Tr>
-              <Td><Input name="id" value={newProcess.id} onChange={handleInputChange} placeholder="ID" /></Td>
-              <Td><Input name="processFunction" value={newProcess.processFunction} onChange={handleInputChange} placeholder="Process/Function" /></Td>
-              <Td><Input name="description" value={newProcess.description} onChange={handleInputChange} placeholder="Description" /></Td>
-              <Td><Input name="processOwner" value={newProcess.processOwner} onChange={handleInputChange} placeholder="Process Owner" /></Td>
-              <Td><Input name="peoplePrimary" value={newProcess.peoplePrimary} onChange={handleInputChange} placeholder="People Primary" /></Td>
-              <Td><Input name="peopleAlternatives" value={newProcess.peopleAlternatives} onChange={handleInputChange} placeholder="People Alternatives" /></Td>
-              <Td><Input name="itPrimary" value={newProcess.itPrimary} onChange={handleInputChange} placeholder="IT Primary" /></Td>
-              <Td><Input name="itAlternatives" value={newProcess.itAlternatives} onChange={handleInputChange} placeholder="IT Alternatives" /></Td>
-              <Td><Input name="devicesPrimary" value={newProcess.devicesPrimary} onChange={handleInputChange} placeholder="Devices Primary" /></Td>
-              <Td><Input name="devicesAlternatives" value={newProcess.devicesAlternatives} onChange={handleInputChange} placeholder="Devices Alternatives" /></Td>
-              <Td><Input name="facilityPrimary" value={newProcess.facilityPrimary} onChange={handleInputChange} placeholder="Facility Primary" /></Td>
-              <Td><Input name="facilityAlternatives" value={newProcess.facilityAlternatives} onChange={handleInputChange} placeholder="Facility Alternatives" /></Td>
-              <Td><Input name="suppliersPrimary" value={newProcess.suppliersPrimary} onChange={handleInputChange} placeholder="Suppliers Primary" /></Td>
-              <Td><Input name="suppliersAlternatives" value={newProcess.suppliersAlternatives} onChange={handleInputChange} placeholder="Suppliers Alternatives" /></Td>
-              <Td><Input name="additionalPrimary" value={newProcess.additionalPrimary} onChange={handleInputChange} placeholder="Additional Primary" /></Td>
-              <Td><Input name="additionalAlternatives" value={newProcess.additionalAlternatives} onChange={handleInputChange} placeholder="Additional Alternatives" /></Td>
-            </Tr>
           </Tbody>
         </Table>
       </Box>
       <Button onClick={handleAddProcess} colorScheme="blue">Add Process</Button>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Edit Process</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {editingProcess && (
+              <VStack spacing={4}>
+                <Input
+                  placeholder="Process/Function"
+                  value={editingProcess.processFunction}
+                  onChange={(e) => setEditingProcess({ ...editingProcess, processFunction: e.target.value })}
+                />
+                <Input
+                  placeholder="Description"
+                  value={editingProcess.description}
+                  onChange={(e) => setEditingProcess({ ...editingProcess, description: e.target.value })}
+                />
+                <Input
+                  placeholder="Process Owner"
+                  value={editingProcess.processOwner}
+                  onChange={(e) => setEditingProcess({ ...editingProcess, processOwner: e.target.value })}
+                />
+                <Input
+                  placeholder="Client-Facing Availability Requirements"
+                  value={editingProcess.clientFacingAvailabilityRequirements}
+                  onChange={(e) => setEditingProcess({ ...editingProcess, clientFacingAvailabilityRequirements: e.target.value })}
+                />
+                <Input
+                  placeholder="Additional Availability Requirements"
+                  value={editingProcess.additionalAvailabilityRequirements}
+                  onChange={(e) => setEditingProcess({ ...editingProcess, additionalAvailabilityRequirements: e.target.value })}
+                />
+                {/* Add more fields for dependencies here */}
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="blue" mr={3} onClick={handleUpdateProcess}>
+              Update
+            </Button>
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </VStack>
   );
 };
