@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Table, Thead, Tbody, Tr, Th, Td, Input, Select,
-  Button, VStack, Heading
+  Box, Table, Thead, Tbody, Tr, Th, Td, Input,
+  Button, Heading
 } from '@chakra-ui/react';
 import axios from 'axios';
 
