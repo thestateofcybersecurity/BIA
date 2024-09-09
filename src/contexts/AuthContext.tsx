@@ -9,7 +9,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
-  login: async () => {},
+  login: async (_email: string, _password: string) => {},
   logout: () => {},
 })
 
