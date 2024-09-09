@@ -120,7 +120,7 @@ export default function ImpactAnalysis({ processes }: ImpactAnalysisProps) {
             <Tr key={analysis.id}>
               <Td>{analysis.processFunction}</Td>
               <Td>{analysis.criticalityRating}</Td>
-              <Td>${analysis.totalCostOfDowntimePer24Hours.toFixed(2)}</Td>
+              <Td>${analysis.totalCostOfDowntimePer24Hours?.toFixed(2) || 'N/A'}</Td>
               <Td>
                 <Button onClick={() => setCurrentAnalysis(analysis)}>Edit</Button>
               </Td>
