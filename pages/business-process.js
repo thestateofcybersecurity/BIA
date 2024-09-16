@@ -149,6 +149,7 @@ const BusinessProcessForm = () => {
       </div>
       <button type="submit">Save Business Process</button>
     </form>
+  </div>
   );
 };
 
