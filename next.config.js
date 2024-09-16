@@ -1,9 +1,9 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+module.exports = {
   reactStrictMode: true,
-  serverRuntimeConfig: {
-    MONGODB_URI: process.env.MONGODB_URI,
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback.fs = false;
+    }
+    return config;
   },
-}
-
-module.exports = nextConfig
+};
