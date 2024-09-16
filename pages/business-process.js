@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import Header from '../components/Header';
 
 const BusinessProcessForm = () => {
-  const { user } = useAuth0();
+  const { user, getAccessTokenSilently } = useAuth0();
   const [formData, setFormData] = useState({
     processName: '',
     description: '',
@@ -16,29 +17,15 @@ const BusinessProcessForm = () => {
     }
   });
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name.includes('.')) {
-      const [parent, child] = name.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/businessProcess', {
+      const token = await getAccessTokenSilently();
+      const response = await fetch('/api/index?path=businessProcess', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           userId: user.sub,
@@ -55,9 +42,27 @@ const BusinessProcessForm = () => {
       alert('Failed to save business process. Please try again.');
     }
   };
+  
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value
+        }
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
 
   return (
-    <form onSubmit={handleSubmit}>
+   <div>
+      <Header />
+      <form onSubmit={handleSubmit}>
       <h2>Business Process Assessment</h2>
       <div>
         <label htmlFor="processName">Process/Function:</label>
