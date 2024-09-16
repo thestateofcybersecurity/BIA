@@ -1,4 +1,4 @@
-import { checkJwt } from '/auth';
+import { checkJwt } from './auth';
 import connectDB from '../../config/database';
 import BusinessProcess from '../../models/BusinessProcess';
 import ImpactAnalysis from '../../models/ImpactAnalysis';
