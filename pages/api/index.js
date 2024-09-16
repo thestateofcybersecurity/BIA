@@ -4,9 +4,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { checkJwt } = require('./auth');
 const connectDB = require('../config/database');
-const BusinessProcess = require('../models/BusinessProcess');
-const ImpactAnalysis = require('../models/ImpactAnalysis');
-const RTORPOAnalysis = require('../models/RTORPOAnalysis');
+const BusinessProcess = require('../../models/BusinessProcess');
+const ImpactAnalysis = require('../../models/ImpactAnalysis');
+const RTORPOAnalysis = require('../../models/RTORPOAnalysis');
 
 const app = express();
 
