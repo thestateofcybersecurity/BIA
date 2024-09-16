@@ -1,5 +1,4 @@
-// models/BusinessProcess.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const BusinessProcessSchema = new mongoose.Schema({
   userId: { type: String, required: true },
@@ -17,4 +16,4 @@ const BusinessProcessSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('BusinessProcess', BusinessProcessSchema);
+export default mongoose.models.BusinessProcess || mongoose.model('BusinessProcess', BusinessProcessSchema);
