@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
+  "buildCommand": "next build",
+  "devCommand": "next dev",
   "outputDirectory": ".next",
   "env": {
     "MONGODB_URI": "@mongodb-uri",
