@@ -1,5 +1,4 @@
-// models/ImpactAnalysis.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const ImpactAnalysisSchema = new mongoose.Schema({
   userId: { type: String, required: true },
@@ -24,4 +23,4 @@ const ImpactAnalysisSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('ImpactAnalysis', ImpactAnalysisSchema);
+export default mongoose.models.ImpactAnalysis || mongoose.model('ImpactAnalysis', ImpactAnalysisSchema);
