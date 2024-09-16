@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import Header from '../components/Header';
 
 const RTORPOAnalysis = () => {
   const { user, getAccessTokenSilently } = useAuth0();
@@ -10,7 +11,7 @@ const RTORPOAnalysis = () => {
     const fetchData = async () => {
       try {
         const token = await getAccessTokenSilently();
-        const response = await fetch(`/api/rto-rpo-analysis?userId=${user.sub}`, {
+        const response = await fetch(`/api/index?path=rto-rpo-analysis&userId=${user.sub}`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -75,6 +76,7 @@ const RTORPOAnalysis = () => {
 
   return (
     <div>
+      <Header />
       <h2>RTO/RPO Gap Analysis</h2>
       <div>
         <button onClick={() => setActiveTab('recovery-rto')}>Recovery - RTO Gaps</button>
