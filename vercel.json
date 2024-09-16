@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "env": {
+    "MONGODB_URI": "@mongodb-uri",
+    "AUTH0_DOMAIN": "@auth0-domain",
+    "AUTH0_AUDIENCE": "@auth0-audience",
+    "AUTH0_CLIENT_ID": "@auth0-client-id"
+  }
+}
