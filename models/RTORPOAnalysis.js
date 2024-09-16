@@ -1,5 +1,4 @@
-// models/RTORPOAnalysis.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const RTORPOAnalysisSchema = new mongoose.Schema({
   userId: { type: String, required: true },
@@ -13,4 +12,4 @@ const RTORPOAnalysisSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('RTORPOAnalysis', RTORPOAnalysisSchema);
+export default mongoose.models.RTORPOAnalysis || mongoose.model('RTORPOAnalysis', RTORPOAnalysisSchema);
