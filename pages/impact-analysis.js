@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import Header from '../components/Header';
 
-const ImpactAnalysisForm = () => {
-  const { user } = useAuth0();
+const BusinessProcessForm = () => {
+  const { user, getAccessTokenSilently } = useAuth0();
   const [formData, setFormData] = useState({
     processName: '',
     clientFacingAvailability: '',
@@ -31,10 +32,12 @@ const ImpactAnalysisForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/impactAnalysis', {
+      const token = await getAccessTokenSilently();
+      const response = await fetch('/api/index?path=impactAnalysis', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           userId: user.sub,
@@ -53,7 +56,9 @@ const ImpactAnalysisForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <div>
+      <Header />
+      <form onSubmit={handleSubmit}>
       <h2>Impact Analysis</h2>
       <div>
         <label htmlFor="processName">Process/Function:</label>
@@ -116,6 +121,7 @@ const ImpactAnalysisForm = () => {
       {/* Add more form fields for other impact metrics */}
       <button type="submit">Save Impact Analysis</button>
     </form>
+  </div>
   );
 };
 
