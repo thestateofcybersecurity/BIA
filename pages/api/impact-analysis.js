@@ -7,7 +7,7 @@ import BusinessProcess from '../../models/BusinessProcess';
 export default async function handler(req, res) {
 const { user, getAccessTokenSilently } = useAuth0();
 
-  await dbConnect();
+  await connectDB();
 
   switch (req.method) {
     case 'POST':
