@@ -124,15 +124,16 @@ const ImpactAnalysisForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/api/impact-analysis', {
+      const response = await axios.post('/api/impact-analysis', {
         ...formData,
-        businessProcessId: selectedProcess
+        businessProcessId: selectedProcess,
+        ...scores // Include calculated scores
       });
       alert('Impact analysis saved successfully!');
       fetchProcesses(); // Refresh the list of processes
     } catch (error) {
-      console.error('Error saving impact analysis:', error);
-      alert('Error saving impact analysis. Please try again.');
+      console.error('Error saving impact analysis:', error.response?.data || error.message);
+      alert(`Error saving impact analysis: ${error.response?.data?.error || error.message}`);
     }
   };
 
