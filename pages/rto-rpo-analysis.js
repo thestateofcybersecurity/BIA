@@ -1,36 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import Header from '../components/Header';
 import { Box, Button, Heading, Table, Thead, Tbody, Tr, Th, Td, ButtonGroup, VStack } from '@chakra-ui/react';
 
 const RTORPOAnalysis = () => {
-  const { user, getAccessTokenSilently } = useAuth0();
+  const { user, error, isLoading } = useUser();
   const [data, setData] = useState([]);
   const [activeTab, setActiveTab] = useState('recovery-rto');
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = await getAccessTokenSilently();
-        const response = await fetch(`/api/index?path=rto-rpo-analysis&userId=${user.sub}`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          const result = await response.json();
-          setData(result);
-        } else {
-          throw new Error('Failed to fetch RTO/RPO data');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to fetch RTO/RPO data. Please try again.');
-      }
-    };
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
-    fetchData();
-  }, [user, getAccessTokenSilently]);
+  const fetchData = async () => {
+    try {
+      const response = await fetch(`/api/index?path=rto-rpo-analysis&userId=${user.sub}`);
+      if (response.ok) {
+        const result = await response.json();
+        setData(result);
+      } else {
+        throw new Error('Failed to fetch RTO/RPO data');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to fetch RTO/RPO data. Please try again.');
+    }
+  };
 
   const renderTable = () => {
     let filteredData = [];
