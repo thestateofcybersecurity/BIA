@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import Header from '../components/Header';
 import ProtectedRoute from '../components/ProtectedRoute';
+import { Box, Button, FormControl, FormLabel, Input, Textarea, Heading, VStack } from '@chakra-ui/react';
 
 const BusinessProcessForm = () => {
   const { user, getAccessTokenSilently } = useAuth0();
@@ -61,96 +62,56 @@ const BusinessProcessForm = () => {
   };
 
   return (
-   <div>
-      <Header />
+    <Box className="container" bg="white" p={6} rounded="md" shadow="md">
+      <Heading as="h2" size="lg" mb={6}>Business Process Assessment</Heading>
       <form onSubmit={handleSubmit}>
-      <h2>Business Process Assessment</h2>
-      <div>
-        <label htmlFor="processName">Process/Function:</label>
-        <input
-          type="text"
-          id="processName"
-          name="processName"
-          value={formData.processName}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <div>
-        <label htmlFor="description">Description:</label>
-        <textarea
-          id="description"
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <div>
-        <label htmlFor="owner">Process Owner:</label>
-        <input
-          type="text"
-          id="owner"
-          name="owner"
-          value={formData.owner}
-          onChange={handleChange}
-          required
-        />
-      </div>
-      <h3>Dependencies</h3>
-      <div>
-        <label htmlFor="people">People:</label>
-        <input
-          type="text"
-          id="people"
-          name="dependencies.people"
-          value={formData.dependencies.people}
-          onChange={handleChange}
-        />
-      </div>
-      <div>
-        <label htmlFor="itApplications">IT Applications:</label>
-        <input
-          type="text"
-          id="itApplications"
-          name="dependencies.itApplications"
-          value={formData.dependencies.itApplications}
-          onChange={handleChange}
-        />
-      </div>
-      <div>
-        <label htmlFor="devices">Devices/Equipment:</label>
-        <input
-          type="text"
-          id="devices"
-          name="dependencies.devices"
-          value={formData.dependencies.devices}
-          onChange={handleChange}
-        />
-      </div>
-      <div>
-        <label htmlFor="facilityLocation">Facility Location:</label>
-        <input
-          type="text"
-          id="facilityLocation"
-          name="dependencies.facilityLocation"
-          value={formData.dependencies.facilityLocation}
-          onChange={handleChange}
-        />
-      </div>
-      <div>
-        <label htmlFor="suppliers">Suppliers:</label>
-        <input
-          type="text"
-          id="suppliers"
-          name="dependencies.suppliers"
-          value={formData.dependencies.suppliers}
-          onChange={handleChange}
-        />
-      </div>
-      <button type="submit">Save Business Process</button>
-    </form>
-  </div>
+        <VStack spacing={4} align="flex-start">
+          <FormControl id="processName" isRequired>
+            <FormLabel>Process/Function</FormLabel>
+            <Input type="text" name="processName" onChange={handleChange} value={formData.processName} />
+          </FormControl>
+          
+          <FormControl id="description" isRequired>
+            <FormLabel>Description</FormLabel>
+            <Textarea name="description" onChange={handleChange} value={formData.description} />
+          </FormControl>
+          
+          <FormControl id="owner" isRequired>
+            <FormLabel>Process Owner</FormLabel>
+            <Input type="text" name="owner" onChange={handleChange} value={formData.owner} />
+          </FormControl>
+
+          <Heading as="h3" size="md" mt={6}>Dependencies</Heading>
+
+          <FormControl id="people">
+            <FormLabel>People</FormLabel>
+            <Input type="text" name="dependencies.people" onChange={handleChange} value={formData.dependencies.people} />
+          </FormControl>
+          
+          <FormControl id="itApplications">
+            <FormLabel>IT Applications</FormLabel>
+            <Input type="text" name="dependencies.itApplications" onChange={handleChange} value={formData.dependencies.itApplications} />
+          </FormControl>
+
+          <FormControl id="devices">
+            <FormLabel>Devices/Equipment</FormLabel>
+            <Input type="text" name="dependencies.devices" onChange={handleChange} value={formData.dependencies.devices} />
+          </FormControl>
+
+          <FormControl id="facilityLocation">
+            <FormLabel>Facility Location</FormLabel>
+            <Input type="text" name="dependencies.facilityLocation" onChange={handleChange} value={formData.dependencies.facilityLocation} />
+          </FormControl>
+
+          <FormControl id="suppliers">
+            <FormLabel>Suppliers</FormLabel>
+            <Input type="text" name="dependencies.suppliers" onChange={handleChange} value={formData.dependencies.suppliers} />
+          </FormControl>
+
+          <Button type="submit" colorScheme="blue" rounded="md" size="lg">Save Business Process</Button>
+        </VStack>
+      </form>
+    </Box>
   );
 };
 
