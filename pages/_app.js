@@ -3,6 +3,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { useRouter } from 'next/router';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { UserProvider } from '@auth0/nextjs-auth0';
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
