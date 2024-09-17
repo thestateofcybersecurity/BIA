@@ -27,6 +27,7 @@ const Home = () => {
         <ul>
           <li><Link href="/business-process">Define Business Processes</Link></li>
           <li><Link href="/impact-analysis">Conduct Impact Analysis</Link></li>
+          <li><Link href="/comparative-analysis">View Comparative Analysis</Link></li>
           <li><Link href="/rto-rpo-analysis">RTO/RPO Analysis</Link></li>
         </ul>
       </div>
