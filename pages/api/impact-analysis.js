@@ -1,34 +1,47 @@
+// pages/api/impact-analysis.js
 import connectDB from '../../config/database';
+import { getSession } from '@auth0/nextjs-auth0';
 import ImpactAnalysis from '../../models/ImpactAnalysis';
-import { useAuth0 } from '@auth0/auth0-react';
+import BusinessProcess from '../../models/BusinessProcess';
 
 export default async function handler(req, res) {
-  const { user } = await getSession(req, res);
+  const session = await getSession(req, res);
+  if (!session) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
 
   await dbConnect();
 
   switch (req.method) {
     case 'POST':
       try {
-        const impactAnalysis = await ImpactAnalysis.create({
-          userId: user.sub,
-          ...req.body
+        const { businessProcessId, ...impactData } = req.body;
+        const impactAnalysis = new ImpactAnalysis({
+          ...impactData,
+          userId: session.user.sub,
+          businessProcessId
         });
-        res.status(201).json({ success: true, data: impactAnalysis });
+        await impactAnalysis.save();
+
+        // Update the business process to mark impact analysis as completed
+        await BusinessProcess.findByIdAndUpdate(businessProcessId, { impactAnalysisCompleted: true });
+
+        res.status(201).json(impactAnalysis);
       } catch (error) {
-        res.status(400).json({ success: false });
+        res.status(400).json({ error: 'Error creating impact analysis' });
       }
       break;
+
     case 'GET':
       try {
-        const impactAnalyses = await ImpactAnalysis.find({ userId: user.sub });
-        res.status(200).json({ success: true, data: impactAnalyses });
+        const analyses = await ImpactAnalysis.find({ userId: session.user.sub }).populate('businessProcessId');
+        res.status(200).json(analyses);
       } catch (error) {
-        res.status(400).json({ success: false });
+        res.status(400).json({ error: 'Error fetching impact analyses' });
       }
       break;
+
     default:
-      res.status(400).json({ success: false });
-      break;
+      res.status(405).json({ error: 'Method not allowed' });
   }
 }
