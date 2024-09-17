@@ -1,6 +1,6 @@
 import connectDB from '../../config/database';
 import ImpactAnalysis from '../../models/ImpactAnalysis';
-import { getSession } from '@auth0/nextjs-auth0';
+import { useAuth0 } from '@auth0/auth0-react';
 
 export default async function handler(req, res) {
   const { user } = await getSession(req, res);
