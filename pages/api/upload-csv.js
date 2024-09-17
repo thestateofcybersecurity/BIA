@@ -16,7 +16,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 export default async function handler(req, res) {
 const { user, getAccessTokenSilently } = useAuth0();
 
-  await dbConnect();
+  await connectDB();
 
   upload.single('csv')(req, res, async (err) => {
     if (err) {
