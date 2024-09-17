@@ -1,6 +1,5 @@
-// components/CSVUpload.js
 import React, { useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import {
   Box,
   Button,
@@ -12,7 +11,7 @@ import {
 import axios from 'axios';
 
 const CSVUpload = ({ onUploadComplete }) => {
-  const { getAccessTokenSilently } = useAuth0();
+  const { user, error, isLoading } = useUser();
   const [file, setFile] = useState(null);
 
   const handleFileChange = (e) => {
@@ -29,11 +28,9 @@ const CSVUpload = ({ onUploadComplete }) => {
     formData.append('csv', file);
 
     try {
-      const token = await getAccessTokenSilently();
       await axios.post('/api/upload-csv', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
         }
       });
       alert('CSV uploaded and processed successfully!');
@@ -43,6 +40,9 @@ const CSVUpload = ({ onUploadComplete }) => {
       alert('Error uploading CSV. Please try again.');
     }
   };
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>{error.message}</div>;
 
   return (
     <Box>
