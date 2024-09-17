@@ -19,16 +19,20 @@ export default async function handler(req, res) {
         const impactAnalysis = new ImpactAnalysis({
           ...impactData,
           userId: session.user.sub,
-          businessProcessId
+          businessProcess: businessProcessId // Make sure this matches your schema
         });
         await impactAnalysis.save();
 
         // Update the business process to mark impact analysis as completed
-        await BusinessProcess.findByIdAndUpdate(businessProcessId, { impactAnalysisCompleted: true });
+        await BusinessProcess.findByIdAndUpdate(businessProcessId, { 
+          impactAnalysisCompleted: true,
+          impactAnalysis: impactAnalysis._id
+        });
 
         res.status(201).json(impactAnalysis);
       } catch (error) {
-        res.status(400).json({ error: 'Error creating impact analysis' });
+        console.error('Error creating impact analysis:', error);
+        res.status(400).json({ error: error.message });
       }
       break;
 
