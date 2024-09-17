@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import Header from '../components/Header';
-import ProtectedRoute from '../components/ProtectedRoute';
+import { Box, Button, Heading, Table, Thead, Tbody, Tr, Th, Td, ButtonGroup, VStack } from '@chakra-ui/react';
 
 const RTORPOAnalysis = () => {
   const { user, getAccessTokenSilently } = useAuth0();
@@ -52,41 +52,45 @@ const RTORPOAnalysis = () => {
     }
 
     return (
-      <table>
-        <thead>
-          <tr>
-            <th>Process</th>
-            <th>Acceptable</th>
-            <th>Achievable</th>
-            <th>Gap</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table variant="simple">
+        <Thead>
+          <Tr>
+            <Th>Process</Th>
+            <Th>Acceptable</Th>
+            <Th>Achievable</Th>
+            <Th>Gap</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {filteredData.map((item, index) => (
-            <tr key={index}>
-              <td>{item.process}</td>
-              <td>{item.acceptable}</td>
-              <td>{item.achievable}</td>
-              <td>{item.gap}</td>
-            </tr>
+            <Tr key={index}>
+              <Td>{item.process}</Td>
+              <Td>{item.acceptable}</Td>
+              <Td>{item.achievable}</Td>
+              <Td>{item.gap}</Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
     );
   };
 
   return (
-    <div>
+    <Box>
       <Header />
-      <h2>RTO/RPO Gap Analysis</h2>
-      <div>
-        <button onClick={() => setActiveTab('recovery-rto')}>Recovery - RTO Gaps</button>
-        <button onClick={() => setActiveTab('recovery-rpo')}>Recovery - RPO Gaps</button>
-        <button onClick={() => setActiveTab('repatriation-rto')}>Repatriation - RTO Gaps</button>
-        <button onClick={() => setActiveTab('repatriation-rpo')}>Repatriation - RPO Gaps</button>
-      </div>
-      {renderTable()}
-    </div>
+      <Box className="container" bg="white" p={6} rounded="md" shadow="md">
+        <VStack spacing={6} align="stretch">
+          <Heading as="h2" size="lg">RTO/RPO Gap Analysis</Heading>
+          <ButtonGroup>
+            <Button onClick={() => setActiveTab('recovery-rto')} colorScheme={activeTab === 'recovery-rto' ? 'blue' : 'gray'}>Recovery - RTO Gaps</Button>
+            <Button onClick={() => setActiveTab('recovery-rpo')} colorScheme={activeTab === 'recovery-rpo' ? 'blue' : 'gray'}>Recovery - RPO Gaps</Button>
+            <Button onClick={() => setActiveTab('repatriation-rto')} colorScheme={activeTab === 'repatriation-rto' ? 'blue' : 'gray'}>Repatriation - RTO Gaps</Button>
+            <Button onClick={() => setActiveTab('repatriation-rpo')} colorScheme={activeTab === 'repatriation-rpo' ? 'blue' : 'gray'}>Repatriation - RPO Gaps</Button>
+          </ButtonGroup>
+          {renderTable()}
+        </VStack>
+      </Box>
+    </Box>
   );
 };
 
