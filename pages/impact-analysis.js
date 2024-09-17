@@ -25,16 +25,103 @@ const ImpactAnalysisForm = () => {
     healthSafetyRisks: ''
   });
 
+  const [scores, setScores] = useState({
+    revenueScore: 0,
+    productivityScore: 0,
+    operatingCostsScore: 0,
+    financialPenaltiesScore: 0,
+    customersScore: 0,
+    staffScore: 0,
+    partnersScore: 0,
+    complianceScore: 0,
+    healthSafetyScore: 0,
+    overallScore: 0,
+    criticalityTier: ''
+  });
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  useEffect(() => {
+    calculateScores();
+  }, [formData]);
+
+  const calculateScores = () => {
+    const newScores = { ...scores };
+
+    // Calculate individual scores
+    newScores.revenueScore = calculateImpactScore(formData.lossOfRevenue, [25000, 125000, 250000, 500000]);
+    newScores.productivityScore = calculateImpactScore(formData.lossOfProductivity, [5000, 25000, 50000, 100000]);
+    newScores.operatingCostsScore = calculateImpactScore(formData.increasedOperatingCosts, [2500, 12500, 25000, 50000]);
+    newScores.financialPenaltiesScore = calculateImpactScore(formData.financialPenalties, [500, 2500, 5000, 10000]);
+    newScores.customersScore = calculateGoodwillScore(formData.impactOnCustomers);
+    newScores.staffScore = calculateGoodwillScore(formData.impactOnStaff);
+    newScores.partnersScore = calculateGoodwillScore(formData.impactOnPartners);
+    newScores.complianceScore = calculateComplianceScore(formData.impactOnCompliance);
+    newScores.healthSafetyScore = calculateHealthSafetyScore(formData.impactOnSafety);
+
+    // Calculate overall score
+    newScores.overallScore = Object.values(newScores).reduce((sum, score) => sum + score, 0) / 9;
+
+    // Determine criticality tier
+    newScores.criticalityTier = determineCriticalityTier(newScores.overallScore);
+
+    setScores(newScores);
+  };
+
+  const calculateImpactScore = (value, thresholds) => {
+    const numValue = Number(value);
+    if (numValue >= thresholds[3]) return 4;
+    if (numValue >= thresholds[2]) return 3;
+    if (numValue >= thresholds[1]) return 2;
+    if (numValue >= thresholds[0]) return 1;
+    return 0;
+  };
+
+  const calculateGoodwillScore = (impact) => {
+    switch (impact) {
+      case 'Critical Impact': return 4;
+      case 'High Impact': return 3;
+      case 'Medium Impact': return 2;
+      case 'Low Impact': return 1;
+      default: return 0;
+    }
+  };
+
+  const calculateComplianceScore = (impact) => {
+    switch (impact) {
+      case 'Critical Impact': return 4;
+      case 'High Impact': return 3;
+      case 'Medium Impact': return 2;
+      case 'Low Impact': return 1;
+      default: return 0;
+    }
+  };
+
+  const calculateHealthSafetyScore = (impact) => {
+    switch (impact) {
+      case 'High risk of loss-of-life/serious harm': return 4;
+      case 'Some risk of loss-of-life/serious harm': return 3;
+      case 'High degradation of health/safety services': return 2;
+      case 'Some degradation of health/safety services': return 1;
+      default: return 0;
+    }
+  };
+
+  const determineCriticalityTier = (score) => {
+    if (score >= 3.5) return 'Tier 1 (Gold)';
+    if (score >= 3) return 'Tier 2 (Silver)';
+    if (score >= 2.5) return 'Tier 3 (Bronze)';
+    return 'Non-critical';
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const token = await getAccessTokenSilently();
-      const response = await fetch('/api/index?path=impactAnalysis', {
+      const response = await fetch('/api/impact-analysis', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,7 +129,8 @@ const ImpactAnalysisForm = () => {
         },
         body: JSON.stringify({
           userId: user.sub,
-          ...formData
+          ...formData,
+          ...scores
         }),
       });
       if (response.ok) {
@@ -119,10 +207,23 @@ const ImpactAnalysisForm = () => {
           required
         />
       </div>
-      {/* Add more form fields for other impact metrics */}
-      <button type="submit">Save Impact Analysis</button>
-    </form>
-  </div>
+        <div>
+          <h3>Impact Scores</h3>
+          <p>Revenue Score: {scores.revenueScore}</p>
+          <p>Productivity Score: {scores.productivityScore}</p>
+          <p>Operating Costs Score: {scores.operatingCostsScore}</p>
+          <p>Financial Penalties Score: {scores.financialPenaltiesScore}</p>
+          <p>Customers Score: {scores.customersScore}</p>
+          <p>Staff Score: {scores.staffScore}</p>
+          <p>Partners Score: {scores.partnersScore}</p>
+          <p>Compliance Score: {scores.complianceScore}</p>
+          <p>Health & Safety Score: {scores.healthSafetyScore}</p>
+          <p>Overall Score: {scores.overallScore.toFixed(2)}</p>
+          <p>Criticality Tier: {scores.criticalityTier}</p>
+        </div>
+        <button type="submit">Save Impact Analysis</button>
+      </form>
+    </div>
   );
 };
 
