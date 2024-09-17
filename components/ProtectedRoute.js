@@ -1,19 +1,27 @@
-import { useAuth0 } from '@auth0/auth0-react';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { user, error, isLoading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login');
+    if (!isLoading && !user) {
+      router.push('/api/auth/login');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [user, isLoading, router]);
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading) {
     return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>{error.message}</div>;
+  }
+
+  if (!user) {
+    return null;
   }
 
   return children;
