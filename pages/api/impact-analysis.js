@@ -1,6 +1,6 @@
 // pages/api/impact-analysis.js
-import connectDB from '../../config/database';
 import { getSession } from '@auth0/nextjs-auth0';
+import connectDB from '../../config/database';
 import ImpactAnalysis from '../../models/ImpactAnalysis';
 import BusinessProcess from '../../models/BusinessProcess';
 
@@ -19,11 +19,10 @@ export default async function handler(req, res) {
         const impactAnalysis = new ImpactAnalysis({
           ...impactData,
           userId: session.user.sub,
-          businessProcess: businessProcessId // Make sure this matches your schema
+          businessProcess: businessProcessId
         });
         await impactAnalysis.save();
 
-        // Update the business process to mark impact analysis as completed
         await BusinessProcess.findByIdAndUpdate(businessProcessId, { 
           impactAnalysisCompleted: true,
           impactAnalysis: impactAnalysis._id
@@ -38,10 +37,11 @@ export default async function handler(req, res) {
 
     case 'GET':
       try {
-        const analyses = await ImpactAnalysis.find({ userId: session.user.sub }).populate('businessProcessId');
+        const analyses = await ImpactAnalysis.find({ userId: session.user.sub }).populate('businessProcess');
         res.status(200).json(analyses);
       } catch (error) {
-        res.status(400).json({ error: 'Error fetching impact analyses' });
+        console.error('Error fetching impact analyses:', error);
+        res.status(400).json({ error: error.message });
       }
       break;
 
