@@ -1,22 +1,22 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { useAuth0 } from '@auth0/auth0-react';
 import Header from '../components/Header';
-import { useRouter } from 'next/router';
 
 const Home = () => {
   const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login');
-    }
-  }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) return <div>Loading...</div>;
 
-  if (!isAuthenticated) return null; // This prevents content flash before redirect
+  if (!isAuthenticated) {
+    return (
+      <div>
+        <h1>Welcome to BIA Web Application</h1>
+        <p>Please log in to access the BIA tools.</p>
+        <button onClick={() => loginWithRedirect()}>Log In</button>
+      </div>
+    );
+  }
 
   return (
     <div className="home">
