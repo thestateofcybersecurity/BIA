@@ -26,6 +26,12 @@ export default async function handler(req, res) {
       try {
         const { businessProcessId, type, metric, acceptableTime, achievableTime } = req.body;
 
+        // Fetch the business process to get the process name
+        const businessProcess = await BusinessProcess.findById(businessProcessId);
+        if (!businessProcess) {
+          return res.status(404).json({ error: 'Business process not found' });
+        }
+
         // Check if an analysis already exists for this process, type, and metric
         let analysis = await RTORPOAnalysis.findOne({
           userId: session.user.sub,
@@ -43,6 +49,7 @@ export default async function handler(req, res) {
           analysis = new RTORPOAnalysis({
             userId: session.user.sub,
             businessProcessId,
+            processName: businessProcess.processName,
             type,
             metric,
             acceptableTime,
@@ -54,7 +61,7 @@ export default async function handler(req, res) {
 
         res.status(201).json(analysis);
       } catch (error) {
-        res.status(400).json({ error: 'Error saving RTO/RPO analysis' });
+        res.status(400).json({ error: 'Error saving RTO/RPO analysis: ' + error.message });
       }
       break;
 
