@@ -7,16 +7,14 @@ const Login = () => {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.push('/');
-    } else if (!isLoading && !isAuthenticated) {
-      loginWithRedirect();
+    if (!isLoading) {
+      if (isAuthenticated) {
+        router.push('/');
+      } else {
+        loginWithRedirect();
+      }
     }
   }, [isAuthenticated, isLoading, loginWithRedirect, router]);
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
 
   return <div>Redirecting to login...</div>;
 };
