@@ -19,6 +19,18 @@ const ImpactAnalysisSchema = new mongoose.Schema({
   impactOnPartners: String,
   complianceRisks: String,
   healthSafetyRisks: String,
+  // New fields for scores
+  revenueScore: Number,
+  productivityScore: Number,
+  operatingCostsScore: Number,
+  financialPenaltiesScore: Number,
+  customersScore: Number,
+  staffScore: Number,
+  partnersScore: Number,
+  complianceScore: Number,
+  healthSafetyScore: Number,
+  overallScore: Number,
+  criticalityTier: String,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
