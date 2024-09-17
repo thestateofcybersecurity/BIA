@@ -1,20 +1,24 @@
 import React from 'react';
 import Link from 'next/link';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import Header from '../components/Header';
 import { Box, Button, Heading, Text, UnorderedList, ListItem, VStack } from '@chakra-ui/react';
+import { useRouter } from 'next/router';
 
 const Home = () => {
-  const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
+  const { user, error, isLoading } = useUser();
+  const router = useRouter();
 
   if (isLoading) return <Box>Loading...</Box>;
 
-  if (!isAuthenticated) {
+  if (error) return <Box>Error: {error.message}</Box>;
+
+  if (!user) {
     return (
       <Box p={6}>
         <Heading as="h1" size="xl" mb={4}>Welcome to BIA Web Application</Heading>
         <Text mb={4}>Please log in to access the BIA tools.</Text>
-        <Button onClick={() => loginWithRedirect()} colorScheme="blue">Log In</Button>
+        <Button onClick={() => router.push('/api/auth/login')} colorScheme="blue">Log In</Button>
       </Box>
     );
   }
