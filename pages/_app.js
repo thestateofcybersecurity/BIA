@@ -3,6 +3,23 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { useRouter } from 'next/router';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { useEffect } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
+
+function AuthWrapper({ children }) {
+  const { isAuthenticated, isLoading } = useAuth0();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && router.pathname !== '/login') {
+      router.push('/login');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return children;
+}
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -21,7 +38,9 @@ function MyApp({ Component, pageProps }) {
         audience={process.env.NEXT_PUBLIC_AUTH0_AUDIENCE}
       >
         <ChakraProvider>
-          <Component {...pageProps} />
+          <AuthWrapper>
+            <Component {...pageProps} />
+          </AuthWrapper>
         </ChakraProvider>
       </Auth0Provider>
     </ErrorBoundary>
