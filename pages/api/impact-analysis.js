@@ -1,5 +1,5 @@
-import dbConnect from '../../../lib/dbConnect';
-import ImpactAnalysis from '../../../models/ImpactAnalysis';
+import connectDB from '../../config/database';
+import ImpactAnalysis from '../../models/ImpactAnalysis';
 import { getSession } from '@auth0/nextjs-auth0';
 
 export default async function handler(req, res) {
