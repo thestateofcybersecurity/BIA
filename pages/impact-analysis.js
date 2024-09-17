@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import Header from '../components/Header';
 import { Box, Button, FormControl, FormLabel, Input, Select, Heading, VStack, Text, SimpleGrid } from '@chakra-ui/react';
 import axios from 'axios';
 
 const ImpactAnalysisForm = () => {
-  const { user, getAccessTokenSilently } = useAuth0();
+  const { user, error, isLoading } = useUser();
   const [processes, setProcesses] = useState([]);
   const [selectedProcess, setSelectedProcess] = useState('');
   const [formData, setFormData] = useState({
@@ -88,21 +88,20 @@ const ImpactAnalysisForm = () => {
   };
 
   useEffect(() => {
-    fetchProcesses();
-  }, []);
+    if (user) {
+      fetchProcesses();
+    }
+  }, [user]);
 
   const fetchProcesses = async () => {
     try {
-      const token = await getAccessTokenSilently();
-      const response = await axios.get('/api/business-processes', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get('/api/business-processes');
       setProcesses(response.data.filter(process => !process.impactAnalysisCompleted));
     } catch (error) {
       console.error('Error fetching processes:', error);
     }
   };
-
+  
   const handleProcessChange = (e) => {
     setSelectedProcess(e.target.value);
     const process = processes.find(p => p._id === e.target.value);
@@ -248,6 +247,9 @@ const ImpactAnalysisForm = () => {
       </option>
     ));
   };
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>{error.message}</div>;
 
   return (
     <Box>
