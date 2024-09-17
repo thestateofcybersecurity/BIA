@@ -258,9 +258,14 @@ const ImpactAnalysisForm = () => {
         <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
         <form onSubmit={handleSubmit}>
           <VStack spacing={4} align="flex-start">
-            <FormControl id="processName" isRequired>
-              <FormLabel>Process/Function</FormLabel>
-              <Input type="text" name="processName" value={formData.processName} onChange={handleChange} />
+            <FormControl id="processSelect" isRequired>
+              <FormLabel>Select Business Process</FormLabel>
+              <Select value={selectedProcess} onChange={handleProcessChange}>
+                <option value="">Select a process</option>
+                {processes.map(process => (
+                  <option key={process._id} value={process._id}>{process.processName}</option>
+                ))}
+              </Select>
             </FormControl>
 
             <FormControl id="clientFacingAvailability">
