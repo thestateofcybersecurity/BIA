@@ -43,11 +43,11 @@ export default async function handler(req, res) {
           description: record.description,
           owner: record.owner,
           dependencies: {
-            people: record.people,
-            itApplications: record.itApplications,
-            devices: record.devices,
-            facilityLocation: record.facilityLocation,
-            suppliers: record.suppliers
+            people: record.people.split(',').map(item => item.trim()),
+            itApplications: record.itApplications.split(',').map(item => item.trim()),
+            devices: record.devices.split(',').map(item => item.trim()),
+            facilityLocation: record.facilityLocation.split(',').map(item => item.trim()),
+            suppliers: record.suppliers.split(',').map(item => item.trim())
           }
         }));
 
