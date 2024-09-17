@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import Header from '../components/Header';
+import { Box, Heading, Table, Thead, Tbody, Tr, Th, Td, VStack } from '@chakra-ui/react';
 
 const ComparativeAnalysis = () => {
   const { getAccessTokenSilently } = useAuth0();
@@ -31,46 +32,50 @@ const ComparativeAnalysis = () => {
   };
 
   return (
-    <div>
+    <Box>
       <Header />
-      <h2>Comparative Analysis</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Process Name</th>
-            <th>Overall Score</th>
-            <th>Criticality Tier</th>
-            <th>Revenue Score</th>
-            <th>Productivity Score</th>
-            <th>Operating Costs Score</th>
-            <th>Financial Penalties Score</th>
-            <th>Customers Score</th>
-            <th>Staff Score</th>
-            <th>Partners Score</th>
-            <th>Compliance Score</th>
-            <th>Health & Safety Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          {analyses.map((analysis) => (
-            <tr key={analysis._id}>
-              <td>{analysis.processName}</td>
-              <td>{analysis.overallScore.toFixed(2)}</td>
-              <td>{analysis.criticalityTier}</td>
-              <td>{analysis.revenueScore}</td>
-              <td>{analysis.productivityScore}</td>
-              <td>{analysis.operatingCostsScore}</td>
-              <td>{analysis.financialPenaltiesScore}</td>
-              <td>{analysis.customersScore}</td>
-              <td>{analysis.staffScore}</td>
-              <td>{analysis.partnersScore}</td>
-              <td>{analysis.complianceScore}</td>
-              <td>{analysis.healthSafetyScore}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+      <Box className="container" bg="white" p={6} rounded="md" shadow="md">
+        <VStack spacing={6} align="stretch">
+          <Heading as="h2" size="lg">Comparative Analysis</Heading>
+          <Table variant="simple">
+            <Thead>
+              <Tr>
+                <Th>Process Name</Th>
+                <Th>Overall Score</Th>
+                <Th>Criticality Tier</Th>
+                <Th>Revenue Score</Th>
+                <Th>Productivity Score</Th>
+                <Th>Operating Costs Score</Th>
+                <Th>Financial Penalties Score</Th>
+                <Th>Customers Score</Th>
+                <Th>Staff Score</Th>
+                <Th>Partners Score</Th>
+                <Th>Compliance Score</Th>
+                <Th>Health & Safety Score</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {analyses.map((analysis) => (
+                <Tr key={analysis._id}>
+                  <Td>{analysis.processName}</Td>
+                  <Td>{analysis.overallScore.toFixed(2)}</Td>
+                  <Td>{analysis.criticalityTier}</Td>
+                  <Td>{analysis.revenueScore}</Td>
+                  <Td>{analysis.productivityScore}</Td>
+                  <Td>{analysis.operatingCostsScore}</Td>
+                  <Td>{analysis.financialPenaltiesScore}</Td>
+                  <Td>{analysis.customersScore}</Td>
+                  <Td>{analysis.staffScore}</Td>
+                  <Td>{analysis.partnersScore}</Td>
+                  <Td>{analysis.complianceScore}</Td>
+                  <Td>{analysis.healthSafetyScore}</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </VStack>
+      </Box>
+    </Box>
   );
 };
 
