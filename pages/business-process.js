@@ -4,6 +4,7 @@ import { Box, Button, FormControl, FormLabel, Input, Textarea, Heading, VStack }
 import BusinessProcessList from '../components/BusinessProcessList';
 import CSVUpload from '../components/CSVUpload';
 import Header from '../components/Header';
+import axios from 'axios';
 
 const BusinessProcessForm = () => {
   const { user, error, isLoading } = useUser();
@@ -23,20 +24,11 @@ const BusinessProcessForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/index?path=businessProcess', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user.sub,
-          ...formData
-        }),
-      });
-      if (response.ok) {
+      const response = await axios.post('/api/business-process', formData);
+      if (response.data.success) {
         alert('Business process saved successfully!');
       } else {
-        throw new Error('Failed to save business process');
+        throw new Error(response.data.error);
       }
     } catch (error) {
       console.error('Error:', error);
