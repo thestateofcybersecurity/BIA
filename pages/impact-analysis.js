@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import Header from '../components/Header';
-import {
-  Box,
-  Button,
-  FormControl,
-  FormLabel,
-  Select,
-  Heading,
-  VStack,
-  Text,
-  SimpleGrid,
-} from '@chakra-ui/react';
+import { Box, Button, FormControl, FormLabel, Input, Select, Heading, VStack, Text, SimpleGrid } from '@chakra-ui/react';
 
 const ImpactAnalysisForm = () => {
   const { user, getAccessTokenSilently } = useAuth0();
