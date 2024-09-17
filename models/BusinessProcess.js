@@ -7,13 +7,14 @@ const BusinessProcessSchema = new mongoose.Schema({
   description: String,
   owner: String,
   dependencies: {
-    people: String,
-    itApplications: String,
-    devices: String,
-    facilityLocation: String,
-    suppliers: String
+    people: [String],
+    itApplications: [String],
+    devices: [String],
+    facilityLocation: [String],
+    suppliers: [String]
   },
   impactAnalysisCompleted: { type: Boolean, default: false },
+  impactAnalysis: { type: mongoose.Schema.Types.ObjectId, ref: 'ImpactAnalysis' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
