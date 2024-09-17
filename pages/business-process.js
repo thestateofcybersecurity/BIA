@@ -164,14 +164,8 @@ const BusinessProcessForm = () => {
         <Heading as="h3" size="md" mt={6}>Bulk Upload</Heading>
         <CSVUpload onUploadComplete={handleCSVUploadComplete} />
 
-        <Heading as="h3" size="md" mt={6}>Submitted Processes</Heading>
-        {processes.map((process) => (
-          <Box key={process._id} mt={4} p={4} border="1px" borderColor="gray.200" borderRadius="md">
-            <Text><strong>Name:</strong> {process.processName}</Text>
-            <Text><strong>Owner:</strong> {process.owner}</Text>
-            <Text><strong>Description:</strong> {process.description}</Text>
-          </Box>
-        ))}
+        <Heading as="h3" size="md" mt={6} mb={4}>Existing Business Processes</Heading>
+        <BusinessProcessList />
       </Box>
     </Box>
   );
