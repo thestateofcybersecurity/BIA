@@ -7,6 +7,7 @@ import {
   FormLabel,
   Input,
   Text,
+  VStack,
 } from '@chakra-ui/react';
 import axios from 'axios';
 
@@ -46,12 +47,17 @@ const CSVUpload = ({ onUploadComplete }) => {
 
   return (
     <Box>
-      <FormControl>
-        <FormLabel>Upload CSV File</FormLabel>
-        <Input type="file" accept=".csv" onChange={handleFileChange} />
-      </FormControl>
-      <Button onClick={handleUpload} mt={4}>Upload</Button>
-      <Text mt={2}>Upload a CSV file to bulk import business processes.</Text>
+      <VStack spacing={4} align="flex-start">
+        <FormControl>
+          <FormLabel>Upload CSV File</FormLabel>
+          <Input type="file" accept=".csv" onChange={handleFileChange} />
+        </FormControl>
+        <Button onClick={handleUpload} colorScheme="blue">Upload</Button>
+        <Text>Upload a CSV file to bulk import business processes.</Text>
+        <Text fontSize="sm">
+          CSV should have columns: processName, description, owner, people, itApplications, devices, facilityLocation, suppliers
+        </Text>
+      </VStack>
     </Box>
   );
 };
