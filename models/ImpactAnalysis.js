@@ -1,7 +1,9 @@
+// models/ImpactAnalysis.js
 import mongoose from 'mongoose';
 
 const ImpactAnalysisSchema = new mongoose.Schema({
   userId: { type: String, required: true },
+  businessProcess: { type: mongoose.Schema.Types.ObjectId, ref: 'BusinessProcess', required: true },
   processName: { type: String, required: true },
   clientFacingAvailability: String,
   additionalAvailability: String,
@@ -19,7 +21,7 @@ const ImpactAnalysisSchema = new mongoose.Schema({
   impactOnPartners: String,
   complianceRisks: String,
   healthSafetyRisks: String,
-  // New fields for scores
+  // Scores
   revenueScore: Number,
   productivityScore: Number,
   operatingCostsScore: Number,
