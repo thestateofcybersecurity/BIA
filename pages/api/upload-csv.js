@@ -1,5 +1,5 @@
 // pages/api/upload-csv.js
-import { useAuth0 } from '@auth0/auth0-react';
+import { getSession } from '@auth0/nextjs-auth0';
 import connectDB from '../../config/database';
 import BusinessProcess from '../../models/BusinessProcess';
 import multer from 'multer';
@@ -14,7 +14,10 @@ export const config = {
 const upload = multer({ storage: multer.memoryStorage() });
 
 export default async function handler(req, res) {
-const { user, getAccessTokenSilently } = useAuth0();
+  const session = await getSession(req, res);
+  if (!session) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
 
   await connectDB();
 
