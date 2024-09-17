@@ -17,7 +17,7 @@ const Header = () => {
         <ChakraLink href="/" color="white" fontSize="xl" fontWeight="bold" mr={6}>Home</ChakraLink>
         <ChakraLink href="/business-process" color="white" mr={6}>Business Process</ChakraLink>
         <ChakraLink href="/impact-analysis" color="white" mr={6}>Impact Analysis</ChakraLink>
-        <ChakraLink href="/rto-rpo-analysis" color="white">RTO/RPO Analysis</ChakraLink>
+        <ChakraLink href="/rto-rpo-analysis" color="white" mr={6}>RTO/RPO Analysis</ChakraLink>
         <ChakraLink href="/comparative-analysis" color="white">Comparative Analysis</ChakraLink>
       </Box>
       <Box>
