@@ -22,7 +22,9 @@ function MyApp({ Component, pageProps }) {
         audience={process.env.NEXT_PUBLIC_AUTH0_AUDIENCE}
       >
         <ChakraProvider>
+        <UserProvider>
           <Component {...pageProps} />
+        </UserProvider>
         </ChakraProvider>
       </Auth0Provider>
     </ErrorBoundary>
