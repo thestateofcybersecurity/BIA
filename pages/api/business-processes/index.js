@@ -1,6 +1,6 @@
 // pages/api/business-processes/index.js
 import { getSession } from '@auth0/nextjs-auth0';
-import dbConnect from '../../../lib/dbConnect';
+import connectDB from '../../../config/database';
 import BusinessProcess from '../../../models/BusinessProcess';
 
 export default async function handler(req, res) {
