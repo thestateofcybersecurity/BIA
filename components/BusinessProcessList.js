@@ -1,7 +1,31 @@
-// components/BusinessProcessList.js
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import {Box, Button, Table, Thead, Tbody, Tr, Th, Td, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, useDisclosure, FormControl, FormLabel, Input, Textarea, VStack } from '@chakra-ui/react';
+import {
+  Box,
+  Button,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  VStack,
+  HStack,
+  IconButton,
+} from '@chakra-ui/react';
+import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import axios from 'axios';
 
 const BusinessProcessList = () => {
@@ -48,6 +72,36 @@ const BusinessProcessList = () => {
     }));
   };
 
+  const handleDependencyChange = (type, index, value) => {
+    setEditingProcess(prev => ({
+      ...prev,
+      dependencies: {
+        ...prev.dependencies,
+        [type]: prev.dependencies[type].map((item, i) => i === index ? value : item)
+      }
+    }));
+  };
+
+  const addDependency = (type) => {
+    setEditingProcess(prev => ({
+      ...prev,
+      dependencies: {
+        ...prev.dependencies,
+        [type]: [...prev.dependencies[type], '']
+      }
+    }));
+  };
+
+  const removeDependency = (type, index) => {
+    setEditingProcess(prev => ({
+      ...prev,
+      dependencies: {
+        ...prev.dependencies,
+        [type]: prev.dependencies[type].filter((_, i) => i !== index)
+      }
+    }));
+  };
+
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>{error.message}</div>;
 
@@ -76,7 +130,7 @@ const BusinessProcessList = () => {
         </Tbody>
       </Table>
 
-      <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal isOpen={isOpen} onClose={onClose} size="xl">
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Edit Business Process</ModalHeader>
@@ -95,7 +149,28 @@ const BusinessProcessList = () => {
                 <FormLabel>Owner</FormLabel>
                 <Input name="owner" value={editingProcess?.owner || ''} onChange={handleChange} />
               </FormControl>
-              {/* Add more fields as needed */}
+              
+              {editingProcess && Object.entries(editingProcess.dependencies).map(([type, dependencies]) => (
+                <FormControl key={type}>
+                  <FormLabel>{type.charAt(0).toUpperCase() + type.slice(1)}</FormLabel>
+                  {dependencies.map((dep, index) => (
+                    <HStack key={index} mt={2}>
+                      <Input
+                        value={dep}
+                        onChange={(e) => handleDependencyChange(type, index, e.target.value)}
+                      />
+                      <IconButton
+                        icon={<DeleteIcon />}
+                        onClick={() => removeDependency(type, index)}
+                        aria-label="Remove dependency"
+                      />
+                    </HStack>
+                  ))}
+                  <Button leftIcon={<AddIcon />} onClick={() => addDependency(type)} mt={2}>
+                    Add {type}
+                  </Button>
+                </FormControl>
+              ))}
             </VStack>
           </ModalBody>
           <ModalFooter>
