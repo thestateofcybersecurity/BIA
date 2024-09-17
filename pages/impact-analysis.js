@@ -93,6 +93,10 @@ const ImpactAnalysisForm = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    calculateScores();
+  }, [formData]); // Recalculate scores whenever formData changes
+
   const fetchProcesses = async () => {
     try {
       const response = await axios.get('/api/business-processes');
@@ -127,10 +131,10 @@ const ImpactAnalysisForm = () => {
       const response = await axios.post('/api/impact-analysis', {
         ...formData,
         businessProcessId: selectedProcess,
-        ...scores // Include calculated scores
+        ...scores
       });
       alert('Impact analysis saved successfully!');
-      fetchProcesses(); // Refresh the list of processes
+      fetchProcesses();
     } catch (error) {
       console.error('Error saving impact analysis:', error.response?.data || error.message);
       alert(`Error saving impact analysis: ${error.response?.data?.error || error.message}`);
@@ -374,7 +378,7 @@ const ImpactAnalysisForm = () => {
               </Select>
             </FormControl>
                 
-          <Heading as="h3" size="md" mt={6}>Impact Scores</Heading>
+            <Heading as="h3" size="md" mt={6}>Impact Scores</Heading>
             <SimpleGrid columns={2} spacing={4}>
               <Text>Revenue Score: {scores.revenueScore.toFixed(2)}</Text>
               <Text>Productivity Score: {scores.productivityScore.toFixed(2)}</Text>
@@ -398,6 +402,5 @@ const ImpactAnalysisForm = () => {
     </Box>
   );
 };
-
 
 export default ImpactAnalysisForm;
