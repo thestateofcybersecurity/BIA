@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import Header from '../components/Header';
 import { Box, Button, FormControl, FormLabel, Input, Select, Heading, VStack, Text, SimpleGrid } from '@chakra-ui/react';
+import axios from 'axios';
 
 const ImpactAnalysisForm = () => {
   const { user, getAccessTokenSilently } = useAuth0();
+  const [processes, setProcesses] = useState([]);
+  const [selectedProcess, setSelectedProcess] = useState('');
   const [formData, setFormData] = useState({
     processName: '',
     clientFacingAvailability: '',
@@ -90,8 +93,57 @@ const ImpactAnalysisForm = () => {
   };
 
   useEffect(() => {
-    calculateScores();
-  }, [formData]);
+    fetchProcesses();
+  }, []);
+
+  const fetchProcesses = async () => {
+    try {
+      const token = await getAccessTokenSilently();
+      const response = await axios.get('/api/business-processes', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setProcesses(response.data.filter(process => !process.impactAnalysisCompleted));
+    } catch (error) {
+      console.error('Error fetching processes:', error);
+    }
+  };
+
+  const handleProcessChange = (e) => {
+    setSelectedProcess(e.target.value);
+    const process = processes.find(p => p._id === e.target.value);
+    if (process) {
+      setFormData(prevData => ({
+        ...prevData,
+        processName: process.processName,
+        description: process.description,
+        owner: process.owner,
+        // ... (set other relevant fields)
+      }));
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const token = await getAccessTokenSilently();
+      await axios.post('/api/impact-analysis', {
+        ...formData,
+        businessProcessId: selectedProcess
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert('Impact analysis saved successfully!');
+      fetchProcesses(); // Refresh the list of processes
+    } catch (error) {
+      console.error('Error saving impact analysis:', error);
+      alert('Error saving impact analysis. Please try again.');
+    }
+  };
 
   const calculateScores = () => {
     const newScores = { ...scores };
@@ -192,33 +244,6 @@ const ImpactAnalysisForm = () => {
     if (score >= 3) return 'Tier 2 (Silver)';
     if (score >= 2.5) return 'Tier 3 (Bronze)';
     return 'Non-critical';
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const token = await getAccessTokenSilently();
-      const response = await fetch('/api/impact-analysis', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          userId: user.sub,
-          ...formData,
-          ...scores
-        }),
-      });
-      if (response.ok) {
-        alert('Impact analysis saved successfully!');
-      } else {
-        throw new Error('Failed to save impact analysis');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Failed to save impact analysis. Please try again.');
-    }
   };
 
   const renderOptions = (category) => {
