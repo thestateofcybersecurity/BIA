@@ -124,12 +124,9 @@ const ImpactAnalysisForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = await getAccessTokenSilently();
       await axios.post('/api/impact-analysis', {
         ...formData,
         businessProcessId: selectedProcess
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       alert('Impact analysis saved successfully!');
       fetchProcesses(); // Refresh the list of processes
