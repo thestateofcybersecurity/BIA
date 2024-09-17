@@ -62,6 +62,8 @@ const BusinessProcessForm = () => {
   };
 
   return (
+  <Box>
+    <Header />
     <Box className="container" bg="white" p={6} rounded="md" shadow="md">
       <Heading as="h2" size="lg" mb={6}>Business Process Assessment</Heading>
       <form onSubmit={handleSubmit}>
@@ -110,7 +112,8 @@ const BusinessProcessForm = () => {
 
           <Button type="submit" colorScheme="blue" rounded="md" size="lg">Save Business Process</Button>
         </VStack>
-      </form>
+        </form>
+      </Box>
     </Box>
   );
 };
