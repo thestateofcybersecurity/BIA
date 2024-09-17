@@ -87,7 +87,7 @@ const RTORPOAnalysis = () => {
         <Tbody>
           {filteredData.map((item, index) => (
             <Tr key={index}>
-              <Td>{item.process}</Td>
+              <Td>{item.processName}</Td>
               <Td>{item.acceptableTime}</Td>
               <Td>{item.achievableTime}</Td>
               <Td>{calculateGap(item.acceptableTime, item.achievableTime).toFixed(2)}</Td>
