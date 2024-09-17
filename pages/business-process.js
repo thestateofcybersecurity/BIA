@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
-import ProtectedRoute from '../components/ProtectedRoute';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { Box, Button, FormControl, FormLabel, Input, Textarea, Heading, VStack } from '@chakra-ui/react';
 import BusinessProcessList from '../components/BusinessProcessList';
 import CSVUpload from '../components/CSVUpload';
 import Header from '../components/Header';
-import axios from 'axios';
 
 const BusinessProcessForm = () => {
-  const { user, getAccessTokenSilently } = useAuth0();
+  const { user, error, isLoading } = useUser();
   const [formData, setFormData] = useState({
     processName: '',
     description: '',
@@ -25,12 +23,10 @@ const BusinessProcessForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = await getAccessTokenSilently();
       const response = await fetch('/api/index?path=businessProcess', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           userId: user.sub,
@@ -64,6 +60,9 @@ const BusinessProcessForm = () => {
     }
   };
 
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>{error.message}</div>;
+  
   return (
   <Box>
     <Header />
