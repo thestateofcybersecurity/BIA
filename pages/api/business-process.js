@@ -1,7 +1,7 @@
 // pages/api/business-processes/impact-analysis-status.js
 import { getSession } from '@auth0/nextjs-auth0';
-import connectDB from '../../../config/database';
-import BusinessProcess from '../../../models/BusinessProcess';
+import connectDB from '../../config/database';
+import BusinessProcess from '../../models/BusinessProcess';
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
