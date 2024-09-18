@@ -1,4 +1,4 @@
-// components/RecoveryWorkflow.js
+// components/RecoveryWorkflow.js (Handle auto-generated steps)
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import {
@@ -69,7 +69,7 @@ const RecoveryWorkflow = ({ businessProcessId }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/api/recovery-workflow', {
+            const response = await axios.post('/api/recovery-workflow', {
         businessProcessId,
         recoverySteps: steps,
       });
@@ -130,7 +130,49 @@ const RecoveryWorkflow = ({ businessProcessId }) => {
                   onChange={(e) => handleStepChange(index, 'estimatedCompletionTime', e.target.value)}
                 />
               </FormControl>
-              {/* Add more fields for dependencies and alternate staff as needed */}
+              {/* Dependencies input fields */}
+              <FormControl mt={2}>
+                <FormLabel>People Dependencies</FormLabel>
+                <Input
+                  value={step.dependencies.people.join(', ')}
+                  onChange={(e) => handleStepChange(index, 'dependencies.people', e.target.value.split(', '))}
+                />
+              </FormControl>
+              <FormControl mt={2}>
+                <FormLabel>IT Applications</FormLabel>
+                <Input
+                  value={step.dependencies.itApplications.join(', ')}
+                  onChange={(e) => handleStepChange(index, 'dependencies.itApplications', e.target.value.split(', '))}
+                />
+              </FormControl>
+              <FormControl mt={2}>
+                <FormLabel>Devices</FormLabel>
+                <Input
+                  value={step.dependencies.devices.join(', ')}
+                  onChange={(e) => handleStepChange(index, 'dependencies.devices', e.target.value.split(', '))}
+                />
+              </FormControl>
+              <FormControl mt={2}>
+                <FormLabel>Facilities</FormLabel>
+                <Input
+                  value={step.dependencies.facilities.join(', ')}
+                  onChange={(e) => handleStepChange(index, 'dependencies.facilities', e.target.value.split(', '))}
+                />
+              </FormControl>
+              <FormControl mt={2}>
+                <FormLabel>Suppliers</FormLabel>
+                <Input
+                  value={step.dependencies.suppliers.join(', ')}
+                  onChange={(e) => handleStepChange(index, 'dependencies.suppliers', e.target.value.split(', '))}
+                />
+              </FormControl>
+              <FormControl mt={2}>
+                <FormLabel>Alternate Staff</FormLabel>
+                <Input
+                  value={step.alternateStaff.join(', ')}
+                  onChange={(e) => handleStepChange(index, 'alternateStaff', e.target.value.split(', '))}
+                />
+              </FormControl>
             </Box>
           ))}
           <Button leftIcon={<AddIcon />} onClick={addStep}>
