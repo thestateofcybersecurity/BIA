@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { Box, Button, FormControl, FormLabel, Input, Select, Heading, VStack, Text, SimpleGrid } from '@chakra-ui/react';
+import { Box, Button, FormControl, FormLabel, Input, Select, Heading, VStack, Text, SimpleGrid, useToast } from '@chakra-ui/react';
 import axios from 'axios';
 
 const ImpactAnalysisForm = () => {
   const { user, error, isLoading } = useUser();
+  const toast = useToast();
   const [processes, setProcesses] = useState([]);
   const [selectedProcess, setSelectedProcess] = useState('');
   const [formData, setFormData] = useState({
