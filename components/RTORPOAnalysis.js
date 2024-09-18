@@ -55,11 +55,13 @@ const RTORPOAnalysis = ({ businessProcessId }) => {
 const handleSubmit = async (e) => {
   e.preventDefault();
   try {
+    const [metric, type] = activeTab.split('-');
     const response = await axios.post('/api/rto-rpo-analysis', {
       businessProcessId: selectedProcess,
-      type: activeTab.split('-')[0].toUpperCase(),
-      metric: activeTab.split('-')[1],
-      ...formData
+      type: type.toUpperCase(),
+      metric: metric,
+      acceptableTime: parseFloat(formData.acceptableTime),
+      achievableTime: parseFloat(formData.achievableTime)
     });
     toast({
       title: 'Success',
