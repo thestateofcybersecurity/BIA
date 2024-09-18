@@ -1,23 +1,12 @@
 // components/ImpactAnalysisForm.js
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import {
-  Box,
-  Button,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  Heading,
-  VStack,
-  Text,
-  SimpleGrid,
-  useToast  // Add this import
-} from '@chakra-ui/react';
+import { Box, Button, FormControl, FormLabel, Input, Select, Heading, VStack, Text, SimpleGrid, useToast } from '@chakra-ui/react';
 import axios from 'axios';
 
-const ImpactAnalysisForm = ({ businessProcessId }) => {
+const ImpactAnalysisForm = () => {
   const { user, error, isLoading } = useUser();
+  const toast = useToast();  // Initialize the toast hook
   const [processes, setProcesses] = useState([]);
   const [selectedProcess, setSelectedProcess] = useState('');
   const [formData, setFormData] = useState({
@@ -38,8 +27,54 @@ const ImpactAnalysisForm = ({ businessProcessId }) => {
     complianceRisks: '',
     healthSafetyRisks: '',
   });
-  const toast = useToast();
 
+  const scoringCriteria = {
+    lossOfRevenue: [
+      { value: 500000, score: 4 },
+      { value: 375000, score: 3.5 },
+      { value: 250000, score: 3 },
+      { value: 187500, score: 2.5 },
+      { value: 125000, score: 2 },
+      { value: 75000, score: 1.5 },
+      { value: 25000, score: 1 },
+      { value: 12500, score: 0.5 },
+      { value: 0, score: 0 },
+    ],
+    lossOfProductivity: [
+      { value: 100000, score: 4 },
+      { value: 75000, score: 3.5 },
+      { value: 50000, score: 3 },
+      { value: 37500, score: 2.5 },
+      { value: 25000, score: 2 },
+      { value: 15000, score: 1.5 },
+      { value: 5000, score: 1 },
+      { value: 2500, score: 0.5 },
+      { value: 0, score: 0 },
+    ],
+    increasedOperatingCosts: [
+      { value: 50000, score: 4 },
+      { value: 37500, score: 3.5 },
+      { value: 25000, score: 3 },
+      { value: 18750, score: 2.5 },
+      { value: 12500, score: 2 },
+      { value: 7500, score: 1.5 },
+      { value: 2500, score: 1 },
+      { value: 1250, score: 0.5 },
+      { value: 0, score: 0 },
+    ],
+    financialPenalties: [
+      { value: 10000, score: 4 },
+      { value: 7500, score: 3.5 },
+      { value: 5000, score: 3 },
+      { value: 3750, score: 2.5 },
+      { value: 2500, score: 2 },
+      { value: 1500, score: 1.5 },
+      { value: 500, score: 1 },
+      { value: 250, score: 0.5 },
+      { value: 0, score: 0 },
+    ],
+  };
+  
   useEffect(() => {
     if (businessProcessId) {
       fetchImpactAnalysis();
@@ -67,23 +102,23 @@ const ImpactAnalysisForm = ({ businessProcessId }) => {
     try {
       const response = await axios.post('/api/impact-analysis', {
         ...formData,
-        businessProcessId,
+        businessProcessId: selectedProcess,
+        ...scores
       });
-      if (response.data.success) {
-        toast({
-          title: 'Success',
-          description: 'Impact analysis saved successfully.',
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    } catch (error) {
-      console.error('Error saving impact analysis:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to save impact analysis.',
-        status: 'error',
+        title: "Success",
+        description: "Impact analysis saved successfully!",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
+      fetchProcesses();
+    } catch (error) {
+      console.error('Error saving impact analysis:', error.response?.data || error.message);
+      toast({
+        title: "Error",
+        description: `Failed to save impact analysis: ${error.response?.data?.error || error.message}`,
+        status: "error",
         duration: 5000,
         isClosable: true,
       });
