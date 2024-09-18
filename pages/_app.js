@@ -5,13 +5,13 @@ import ErrorBoundary from '../components/ErrorBoundary';
 
 function MyApp({ Component, pageProps }) {
   return (
-    <ErrorBoundary>
-      <UserProvider>
-        <ChakraProvider>
+    <UserProvider>
+      <ChakraProvider>
+        <ErrorBoundary>
           <Component {...pageProps} />
-        </ChakraProvider>
-      </UserProvider>
-    </ErrorBoundary>
+        </ErrorBoundary>
+      </ChakraProvider>
+    </UserProvider>
   );
 }
 

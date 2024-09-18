@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import Header from '../components/Header';
-import { Box, Button, Heading, Table, Thead, Tbody, Tr, Th, Td, ButtonGroup, VStack, Select, FormControl, FormLabel, Input, Text } from '@chakra-ui/react';
+import { Box, Button, Heading, Table, Thead, Tbody, Tr, Th, Td, ButtonGroup, VStack, Select, FormControl, FormLabel, Input, Text, useToast } from '@chakra-ui/react';
 import axios from 'axios';
 
 const RTORPOAnalysis = () => {
@@ -14,6 +14,7 @@ const RTORPOAnalysis = () => {
     acceptableTime: '',
     achievableTime: '',
   });
+  const toast = useToast();
 
   useEffect(() => {
     if (user) {
@@ -28,6 +29,13 @@ const RTORPOAnalysis = () => {
       setProcesses(response.data.data);
     } catch (error) {
       console.error('Error fetching processes:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch business processes.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
@@ -37,7 +45,13 @@ const RTORPOAnalysis = () => {
       setData(response.data);
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to fetch RTO/RPO data. Please try again.');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch RTO/RPO data.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
@@ -59,11 +73,23 @@ const RTORPOAnalysis = () => {
         metric: activeTab.split('-')[1],
         ...formData
       });
-      alert('RTO/RPO analysis saved successfully!');
+      toast({
+        title: 'Success',
+        description: 'RTO/RPO analysis saved successfully!',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
       fetchData();
     } catch (error) {
       console.error('Error saving RTO/RPO analysis:', error);
-      alert('Error saving RTO/RPO analysis. Please try again.');
+      toast({
+        title: 'Error',
+        description: 'Failed to save RTO/RPO analysis.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 

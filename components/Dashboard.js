@@ -1,21 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { useUser } from '@auth0/nextjs-auth0/client';
+// components/Dashboard.js
+import React, { useState, useEffect } from 'react';
 import { Box, Heading, SimpleGrid, Text, VStack, HStack, Progress, Button } from '@chakra-ui/react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 
 const Dashboard = () => {
-  const { user, error, isLoading } = useUser();
-  const router = useRouter();
   const [businessProcesses, setBusinessProcesses] = useState([]);
   const [maturityScore, setMaturityScore] = useState(0);
   const [recentScenarios, setRecentScenarios] = useState([]);
+  const router = useRouter();
 
   useEffect(() => {
-    if (user) {
-      fetchDashboardData();
-    }
-  }, [user]);
+    fetchDashboardData();
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -36,9 +33,6 @@ const Dashboard = () => {
   const navigateTo = (path) => {
     router.push(path);
   };
-
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>{error.message}</div>;
 
   return (
     <Box p={5}>

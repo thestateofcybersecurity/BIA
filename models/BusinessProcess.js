@@ -15,6 +15,7 @@ const BusinessProcessSchema = new mongoose.Schema({
   },
   impactAnalysisCompleted: { type: Boolean, default: false },
   impactAnalysis: { type: mongoose.Schema.Types.ObjectId, ref: 'ImpactAnalysis' },
+  recoveryWorkflow: { type: mongoose.Schema.Types.ObjectId, ref: 'RecoveryWorkflow' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

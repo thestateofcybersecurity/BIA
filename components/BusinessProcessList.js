@@ -24,6 +24,7 @@ import {
   VStack,
   HStack,
   IconButton,
+  useToast,
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import axios from 'axios';
@@ -33,6 +34,7 @@ const BusinessProcessList = () => {
   const [processes, setProcesses] = useState([]);
   const [editingProcess, setEditingProcess] = useState(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const toast = useToast();
 
   useEffect(() => {
     if (user) {
@@ -42,10 +44,17 @@ const BusinessProcessList = () => {
 
   const fetchProcesses = async () => {
     try {
-      const response = await axios.get('/api/business-processes');
-      setProcesses(response.data);
+      const response = await axios.get('/api/business-process');
+      setProcesses(response.data.data);
     } catch (error) {
       console.error('Error fetching processes:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch business processes.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
@@ -56,11 +65,25 @@ const BusinessProcessList = () => {
 
   const handleSave = async () => {
     try {
-      await axios.put(`/api/business-processes/${editingProcess._id}`, editingProcess);
+      await axios.put(`/api/business-process/${editingProcess._id}`, editingProcess);
       onClose();
       fetchProcesses();
+      toast({
+        title: 'Success',
+        description: 'Business process updated successfully.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
     } catch (error) {
       console.error('Error updating process:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update business process.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
@@ -113,6 +136,7 @@ const BusinessProcessList = () => {
             <Th>Process Name</Th>
             <Th>Owner</Th>
             <Th>Impact Analysis</Th>
+            <Th>Recovery Workflow</Th>
             <Th>Actions</Th>
           </Tr>
         </Thead>
@@ -122,6 +146,7 @@ const BusinessProcessList = () => {
               <Td>{process.processName}</Td>
               <Td>{process.owner}</Td>
               <Td>{process.impactAnalysisCompleted ? 'Completed' : 'Pending'}</Td>
+              <Td>{process.recoveryWorkflow ? 'Completed' : 'Pending'}</Td>
               <Td>
                 <Button onClick={() => handleEdit(process)}>Edit</Button>
               </Td>
