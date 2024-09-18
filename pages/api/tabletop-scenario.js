@@ -5,10 +5,6 @@ import TabletopScenario from '../../models/TabletopScenario';
 import { Configuration, OpenAIApi } from 'openai-edge';
 import { OpenAIStream, StreamingTextResponse } from 'ai';
 
-export const config = {
-  runtime: 'edge',
-};
-
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -52,11 +48,11 @@ export default async function handler(req, res) {
             ],
             temperature: 0.7,
             max_tokens: 500,
-            stream: true,
           });
 
-          const stream = OpenAIStream(response);
-          return new StreamingTextResponse(stream);
+          // Wait for the entire response and return it
+          const responseData = await response.json();
+          res.status(201).json({ success: true, data: responseData });
         } else {
           const scenario = new TabletopScenario({
             ...scenarioData,
