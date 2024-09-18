@@ -18,12 +18,49 @@ import {
 import axios from 'axios';
 import MaturityScorecardDashboard from './MaturityScorecardDashboard';
 
+const initialFormData = {
+  bcpScope: '',
+  businessOperations: '',
+  dependencies: '',
+  alternativesForDependencies: '',
+  legalAndRegulatoryRequirements: '',
+  internalStakeholders: '',
+  externalStakeholders: '',
+  organizationalObjectives: '',
+  biaProcess: '',
+  biaConducted: '',
+  rtosRposDefined: '',
+  biaReviewed: '',
+  incidentResponsePlans: '',
+  recoveryPlanFlexibility: '',
+  incidentResponseResources: '',
+  interimProcesses: '',
+  returnToNormalProcedures: '',
+  bcPolicy: '',
+  bcPolicyCommunication: '',
+  bcmTeam: '',
+  reviewMaintenancePlan: '',
+  bcmsProjectPlan: '',
+  riskManagement: '',
+  riskAssessment: '',
+  crisisCommunication: '',
+  emergencyResponsePlans: '',
+  crisisManagementPlans: '',
+  crisisTesting: '',
+  topManagementParticipation: '',
+  bcTesting: '',
+  testDocumentation: '',
+  testReview: '',
+  annualTesting: '',
+  changeManagementProcedures: '',
+  documentationSecurity: '',
+  documentationVersionControl: '',
+  externalDocumentationControl: '',
+};
+
 const MaturityScorecard = () => {
   const { user } = useUser();
-  const [formData, setFormData] = useState({
-    // ... (keep all your existing form fields)
-  });
-
+  const [formData, setFormData] = useState(initialFormData);
   const [overallMaturityScore, setOverallMaturityScore] = useState(0);
   const toast = useToast();
 
@@ -40,18 +77,23 @@ const MaturityScorecard = () => {
       }
     } catch (error) {
       console.error('Error fetching maturity scorecard:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch maturity scorecard.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: parseInt(value, 10) }));
   };
 
   const calculateMaturityScore = () => {
-    const scores = Object.values(formData).map(value => {
-      return parseInt(value) || 0;
-    });
+    const scores = Object.values(formData).filter(value => typeof value === 'number');
     return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
   };
 
@@ -61,7 +103,7 @@ const MaturityScorecard = () => {
     try {
       const response = await axios.post('/api/maturity-scorecard', {
         ...formData,
-        overallMaturityScore: score,
+        overallMaturityScore: parseFloat(score),
       });
       if (response.data.success) {
         setOverallMaturityScore(score);
@@ -77,7 +119,7 @@ const MaturityScorecard = () => {
       console.error('Error saving maturity scorecard:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save maturity scorecard.',
+        description: `Failed to save maturity scorecard: ${error.response?.data?.error || error.message}`,
         status: 'error',
         duration: 5000,
         isClosable: true,
