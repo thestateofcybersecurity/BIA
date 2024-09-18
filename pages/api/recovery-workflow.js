@@ -294,7 +294,7 @@ function generateRecoverySteps(businessProcess) {
       facilities: [],
       suppliers: []
     },
-    estimatedCompletionTime: Ongoing (Within 1 week)
+    estimatedCompletionTime: Ongoing (Within a week)
   });
 
   steps.push({
