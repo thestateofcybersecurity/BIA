@@ -280,7 +280,7 @@ function generateRecoverySteps(businessProcess) {
       facilities: ['Primary Business Location'],
       suppliers: []
     },
-    estimatedCompletionTime: 24-48 hours
+    estimatedCompletionTime: '24-48 hours'
   });
 
   steps.push({
