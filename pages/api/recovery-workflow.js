@@ -252,7 +252,7 @@ function generateRecoverySteps(businessProcess) {
       facilities: [],
       suppliers: []
     },
-    estimatedCompletionTime: Ongoing (Daily)
+    estimatedCompletionTime: 'Ongoing (Daily)'
   });
 
   steps.push({
@@ -294,7 +294,7 @@ function generateRecoverySteps(businessProcess) {
       facilities: [],
       suppliers: []
     },
-    estimatedCompletionTime: Ongoing (Within a week)
+    estimatedCompletionTime: 'Ongoing (Within a week)'
   });
 
   steps.push({
@@ -308,7 +308,7 @@ function generateRecoverySteps(businessProcess) {
       facilities: [],
       suppliers: []
     },
-    estimatedCompletionTime: 1 week
+    estimatedCompletionTime: '1 week'
 });
 
   steps.push({
@@ -322,7 +322,7 @@ function generateRecoverySteps(businessProcess) {
       facilities: [],
       suppliers: []
     },
-    estimatedCompletionTime: 1 week
+    estimatedCompletionTime: '1 week'
   });
 
   steps.push({
@@ -336,7 +336,7 @@ function generateRecoverySteps(businessProcess) {
       facilities: [],
       suppliers: []
     },
-    estimatedCompletionTime: 1 week
+    estimatedCompletionTime: '1 week'
   });
 
   // More steps could be auto-generated based on the process type and dependencies
