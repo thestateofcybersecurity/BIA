@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import Header from '../components/Header';
 import { Box, Button, Heading, Table, Thead, Tbody, Tr, Th, Td, ButtonGroup, VStack, Select, FormControl, FormLabel, Input, Text, useToast } from '@chakra-ui/react';
 import axios from 'axios';
 
@@ -129,7 +128,6 @@ const RTORPOAnalysis = () => {
 
   return (
     <Box>
-      <Header />
       <Box className="container" bg="white" p={6} rounded="md" shadow="md">
         <VStack spacing={6} align="stretch">
           <Heading as="h2" size="lg">RTO/RPO Gap Analysis</Heading>
