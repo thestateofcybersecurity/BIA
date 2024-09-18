@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import Header from '../components/Header';
 import { Box, Button, FormControl, FormLabel, Input, Select, Heading, VStack, Text, SimpleGrid } from '@chakra-ui/react';
 import axios from 'axios';
 
@@ -133,14 +132,26 @@ const ImpactAnalysisForm = () => {
         businessProcessId: selectedProcess,
         ...scores
       });
-      alert('Impact analysis saved successfully!');
+      toast({
+        title: "Success",
+        description: "Impact analysis saved successfully!",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
       fetchProcesses();
     } catch (error) {
       console.error('Error saving impact analysis:', error.response?.data || error.message);
-      alert(`Error saving impact analysis: ${error.response?.data?.error || error.message}`);
+      toast({
+        title: "Error",
+        description: `Failed to save impact analysis: ${error.response?.data?.error || error.message}`,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
-
+  
   const calculateScores = () => {
     const newScores = { ...scores };
 
@@ -255,7 +266,6 @@ const ImpactAnalysisForm = () => {
 
   return (
     <Box>
-      <Header />
       <Box className="container" bg="white" p={6} rounded="md" shadow="md">
         <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
         <form onSubmit={handleSubmit}>
