@@ -9,49 +9,19 @@ import {
   VStack,
   Text,
   useToast,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react';
 import axios from 'axios';
+import MaturityScorecardDashboard from './MaturityScorecardDashboard';
 
 const MaturityScorecard = () => {
   const { user } = useUser();
   const [formData, setFormData] = useState({
-    bcpScope: '',
-    businessOperations: '',
-    dependencies: '',
-    alternativesForDependencies: '',
-    legalAndRegulatoryRequirements: '',
-    internalStakeholders: '',
-    externalStakeholders: '',
-    organizationalObjectives: '',
-    biaProcess: '',
-    biaConducted: '',
-    rtosRposDefined: '',
-    biaReviewed: '',
-    incidentResponsePlans: '',
-    recoveryPlanFlexibility: '',
-    incidentResponseResources: '',
-    interimProcesses: '',
-    returnToNormalProcedures: '',
-    bcPolicy: '',
-    bcPolicyCommunication: '',
-    bcmTeam: '',
-    reviewMaintenancePlan: '',
-    bcmsProjectPlan: '',
-    riskManagement: '',
-    riskAssessment: '',
-    crisisCommunication: '',
-    emergencyResponsePlans: '',
-    crisisManagementPlans: '',
-    crisisTesting: '',
-    topManagementParticipation: '',
-    bcTesting: '',
-    testDocumentation: '',
-    testReview: '',
-    annualTesting: '',
-    changeManagementProcedures: '',
-    documentationSecurity: '',
-    documentationVersionControl: '',
-    externalDocumentationControl: '',
+    // ... (keep all your existing form fields)
   });
 
   const [overallMaturityScore, setOverallMaturityScore] = useState(0);
@@ -80,7 +50,7 @@ const MaturityScorecard = () => {
 
   const calculateMaturityScore = () => {
     const scores = Object.values(formData).map(value => {
-      return parseInt(value) || 0; // Convert string input to number and ensure no empty strings affect the score
+      return parseInt(value) || 0;
     });
     return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
   };
@@ -121,8 +91,15 @@ const MaturityScorecard = () => {
 
   return (
     <Box>
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4} align="stretch">
+      <Tabs>
+        <TabList>
+          <Tab>Scorecard</Tab>
+          <Tab>Dashboard</Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel>
+            <form onSubmit={handleSubmit}>
+              <VStack spacing={4} align="stretch">
 
           {/* ISO 22301 Clause 4: Define BCP Scope, Objectives, and Stakeholders */}
           <FormControl>
@@ -428,13 +405,15 @@ const MaturityScorecard = () => {
           </FormControl>
 
           {/* Submit Button */}
-          <Button type="submit" colorScheme="blue">Save Maturity Scorecard</Button>
-        </VStack>
-      </form>
-
-      <Box mt={4}>
-        <Text fontSize="xl" fontWeight="bold">Overall Maturity Score: {overallMaturityScore}</Text>
-      </Box>
+                <Button type="submit" colorScheme="blue">Save Maturity Scorecard</Button>
+              </VStack>
+            </form>
+          </TabPanel>
+          <TabPanel>
+            <MaturityScorecardDashboard formData={formData} overallMaturityScore={overallMaturityScore} />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Box>
   );
 };
