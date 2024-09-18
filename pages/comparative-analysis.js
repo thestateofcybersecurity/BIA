@@ -1,6 +1,5 @@
 import React from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import Header from '../components/Header';
 import { Box, Heading } from '@chakra-ui/react';
 import ComparativeAnalysis from '../components/ComparativeAnalysis';
 
@@ -12,7 +11,6 @@ const ComparativeAnalysisPage = () => {
 
   return (
     <Box>
-      <Header />
       <Box className="container" bg="white" p={6} rounded="md" shadow="md">
         <Heading as="h2" size="lg" mb={6}>Comparative Analysis</Heading>
         <ComparativeAnalysis />
