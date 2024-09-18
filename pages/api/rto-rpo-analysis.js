@@ -18,13 +18,17 @@ export default async function handler(req, res) {
         const analyses = await RTORPOAnalysis.find({ userId: session.user.sub }).populate('businessProcessId');
         res.status(200).json(analyses);
       } catch (error) {
-        res.status(400).json({ error: 'Error fetching RTO/RPO analyses' });
+        res.status(400).json({ error: 'Error fetching RTO/RPO analyses: ' + error.message });
       }
       break;
 
     case 'POST':
       try {
         const { businessProcessId, type, metric, acceptableTime, achievableTime } = req.body;
+
+        if (!businessProcessId) {
+          return res.status(400).json({ error: 'Business process ID is required' });
+        }
 
         // Fetch the business process to get the process name
         const businessProcess = await BusinessProcess.findById(businessProcessId);
@@ -59,8 +63,9 @@ export default async function handler(req, res) {
 
         await analysis.save();
 
-        res.status(201).json(analysis);
+        res.status(201).json({ success: true, data: analysis });
       } catch (error) {
+        console.error('Error saving RTO/RPO analysis:', error);
         res.status(400).json({ error: 'Error saving RTO/RPO analysis: ' + error.message });
       }
       break;
