@@ -22,8 +22,6 @@ import axios from 'axios';
 const RTORPOAnalysis = ({ businessProcessId }) => {
   const { user } = useUser();
   const [formData, setFormData] = useState({
-    type: 'RTO',
-    metric: 'recovery',
     acceptableTime: '',
     achievableTime: '',
   });
