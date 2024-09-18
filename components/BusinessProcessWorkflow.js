@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, Button, FormControl, FormLabel, Input, Textarea, VStack, HStack, IconButton, useToast } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import axios from 'axios';
 
-const BusinessProcessWorkflow = () => {
+const BusinessProcessWorkflow = ({ onProcessAdded }) => {
   const [formData, setFormData] = useState({
     processName: '',
     description: '',
@@ -66,6 +66,7 @@ const BusinessProcessWorkflow = () => {
           isClosable: true,
         });
         resetForm();
+        onProcessAdded();
       } else {
         throw new Error(response.data.error);
       }
