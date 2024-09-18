@@ -1,128 +1,115 @@
-// components/ComparativeAnalysis.js
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import {
   Box,
+  Heading,
   Table,
   Thead,
   Tbody,
   Tr,
   Th,
   Td,
-  Select,
   VStack,
-  Heading,
-  Text,
+  Alert,
+  AlertIcon,
+  useToast
 } from '@chakra-ui/react';
 import axios from 'axios';
 
 const ComparativeAnalysis = () => {
-  const { user } = useUser();
-  const [businessProcesses, setBusinessProcesses] = useState([]);
-  const [selectedProcesses, setSelectedProcesses] = useState([]);
-  const [analysisData, setAnalysisData] = useState([]);
+  const { user, error: authError, isLoading } = useUser();
+  const [analyses, setAnalyses] = useState([]);
+  const [error, setError] = useState(null);
+  const toast = useToast();
 
   useEffect(() => {
-    fetchBusinessProcesses();
-  }, []);
-
-  useEffect(() => {
-    if (selectedProcesses.length > 0) {
-      fetchAnalysisData();
+    if (user) {
+      fetchAnalyses();
     }
-  }, [selectedProcesses]);
+  }, [user]);
 
-  const fetchBusinessProcesses = async () => {
+  const fetchAnalyses = async () => {
     try {
-      const response = await axios.get('/api/business-process');
-      setBusinessProcesses(response.data.data);
-    } catch (error) {
-      console.error('Error fetching business processes:', error);
-    }
-  };
-
-  const fetchAnalysisData = async () => {
-    try {
-      const impactAnalysisPromises = selectedProcesses.map(processId =>
-        axios.get(`/api/impact-analysis?businessProcessId=${processId}`)
-      );
-      const rtoRpoAnalysisPromises = selectedProcesses.map(processId =>
-        axios.get(`/api/rto-rpo-analysis?businessProcessId=${processId}`)
-      );
-
-      const [impactAnalysisResponses, rtoRpoAnalysisResponses] = await Promise.all([
-        Promise.all(impactAnalysisPromises),
-        Promise.all(rtoRpoAnalysisPromises)
+      const [impactResponse, businessProcessResponse, rtoRpoResponse] = await Promise.all([
+        axios.get('/api/impact-analysis'),
+        axios.get('/api/business-process'),
+        axios.get('/api/rto-rpo-analysis'),
       ]);
 
-      const combinedData = selectedProcesses.map((processId, index) => {
-        const process = businessProcesses.find(p => p._id === processId);
-        const impactAnalysis = impactAnalysisResponses[index].data.data;
-        const rtoRpoAnalysis = rtoRpoAnalysisResponses[index].data.data;
+      // Ensure that the responses contain arrays
+      const impactAnalyses = Array.isArray(impactResponse.data) ? impactResponse.data : [];
+      const businessProcesses = Array.isArray(businessProcessResponse.data) ? businessProcessResponse.data : [];
+      const rtoRpoAnalyses = Array.isArray(rtoRpoResponse.data) ? rtoRpoResponse.data : [];
+
+      const combinedData = impactAnalyses.map(impact => {
+        const businessProcess = businessProcesses.find(bp => bp._id === impact.businessProcessId) || {};
+        const rtoRpo = rtoRpoAnalyses.find(rr => rr.businessProcessId === impact.businessProcessId) || {};
 
         return {
-          processName: process.processName,
-          criticalityTier: impactAnalysis.criticalityTier,
-          overallImpactScore: impactAnalysis.overallScore,
-          rto: rtoRpoAnalysis.find(a => a.type === 'RTO')?.acceptableTime || 'N/A',
-          rpo: rtoRpoAnalysis.find(a => a.type === 'RPO')?.acceptableTime || 'N/A',
+          ...impact,
+          processName: businessProcess.processName || 'N/A',
+          rto: rtoRpo.acceptableTime || 'N/A',
+          rpo: rtoRpo.achievableTime || 'N/A',
         };
       });
 
-      setAnalysisData(combinedData);
+      setAnalyses(combinedData);
     } catch (error) {
-      console.error('Error fetching analysis data:', error);
+      console.error('Error fetching analyses:', error);
+      setError('Failed to fetch comparative analysis data. Please try again.');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch comparative analysis data.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
-  const handleProcessSelection = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-    setSelectedProcesses(selectedOptions);
-  };
+  if (isLoading) return <div>Loading...</div>;
+  if (authError) return <div>{authError.message}</div>;
 
   return (
     <Box>
-      <VStack spacing={4} align="stretch">
-        <Heading size="lg">Comparative Analysis</Heading>
-        <Text>Select business processes to compare:</Text>
-        <Select
-          multiple
-          onChange={handleProcessSelection}
-          size="sm"
-          height="auto"
-          maxHeight="200px"
-          overflowY="auto"
-        >
-          {businessProcesses.map(process => (
-            <option key={process._id} value={process._id}>
-              {process.processName}
-            </option>
-          ))}
-        </Select>
-
-        {analysisData.length > 0 && (
+      <VStack spacing={6} align="stretch">
+        <Heading as="h2" size="lg">Comparative Analysis</Heading>
+        {error && (
+          <Alert status="error">
+            <AlertIcon />
+            {error}
+          </Alert>
+        )}
+        {analyses.length > 0 ? (
           <Table variant="simple">
             <Thead>
               <Tr>
                 <Th>Process Name</Th>
+                <Th>Overall Score</Th>
                 <Th>Criticality Tier</Th>
-                <Th>Overall Impact Score</Th>
-                <Th>RTO (hrs)</Th>
-                <Th>RPO (hrs)</Th>
+                <Th>RTO</Th>
+                <Th>RPO</Th>
+                {/* Add more headers as needed */}
               </Tr>
             </Thead>
             <Tbody>
-              {analysisData.map((data, index) => (
+              {analyses.map((analysis, index) => (
                 <Tr key={index}>
-                  <Td>{data.processName}</Td>
-                  <Td>{data.criticalityTier}</Td>
-                  <Td>{data.overallImpactScore.toFixed(2)}</Td>
-                  <Td>{data.rto}</Td>
-                  <Td>{data.rpo}</Td>
+                  <Td>{analysis.processName}</Td>
+                  <Td>{analysis.overallScore?.toFixed(2) || 'N/A'}</Td>
+                  <Td>{analysis.criticalityTier || 'N/A'}</Td>
+                  <Td>{analysis.rto}</Td>
+                  <Td>{analysis.rpo}</Td>
+                  {/* Add more cells as needed */}
                 </Tr>
               ))}
             </Tbody>
           </Table>
+        ) : (
+          <Alert status="info">
+            <AlertIcon />
+            No comparative analysis data available.
+          </Alert>
         )}
       </VStack>
     </Box>
