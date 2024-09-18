@@ -8,14 +8,18 @@ import {
   FormLabel,
   Input,
   Select,
-  Textarea,
+  Heading,
   VStack,
-  useToast,
+  Text,
+  SimpleGrid,
+  useToast  // Add this import
 } from '@chakra-ui/react';
 import axios from 'axios';
 
 const ImpactAnalysisForm = ({ businessProcessId }) => {
-  const { user } = useUser();
+  const { user, error, isLoading } = useUser();
+  const [processes, setProcesses] = useState([]);
+  const [selectedProcess, setSelectedProcess] = useState('');
   const [formData, setFormData] = useState({
     clientFacingAvailability: '',
     additionalAvailability: '',
