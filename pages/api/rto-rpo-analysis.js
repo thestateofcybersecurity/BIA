@@ -26,17 +26,15 @@ export default async function handler(req, res) {
       try {
         const { businessProcessId, type, metric, acceptableTime, achievableTime } = req.body;
 
-        if (!businessProcessId) {
-          return res.status(400).json({ error: 'Business process ID is required' });
+        if (!businessProcessId || !type || !metric || !acceptableTime || !achievableTime) {
+          return res.status(400).json({ error: 'All fields are required' });
         }
 
-        // Fetch the business process to get the process name
         const businessProcess = await BusinessProcess.findById(businessProcessId);
         if (!businessProcess) {
           return res.status(404).json({ error: 'Business process not found' });
         }
 
-        // Check if an analysis already exists for this process, type, and metric
         let analysis = await RTORPOAnalysis.findOne({
           userId: session.user.sub,
           businessProcessId,
@@ -45,11 +43,9 @@ export default async function handler(req, res) {
         });
 
         if (analysis) {
-          // Update existing analysis
           analysis.acceptableTime = acceptableTime;
           analysis.achievableTime = achievableTime;
         } else {
-          // Create new analysis
           analysis = new RTORPOAnalysis({
             userId: session.user.sub,
             businessProcessId,
