@@ -1,4 +1,4 @@
-// pages/api/business-processes/impact-analysis-status.js
+// pages/api/business-process.js
 import { getSession } from '@auth0/nextjs-auth0';
 import connectDB from '../../config/database';
 import BusinessProcess from '../../models/BusinessProcess';
@@ -29,6 +29,23 @@ export default async function handler(req, res) {
       try {
         const businessProcesses = await BusinessProcess.find({ userId: session.user.sub });
         res.status(200).json({ success: true, data: businessProcesses });
+      } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+      }
+      break;
+
+    case 'PUT':
+      try {
+        const { id } = req.query;
+        const updatedProcess = await BusinessProcess.findByIdAndUpdate(
+          id,
+          { ...req.body, updatedAt: Date.now() },
+          { new: true, runValidators: true }
+        );
+        if (!updatedProcess) {
+          return res.status(404).json({ success: false, error: 'Business process not found' });
+        }
+        res.status(200).json({ success: true, data: updatedProcess });
       } catch (error) {
         res.status(400).json({ success: false, error: error.message });
       }
