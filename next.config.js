@@ -1,4 +1,6 @@
-module.exports = {
+const { withAuth } = require('next-auth0');
+
+module.exports = withAuth({
   reactStrictMode: true,
   env: {
     MONGODB_URI: process.env.MONGODB_URI,
