@@ -365,9 +365,9 @@ const MaturityScorecard = () => {
         </VStack>
       </form>
 
-      <Text mt={4} fontSize="xl" fontWeight="bold">
-        Overall Maturity Score: {overallMaturityScore}
-      </Text>
+      <Box mt={4}>
+        <Text fontSize="xl" fontWeight="bold">Overall Maturity Score: {overallMaturityScore}</Text>
+      </Box>
     </Box>
   );
 };
