@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
   auth0Id: { type: String, required: true, unique: true },
@@ -9,4 +9,4 @@ const UserSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-const User = mongoose.model('User', UserSchema);
+export default User = mongoose.model('User', UserSchema);
