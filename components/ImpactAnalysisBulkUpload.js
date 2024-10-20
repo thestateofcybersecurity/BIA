@@ -35,7 +35,7 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
     Papa.parse(file, {
       complete: async (results) => {
         try {
-          const response = await axios.post('/api/impact-analysis/bulk-upload', {
+          const response = await axios.post('/api/impact-analysis?bulkUpload=true', {
             data: results.data,
           });
           toast({
