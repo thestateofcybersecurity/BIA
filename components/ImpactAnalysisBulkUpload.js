@@ -30,12 +30,12 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
 
   const translateCriticalityRating = (rating) => {
     const ratingMap = {
-      'Tier 0': 'Tier 1 (Gold)',
-      'Tier 1': 'Tier 2 (Silver)',
-      'Tier 2': 'Tier 3 (Bronze)',
-      'Tier 3': 'Non-critical',
+      'Tier 0': 'Critical',
+      'Tier 1': 'High',
+      'Tier 2': 'Medium',
+      'Tier 3': 'Low',
     };
-    return ratingMap[rating] || 'Non-critical';
+    return ratingMap[rating] || 'Low';
   };
 
   const translateImpactScore = (score) => {
