@@ -8,6 +8,9 @@ import {
   Input,
   VStack,
   useToast,
+  Text,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
 import axios from 'axios';
 import Papa from 'papaparse';
@@ -72,6 +75,18 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
         <Button onClick={handleUpload} colorScheme="blue">
           Upload
         </Button>
+        <Alert status="info">
+          <AlertIcon />
+          <Text>
+            Upload a CSV file to bulk import impact analyses. The CSV should have the following columns:
+          </Text>
+        </Alert>
+        <Text fontSize="sm">
+          Required columns: processName, clientFacingAvailability, additionalAvailability, criticalityRating, lossOfRevenue, lossOfProductivity, increasedOperatingCosts, financialPenalties, impactOnCustomers, impactOnStaff, impactOnPartners, complianceImpact, healthSafetyRisk
+        </Text>
+        <Text fontSize="sm">
+          Note: The 'processName' should match an existing business process in the system.
+        </Text>
       </VStack>
     </Box>
   );
