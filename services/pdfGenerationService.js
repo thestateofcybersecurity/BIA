@@ -12,60 +12,96 @@ export async function generateBCPPDF(data) {
       resolve(pdfData);
     });
 
-    // Title and Document Information
-    doc.fontSize(18).text('Business Continuity Plan', { align: 'center' }).moveDown();
-    doc.fontSize(14).text('Document Information').moveDown();
-    doc.fontSize(12).text(`Version #: 1.0`);
-    doc.text(`Version Date: ${moment().format('MM/DD/YYYY')}`);
+    // Document Information and Title
+    doc.fontSize(20).text('Business Continuity Plan', { align: 'center' }).moveDown();
+    doc.fontSize(14).text('Version #: 1.0', { align: 'right' });
+    doc.text(`Version Date: ${moment().format('MMMM Do YYYY')}`, { align: 'right' });
     doc.moveDown();
 
-    // Business Processes
+    // Table of Contents
     doc.addPage();
-    doc.fontSize(14).text('Business Processes and Dependencies').moveDown();
+    doc.fontSize(16).text('Table of Contents', { underline: true });
+    doc.fontSize(12)
+      .text('1. Introduction and Scope', { indent: 20 })
+      .text('2. Business Continuity Requirements', { indent: 20 })
+      .text('3. RTO and RPO Summary', { indent: 20 })
+      .text('4. Risk Assessment', { indent: 20 })
+      .text('5. Alternate Business Locations', { indent: 20 })
+      .text('6. IT Resiliency and Disaster Recovery', { indent: 20 })
+      .text('7. Incident Response Procedures', { indent: 20 })
+      .text('8. Communications During a Disaster', { indent: 20 })
+      .text('9. BC Awareness and Training', { indent: 20 })
+      .text('10. Testing and Maintenance', { indent: 20 })
+      .text('11. Summary', { indent: 20 });
+
+    // Section 1: Introduction and Scope
+    doc.addPage();
+    doc.fontSize(16).text('1. Introduction and Scope', { underline: true });
+    doc.fontSize(12).text('This document outlines our Business Continuity Plan (BCP), ensuring recovery from business disruptions...');
+    // Insert other introduction and scope content...
+    doc.moveDown();
+
+    // Section 2: Business Continuity Requirements
+    doc.fontSize(16).text('2. Business Continuity Requirements', { underline: true }).moveDown();
+    doc.fontSize(14).text('2.1 Business Processes and Dependencies').moveDown();
     data.businessProcesses.forEach(process => {
       doc.fontSize(12).text(`Process Name: ${process.processName}`);
       doc.text(`Owner: ${process.owner}`);
-      doc.text(`Dependencies: ${JSON.stringify(process.dependencies)}`);
+      doc.text(`Dependencies: ${JSON.stringify(process.dependencies, null, 2)}`);
       doc.moveDown();
     });
 
-    // Business Impact Analysis
+    // Section 3: RTO and RPO Summary
     doc.addPage();
-    doc.fontSize(14).text('Business Impact Analysis (BIA)').moveDown();
-    data.impactAnalyses.forEach(analysis => {
-      doc.fontSize(12).text(`Process: ${analysis.processName}`);
-      doc.text(`Criticality Rating: ${analysis.criticalityRating}`);
-      doc.text(`Overall Score: ${analysis.overallScore}`);
-      doc.moveDown();
-    });
-
-    // RTO/RPO Analysis
-    doc.addPage();
-    doc.fontSize(14).text('RTO and RPO Summary').moveDown();
+    doc.fontSize(16).text('3. RTO and RPO Summary', { underline: true }).moveDown();
+    doc.fontSize(14).text('3.1 RTO and RPO for Critical Business Processes').moveDown();
     data.rtoRpoAnalyses.forEach(analysis => {
       doc.fontSize(12).text(`Process: ${analysis.processName}`);
-      doc.text(`RTO: ${analysis.rto}`);
-      doc.text(`RPO: ${analysis.rpo}`);
+      doc.text(`RTO: ${analysis.rto} | RPO: ${analysis.rpo}`);
       doc.moveDown();
     });
 
-    // Business Recovery Procedures
+    // Section 4: Risk Assessment
     doc.addPage();
-    doc.fontSize(14).text('Business Recovery Procedures').moveDown();
-    data.recoveryWorkflows.forEach(workflow => {
-      doc.fontSize(12).text(`Process: ${workflow.processName}`);
-      doc.text(`Recovery Steps: ${workflow.recoverySteps}`);
-      doc.moveDown();
-    });
+    doc.fontSize(16).text('4. Risk Assessment', { underline: true }).moveDown();
+    doc.fontSize(12).text('Details on the risk assessment based on geographic, personnel, and technological risks...').moveDown();
 
-    // Maturity Scorecard (if available)
-    if (data.maturityScorecard) {
-      doc.addPage();
-      doc.fontSize(14).text('BC Maturity Assessment').moveDown();
-      doc.fontSize(12).text(`Overall Maturity Score: ${data.maturityScorecard.overallMaturityScore}`);
-    }
+    // Section 5: Alternate Business Locations
+    doc.addPage();
+    doc.fontSize(16).text('5. Alternate Business Locations', { underline: true }).moveDown();
+    doc.fontSize(12).text('Primary: Location A, Secondary: Location B').moveDown();
 
-    // Close document
+    // Section 6: IT Resiliency and Disaster Recovery
+    doc.addPage();
+    doc.fontSize(16).text('6. IT Resiliency and Disaster Recovery', { underline: true }).moveDown();
+    doc.fontSize(12).text('Details on IT Resiliency...').moveDown();
+
+    // Section 7: Incident Response Procedures
+    doc.addPage();
+    doc.fontSize(16).text('7. Incident Response Procedures', { underline: true }).moveDown();
+    doc.fontSize(12).text('The incident response team is responsible for...').moveDown();
+
+    // Section 8: Communications During a Disaster
+    doc.addPage();
+    doc.fontSize(16).text('8. Communications During a Disaster', { underline: true }).moveDown();
+    doc.fontSize(12).text('Communication protocols during a disaster include phone systems and email backups...').moveDown();
+
+    // Section 9: BC Awareness and Training
+    doc.addPage();
+    doc.fontSize(16).text('9. BC Awareness and Training', { underline: true }).moveDown();
+    doc.fontSize(12).text('Details on training for the business continuity team...').moveDown();
+
+    // Section 10: Testing and Maintenance
+    doc.addPage();
+    doc.fontSize(16).text('10. Testing and Maintenance', { underline: true }).moveDown();
+    doc.fontSize(12).text('Annual review and testing procedures...').moveDown();
+
+    // Section 11: Summary
+    doc.addPage();
+    doc.fontSize(16).text('11. Summary', { underline: true }).moveDown();
+    doc.fontSize(12).text('Our Business Continuity Plan aims to ensure...').moveDown();
+
+    // Finalize the PDF document
     doc.end();
   });
 }
