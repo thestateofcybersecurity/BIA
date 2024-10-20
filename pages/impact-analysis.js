@@ -16,7 +16,14 @@ import {
   Th,
   Td,
   Button,
-  useDisclosure
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
 } from '@chakra-ui/react';
 import ImpactAnalysisForm from '../components/ImpactAnalysisForm';
 import ImpactAnalysisBulkUpload from '../components/ImpactAnalysisBulkUpload';
@@ -50,7 +57,6 @@ const ImpactAnalysisPage = () => {
 
   const handleAnalysisSaved = () => {
     fetchAnalyses();
-    setSelectedAnalysis(null);
     onClose();
   };
 
@@ -95,13 +101,6 @@ const ImpactAnalysisPage = () => {
                     ))}
                   </Tbody>
                 </Table>
-                {isOpen && (
-                  <ImpactAnalysisForm 
-                    analysisId={selectedAnalysis._id} 
-                    initialData={selectedAnalysis}
-                    onSave={handleAnalysisSaved}
-                  />
-                )}
               </TabPanel>
               <TabPanel>
                 <ImpactAnalysisBulkUpload onUploadComplete={fetchAnalyses} />
@@ -110,6 +109,26 @@ const ImpactAnalysisPage = () => {
           </Tabs>
         </VStack>
       </Box>
+
+      <Modal isOpen={isOpen} onClose={onClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Edit Impact Analysis</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {selectedAnalysis && (
+              <ImpactAnalysisForm
+                analysisId={selectedAnalysis._id}
+                initialData={selectedAnalysis}
+                onSave={handleAnalysisSaved}
+              />
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };
