@@ -14,6 +14,43 @@ export default async function handler(req, res) {
 
   switch (req.method) {
     case 'POST':
+      if (req.query.bulkUpload) {
+        try {
+          const { data } = req.body;
+          const uploadedAnalyses = [];
+
+          for (const row of data) {
+            const businessProcess = await BusinessProcess.findOne({
+              processName: row.processName,
+              userId: session.user.sub,
+            });
+
+            if (!businessProcess) {
+              continue; // Skip if business process not found
+            }
+
+            const impactAnalysis = new ImpactAnalysis({
+              ...row,
+              userId: session.user.sub,
+              businessProcess: businessProcess._id,
+            });
+
+            await impactAnalysis.save();
+            uploadedAnalyses.push(impactAnalysis);
+
+            await BusinessProcess.findByIdAndUpdate(businessProcess._id, {
+              impactAnalysisCompleted: true,
+              impactAnalysis: impactAnalysis._id,
+            });
+          }
+
+          res.status(201).json({ uploadedCount: uploadedAnalyses.length });
+        } catch (error) {
+          console.error('Error bulk uploading impact analyses:', error);
+          res.status(400).json({ error: error.message });
+        }
+      } else {
+    case 'POST':
       try {
         const { businessProcessId, ...impactData } = req.body;
         const impactAnalysis = new ImpactAnalysis({
