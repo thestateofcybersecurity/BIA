@@ -304,150 +304,152 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
   if (error) return <div>{error.message}</div>;
 
   return (
-    <Box>
-      <Box className="container" bg="white" p={6} rounded="md" shadow="md">
-        <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
-        <form onSubmit={handleSubmit}>
-          <VStack spacing={4} align="flex-start">
-            <FormControl id="processSelect" isRequired>
-              <FormLabel>Select Business Process</FormLabel>
-              <Select value={selectedProcess} onChange={handleProcessChange}>
-                <option value="">Select a process</option>
-                {processes.map(process => (
-                  <option key={process._id} value={process._id}>{process.processName}</option>
-                ))}
-              </Select>
-            </FormControl>
+    <Box className="container" bg="white" p={6} rounded="md" shadow="md">
+      <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
+      <form onSubmit={handleSubmit}>
+        <VStack spacing={4} align="flex-start">
+          <FormControl id="processSelect" isRequired>
+            <FormLabel>Select Business Process</FormLabel>
+            <Select 
+              value={selectedProcess} 
+              onChange={handleProcessChange}
+              isDisabled={analysisId != null}
+            >
+              <option value="">Select a process</option>
+              {processes.map(process => (
+                <option key={process._id} value={process._id}>{process.processName}</option>
+              ))}
+            </Select>
+          </FormControl>
 
-            <FormControl id="clientFacingAvailability">
-              <FormLabel>Client-Facing Availability Requirements</FormLabel>
-              <Input type="text" name="clientFacingAvailability" value={formData.clientFacingAvailability} onChange={handleChange} />
-            </FormControl>
-            
-            <FormControl id="additionalAvailability">
-              <FormLabel>Additional Availability Requirements</FormLabel>
-              <Input type="text" name="additionalAvailability" value={formData.additionalAvailability} onChange={handleChange} />
-            </FormControl>
-            
-            <FormControl id="criticalityRating" isRequired>
-              <FormLabel>Criticality Rating</FormLabel>
-              <Select name="criticalityRating" value={formData.criticalityRating} onChange={handleChange}>
-                <option value="">Select a rating</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </Select>
-            </FormControl>
+          <FormControl id="clientFacingAvailability">
+            <FormLabel>Client-Facing Availability Requirements</FormLabel>
+            <Input type="text" name="clientFacingAvailability" value={formData.clientFacingAvailability} onChange={handleChange} />
+          </FormControl>
+          
+          <FormControl id="additionalAvailability">
+            <FormLabel>Additional Availability Requirements</FormLabel>
+            <Input type="text" name="additionalAvailability" value={formData.additionalAvailability} onChange={handleChange} />
+          </FormControl>
+          
+          <FormControl id="criticalityRating" isRequired>
+            <FormLabel>Criticality Rating</FormLabel>
+            <Select name="criticalityRating" value={formData.criticalityRating} onChange={handleChange}>
+              <option value="">Select a rating</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </Select>
+          </FormControl>
 
-            <FormControl id="lossOfRevenue" isRequired>
-              <FormLabel>Loss of Revenue</FormLabel>
-              <Select name="lossOfRevenue" value={formData.lossOfRevenue} onChange={handleChange}>
-                <option value="">Select an option</option>
-                {renderOptions('lossOfRevenue')}
-              </Select>
-            </FormControl>
+          <FormControl id="lossOfRevenue" isRequired>
+            <FormLabel>Loss of Revenue</FormLabel>
+            <Select name="lossOfRevenue" value={formData.lossOfRevenue} onChange={handleChange}>
+              <option value="">Select an option</option>
+              {renderOptions('lossOfRevenue')}
+            </Select>
+          </FormControl>
 
-            <FormControl id="lossOfProductivity" isRequired>
-              <FormLabel>Loss of Productivity</FormLabel>
-              <Select name="lossOfProductivity" value={formData.lossOfProductivity} onChange={handleChange}>
-                <option value="">Select an option</option>
-                {renderOptions('lossOfProductivity')}
-              </Select>
-            </FormControl>
+          <FormControl id="lossOfProductivity" isRequired>
+            <FormLabel>Loss of Productivity</FormLabel>
+            <Select name="lossOfProductivity" value={formData.lossOfProductivity} onChange={handleChange}>
+              <option value="">Select an option</option>
+              {renderOptions('lossOfProductivity')}
+            </Select>
+          </FormControl>
 
-            <FormControl id="increasedOperatingCosts" isRequired>
-              <FormLabel>Increased Operating Costs</FormLabel>
-              <Select name="increasedOperatingCosts" value={formData.increasedOperatingCosts} onChange={handleChange}>
-                <option value="">Select an option</option>
-                {renderOptions('increasedOperatingCosts')}
-              </Select>
-            </FormControl>
+          <FormControl id="increasedOperatingCosts" isRequired>
+            <FormLabel>Increased Operating Costs</FormLabel>
+            <Select name="increasedOperatingCosts" value={formData.increasedOperatingCosts} onChange={handleChange}>
+              <option value="">Select an option</option>
+              {renderOptions('increasedOperatingCosts')}
+            </Select>
+          </FormControl>
 
-            <FormControl id="financialPenalties" isRequired>
-              <FormLabel>Financial Penalties</FormLabel>
-              <Select name="financialPenalties" value={formData.financialPenalties} onChange={handleChange}>
-                <option value="">Select an option</option>
-                {renderOptions('financialPenalties')}
-              </Select>
-            </FormControl>
-    
-            <FormControl id="impactOnCustomers" isRequired>
-              <FormLabel>Impact on Customers</FormLabel>
-              <Select name="impactOnCustomers" value={formData.impactOnCustomers} onChange={handleChange}>
-                <option value="">Select an option</option>
-                <option value="Low Impact">Low Impact</option>
-                <option value="Medium Impact">Medium Impact</option>
-                <option value="High Impact">High Impact</option>
-                <option value="Critical Impact">Critical Impact</option>
-              </Select>
-            </FormControl>
+          <FormControl id="financialPenalties" isRequired>
+            <FormLabel>Financial Penalties</FormLabel>
+            <Select name="financialPenalties" value={formData.financialPenalties} onChange={handleChange}>
+              <option value="">Select an option</option>
+              {renderOptions('financialPenalties')}
+            </Select>
+          </FormControl>
+  
+          <FormControl id="impactOnCustomers" isRequired>
+            <FormLabel>Impact on Customers</FormLabel>
+            <Select name="impactOnCustomers" value={formData.impactOnCustomers} onChange={handleChange}>
+              <option value="">Select an option</option>
+              <option value="Low Impact">Low Impact</option>
+              <option value="Medium Impact">Medium Impact</option>
+              <option value="High Impact">High Impact</option>
+              <option value="Critical Impact">Critical Impact</option>
+            </Select>
+          </FormControl>
 
-            <FormControl id="impactOnStaff" isRequired>
-              <FormLabel>Impact on Internal Staff</FormLabel>
-              <Select name="impactOnStaff" value={formData.impactOnStaff} onChange={handleChange}>
-                <option value="">Select an option</option>
-                <option value="Low Impact">Low Impact</option>
-                <option value="Medium Impact">Medium Impact</option>
-                <option value="High Impact">High Impact</option>
-                <option value="Critical Impact">Critical Impact</option>
-              </Select>
-            </FormControl>
+          <FormControl id="impactOnStaff" isRequired>
+            <FormLabel>Impact on Internal Staff</FormLabel>
+            <Select name="impactOnStaff" value={formData.impactOnStaff} onChange={handleChange}>
+              <option value="">Select an option</option>
+              <option value="Low Impact">Low Impact</option>
+              <option value="Medium Impact">Medium Impact</option>
+              <option value="High Impact">High Impact</option>
+              <option value="Critical Impact">Critical Impact</option>
+            </Select>
+          </FormControl>
 
-            <FormControl id="impactOnPartners" isRequired>
-              <FormLabel>Impact on Business Partners</FormLabel>
-              <Select name="impactOnPartners" value={formData.impactOnPartners} onChange={handleChange}>
-                <option value="">Select an option</option>
-                <option value="Low Impact">Low Impact</option>
-                <option value="Medium Impact">Medium Impact</option>
-                <option value="High Impact">High Impact</option>
-                <option value="Critical Impact">Critical Impact</option>
-              </Select>
-            </FormControl>
+          <FormControl id="impactOnPartners" isRequired>
+            <FormLabel>Impact on Business Partners</FormLabel>
+            <Select name="impactOnPartners" value={formData.impactOnPartners} onChange={handleChange}>
+              <option value="">Select an option</option>
+              <option value="Low Impact">Low Impact</option>
+              <option value="Medium Impact">Medium Impact</option>
+              <option value="High Impact">High Impact</option>
+              <option value="Critical Impact">Critical Impact</option>
+            </Select>
+          </FormControl>
 
-            <FormControl id="complianceImpact" isRequired>
-              <FormLabel>Compliance (e.g. Legal/ Regulatory) Impact</FormLabel>
-              <Select name="complianceImpact" value={formData.complianceImpact} onChange={handleChange}>
-                <option value="">Select an option</option>
-                <option value="Low Impact">Low Impact</option>
-                <option value="Medium Impact">Medium Impact</option>
-                <option value="High Impact">High Impact</option>
-                <option value="Critical Impact">Critical Impact</option>
-              </Select>
-            </FormControl>
+          <FormControl id="complianceImpact" isRequired>
+            <FormLabel>Compliance (e.g. Legal/ Regulatory) Impact</FormLabel>
+            <Select name="complianceImpact" value={formData.complianceImpact} onChange={handleChange}>
+              <option value="">Select an option</option>
+              <option value="Low Impact">Low Impact</option>
+              <option value="Medium Impact">Medium Impact</option>
+              <option value="High Impact">High Impact</option>
+              <option value="Critical Impact">Critical Impact</option>
+            </Select>
+          </FormControl>
 
-            <FormControl id="healthSafetyRisk" isRequired>
-              <FormLabel>Health or Safety Risk</FormLabel>
-              <Select name="healthSafetyRisk" value={formData.healthSafetyRisk} onChange={handleChange}>
-                <option value="">Select an option</option>
-                <option value="Some degradation of health/safety services">Some degradation of health/safety services</option>
-                <option value="High degradation of health/safety services">High degradation of health/safety services</option>
-                <option value="Some risk of loss-of-life/serious harm">Some risk of loss-of-life/serious harm</option>
-                <option value="High risk of loss-of-life/serious harm">High risk of loss-of-life/serious harm</option>
-              </Select>
-            </FormControl>
-                
-            <Heading as="h3" size="md" mt={6}>Impact Scores</Heading>
-            <SimpleGrid columns={2} spacing={4}>
-              <Text>Revenue Score: {scores.revenueScore.toFixed(2)}</Text>
-              <Text>Productivity Score: {scores.productivityScore.toFixed(2)}</Text>
-              <Text>Operating Costs Score: {scores.operatingCostsScore.toFixed(2)}</Text>
-              <Text>Financial Penalties Score: {scores.financialPenaltiesScore.toFixed(2)}</Text>
-              <Text>Customers Score: {scores.customersScore}</Text>
-              <Text>Staff Score: {scores.staffScore}</Text>
-              <Text>Partners Score: {scores.partnersScore}</Text>
-              <Text>Compliance Score: {scores.complianceScore}</Text>
-              <Text>Health & Safety Score: {scores.healthSafetyScore}</Text>
-            </SimpleGrid>
-            <Text fontWeight="bold">Total Cost of Downtime per 24 Hours: ${scores.totalCostOfDowntime.toLocaleString()}</Text>
-            <Text fontWeight="bold">Total Impact on Goodwill, Compliance & Safety: {scores.totalImpactScore}</Text>
-            <Text fontWeight="bold">Overall Score: {scores.overallScore.toFixed(2)}</Text>
-            <Text fontWeight="bold">Criticality Tier: {scores.criticalityTier}</Text>
-            
-            <Button type="submit" colorScheme="blue" mt={6}>Save Impact Analysis</Button>
-          </VStack>
-        </form>
-      </Box>
+          <FormControl id="healthSafetyRisk" isRequired>
+            <FormLabel>Health or Safety Risk</FormLabel>
+            <Select name="healthSafetyRisk" value={formData.healthSafetyRisk} onChange={handleChange}>
+              <option value="">Select an option</option>
+              <option value="Some degradation of health/safety services">Some degradation of health/safety services</option>
+              <option value="High degradation of health/safety services">High degradation of health/safety services</option>
+              <option value="Some risk of loss-of-life/serious harm">Some risk of loss-of-life/serious harm</option>
+              <option value="High risk of loss-of-life/serious harm">High risk of loss-of-life/serious harm</option>
+            </Select>
+          </FormControl>
+              
+          <Heading as="h3" size="md" mt={6}>Impact Scores</Heading>
+          <SimpleGrid columns={2} spacing={4}>
+            <Text>Revenue Score: {scores.revenueScore.toFixed(2)}</Text>
+            <Text>Productivity Score: {scores.productivityScore.toFixed(2)}</Text>
+            <Text>Operating Costs Score: {scores.operatingCostsScore.toFixed(2)}</Text>
+            <Text>Financial Penalties Score: {scores.financialPenaltiesScore.toFixed(2)}</Text>
+            <Text>Customers Score: {scores.customersScore}</Text>
+            <Text>Staff Score: {scores.staffScore}</Text>
+            <Text>Partners Score: {scores.partnersScore}</Text>
+            <Text>Compliance Score: {scores.complianceScore}</Text>
+            <Text>Health & Safety Score: {scores.healthSafetyScore}</Text>
+          </SimpleGrid>
+          <Text fontWeight="bold">Total Cost of Downtime per 24 Hours: ${scores.totalCostOfDowntime.toLocaleString()}</Text>
+          <Text fontWeight="bold">Total Impact on Goodwill, Compliance & Safety: {scores.totalImpactScore}</Text>
+          <Text fontWeight="bold">Overall Score: {scores.overallScore.toFixed(2)}</Text>
+          <Text fontWeight="bold">Criticality Tier: {scores.criticalityTier}</Text>
+          
+          <Button type="submit" colorScheme="blue" mt={6}>Save Impact Analysis</Button>
+        </VStack>
+      </form>
     </Box>
   );
 };
