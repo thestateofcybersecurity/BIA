@@ -114,11 +114,21 @@ export async function generateBCPPDF(data) {
     // Section 2.1 Business Processes and Dependencies
     doc.fontSize(14).text('2.1 Business Processes and Dependencies').moveDown();
     
-    // Loop through business processes and display their details
+    // Process Data Loop
     data.businessProcesses.forEach(process => {
       doc.fontSize(12).font('Helvetica-Bold').text(`Process Name: ${process.processName}`);
       doc.font('Helvetica').text(`Owner: ${process.owner}`);
-      doc.text(`Dependencies: ${process.dependencies.join(', ')}`);  // Assuming dependencies are listed as an array
+
+      // Dependencies (Formatted in Human Readable way)
+      const dependencyTypes = ['people', 'itApplications', 'devices', 'facilityLocation', 'suppliers'];
+      dependencyTypes.forEach(type => {
+        if (process.dependencies[type] && process.dependencies[type].length > 0) {
+          doc.font('Helvetica-Bold').text(`${capitalizeFirstLetter(type)}:`);
+          process.dependencies[type].forEach(item => {
+            doc.font('Helvetica').text(`- ${item}`, { indent: 20 });
+          });
+        }
+      });
       doc.moveDown();
     });
     
