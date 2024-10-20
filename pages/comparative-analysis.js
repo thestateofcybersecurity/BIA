@@ -68,16 +68,26 @@ const ComparativeAnalysis = () => {
         axios.get('/api/rto-rpo-analysis'),
       ]);
 
-      const combinedData = impactResponse.data.map(impact => {
-        const businessProcess = businessProcessResponse.data.find(bp => bp._id === impact.businessProcessId);
-        const rtoRpo = rtoRpoResponse.data.find(rr => rr.businessProcessId === impact.businessProcessId);
+      // Ensure that the responses contain arrays
+      const impactAnalyses = Array.isArray(impactResponse.data) ? impactResponse.data : [];
+      const businessProcesses = Array.isArray(businessProcessResponse.data) ? businessProcessResponse.data : [];
+      const rtoRpoAnalyses = Array.isArray(rtoRpoResponse.data) ? rtoRpoResponse.data : [];
+
+      if (impactAnalyses.length === 0) {
+        setError('No impact analysis data available.');
+        return;
+      }
+
+      const combinedData = impactAnalyses.map(impact => {
+        const businessProcess = businessProcesses.find(bp => bp._id === impact.businessProcessId) || {};
+        const rtoRpo = rtoRpoAnalyses.find(rr => rr.businessProcessId === impact.businessProcessId) || {};
 
         return {
           ...impact,
-          processName: businessProcess?.processName || 'N/A',
-          owner: businessProcess?.owner || 'N/A',
-          rto: rtoRpo?.acceptableTime || 'N/A',
-          rpo: rtoRpo?.achievableTime || 'N/A',
+          processName: businessProcess.processName || 'N/A',
+          owner: businessProcess.owner || 'N/A',
+          rto: rtoRpo.acceptableTime || 'N/A',
+          rpo: rtoRpo.achievableTime || 'N/A',
         };
       });
 
@@ -86,6 +96,13 @@ const ComparativeAnalysis = () => {
     } catch (error) {
       console.error('Error fetching analyses:', error);
       setError('Failed to fetch comparative analysis data. Please try again.');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch comparative analysis data.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
