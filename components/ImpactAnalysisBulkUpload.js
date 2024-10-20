@@ -35,37 +35,55 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
       'Tier 2': 'Tier 3 (Bronze)',
       'Tier 3': 'Non-critical',
     };
-    return ratingMap[rating] || rating;
+    return ratingMap[rating] || 'Non-critical';
   };
 
   const translateImpactScore = (score) => {
-    const scoreMap = {
-      '0': 0,
-      '0.5': 0.5,
-      '1': 1,
-      '1.5': 1.5,
-      '2': 2,
-      '2.5': 2.5,
-      '3': 3,
-      '3.5': 3.5,
-      '4': 4,
+    return parseFloat(score) || 0;
+  };
+
+  const calculateScores = (row) => {
+    const scores = {
+      revenueScore: translateImpactScore(row.lossOfRevenue),
+      productivityScore: translateImpactScore(row.lossOfProductivity),
+      operatingCostsScore: translateImpactScore(row.increasedOperatingCosts),
+      financialPenaltiesScore: translateImpactScore(row.financialPenalties),
+      customersScore: translateImpactScore(row.impactOnCustomers),
+      staffScore: translateImpactScore(row.impactOnStaff),
+      partnersScore: translateImpactScore(row.impactOnPartners),
+      complianceScore: translateImpactScore(row.complianceImpact),
+      healthSafetyScore: translateImpactScore(row.healthSafetyRisk),
     };
-    return scoreMap[score] !== undefined ? scoreMap[score] : parseFloat(score) || 0;
+
+    scores.totalCostOfDowntime = 
+      scores.revenueScore + 
+      scores.productivityScore + 
+      scores.operatingCostsScore + 
+      scores.financialPenaltiesScore;
+
+    scores.totalImpactScore = 
+      scores.customersScore + 
+      scores.staffScore + 
+      scores.partnersScore + 
+      scores.complianceScore + 
+      scores.healthSafetyScore;
+
+    scores.overallScore = Object.values(scores).reduce((sum, score) => sum + score, 0) / 9;
+
+    scores.criticalityTier = 
+      scores.overallScore >= 3.5 ? 'Tier 0 (Gold)' :
+      scores.overallScore >= 3 ? 'Tier 1 (Silver)' :
+      scores.overallScore >= 2.5 ? 'Tier 2 (Bronze)' :
+      'Non-critical';
+
+    return scores;
   };
 
   const preprocessData = (data) => {
     return data.map(row => ({
       ...row,
       criticalityRating: translateCriticalityRating(row.criticalityRating),
-      lossOfRevenue: translateImpactScore(row.lossOfRevenue),
-      lossOfProductivity: translateImpactScore(row.lossOfProductivity),
-      increasedOperatingCosts: translateImpactScore(row.increasedOperatingCosts),
-      financialPenalties: translateImpactScore(row.financialPenalties),
-      impactOnCustomers: translateImpactScore(row.impactOnCustomers),
-      impactOnStaff: translateImpactScore(row.impactOnStaff),
-      impactOnPartners: translateImpactScore(row.impactOnPartners),
-      complianceImpact: translateImpactScore(row.complianceImpact),
-      healthSafetyRisk: translateImpactScore(row.healthSafetyRisk),
+      ...calculateScores(row),
     }));
   };
 
@@ -102,7 +120,7 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
           console.error('Error uploading analyses:', error);
           toast({
             title: 'Upload failed',
-            description: error.response?.data?.message || 'An error occurred during upload.',
+            description: error.response?.data?.error || 'An error occurred during upload.',
             status: 'error',
             duration: 5000,
             isClosable: true,
@@ -137,7 +155,7 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
           Required columns: processName, clientFacingAvailability, additionalAvailability, criticalityRating, lossOfRevenue, lossOfProductivity, increasedOperatingCosts, financialPenalties, impactOnCustomers, impactOnStaff, impactOnPartners, complianceImpact, healthSafetyRisk
         </Text>
         <Text fontSize="sm">
-          Note: The 'processName' should match an existing business process in the system. Criticality Rating should be one of: Tier 0, Tier 1, Tier 2, Tier 3. Impact scores should be between 0 and 4.
+          Note: The 'processName' should match an existing business process in the system. Criticality Rating should be one of: Tier 0, Tier 1, Tier 2, Tier 3. Impact scores should be numerical values.
         </Text>
         {uploadErrors.length > 0 && (
           <Alert status="warning">
