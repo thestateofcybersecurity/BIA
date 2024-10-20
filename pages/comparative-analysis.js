@@ -62,47 +62,12 @@ const ComparativeAnalysis = () => {
 
   const fetchAnalyses = async () => {
     try {
-      const [impactResponse, businessProcessResponse, rtoRpoResponse] = await Promise.all([
-        axios.get('/api/impact-analysis'),
-        axios.get('/api/business-process'),
-        axios.get('/api/rto-rpo-analysis'),
-      ]);
-
-      // Ensure that the responses contain arrays
-      const impactAnalyses = Array.isArray(impactResponse.data) ? impactResponse.data : [];
-      const businessProcesses = Array.isArray(businessProcessResponse.data) ? businessProcessResponse.data : [];
-      const rtoRpoAnalyses = Array.isArray(rtoRpoResponse.data) ? rtoRpoResponse.data : [];
-
-      if (impactAnalyses.length === 0) {
-        setError('No impact analysis data available.');
-        return;
-      }
-
-      const combinedData = impactAnalyses.map(impact => {
-        const businessProcess = businessProcesses.find(bp => bp._id === impact.businessProcessId) || {};
-        const rtoRpo = rtoRpoAnalyses.find(rr => rr.businessProcessId === impact.businessProcessId) || {};
-
-        return {
-          ...impact,
-          processName: businessProcess.processName || 'N/A',
-          owner: businessProcess.owner || 'N/A',
-          rto: rtoRpo.acceptableTime || 'N/A',
-          rpo: rtoRpo.achievableTime || 'N/A',
-        };
-      });
-
-      setAnalyses(combinedData);
-      setFilteredAnalyses(combinedData);
+      const response = await axios.get('/api/impact-analysis?completed=true');
+      setAnalyses(response.data);
+      setFilteredAnalyses(response.data);
     } catch (error) {
       console.error('Error fetching analyses:', error);
       setError('Failed to fetch comparative analysis data. Please try again.');
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch comparative analysis data.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
     }
   };
 
@@ -131,16 +96,21 @@ const ComparativeAnalysis = () => {
   };
 
   const exportData = () => {
-    const csvData = filteredAnalyses.map(analysis => ({
+    return filteredAnalyses.map(analysis => ({
       'Process Name': analysis.processName,
-      'Owner': analysis.owner,
       'Overall Score': analysis.overallScore?.toFixed(2) || 'N/A',
       'Criticality Tier': analysis.criticalityTier || 'N/A',
-      'RTO': analysis.rto,
-      'RPO': analysis.rpo,
+      'Revenue Score': analysis.revenueScore?.toFixed(2) || 'N/A',
+      'Productivity Score': analysis.productivityScore?.toFixed(2) || 'N/A',
+      'Operating Costs Score': analysis.operatingCostsScore?.toFixed(2) || 'N/A',
+      'Financial Penalties Score': analysis.financialPenaltiesScore?.toFixed(2) || 'N/A',
+      'Customers Score': analysis.customersScore?.toFixed(2) || 'N/A',
+      'Staff Score': analysis.staffScore?.toFixed(2) || 'N/A',
+      'Partners Score': analysis.partnersScore?.toFixed(2) || 'N/A',
+      'Compliance Score': analysis.complianceScore?.toFixed(2) || 'N/A',
+      'Health & Safety Score': analysis.healthSafetyScore?.toFixed(2) || 'N/A',
+      'Total Cost of Downtime': analysis.totalCostOfDowntime?.toLocaleString() || 'N/A',
     }));
-
-    return csvData;
   };
 
   const requestSort = (key) => {
@@ -172,8 +142,14 @@ const ComparativeAnalysis = () => {
     const average = overallScores.reduce((a, b) => a + b, 0) / overallScores.length;
     const max = Math.max(...overallScores);
     const min = Math.min(...overallScores);
+    const totalCostOfDowntime = filteredAnalyses.reduce((sum, a) => sum + (a.totalCostOfDowntime || 0), 0);
 
-    return { average: average.toFixed(2), max: max.toFixed(2), min: min.toFixed(2) };
+    return { 
+      average: average.toFixed(2), 
+      max: max.toFixed(2), 
+      min: min.toFixed(2),
+      totalCostOfDowntime: totalCostOfDowntime.toLocaleString()
+    };
   };
 
   const chartData = {
@@ -184,18 +160,44 @@ const ComparativeAnalysis = () => {
         data: sortedAnalyses.map(a => a.overallScore),
         backgroundColor: 'rgba(75, 192, 192, 0.6)',
       },
+      {
+        label: 'Total Cost of Downtime',
+        data: sortedAnalyses.map(a => a.totalCostOfDowntime),
+        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+        yAxisID: 'y1',
+      }
     ],
   };
 
   const chartOptions = {
     responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Overall Score'
+        }
+      },
+      y1: {
+        beginAtZero: true,
+        position: 'right',
+        title: {
+          display: true,
+          text: 'Total Cost of Downtime ($)'
+        },
+        grid: {
+          drawOnChartArea: false,
+        },
+      }
+    },
     plugins: {
       legend: {
         position: 'top',
       },
       title: {
         display: true,
-        text: 'Overall Scores by Business Process',
+        text: 'Overall Scores and Total Cost of Downtime by Business Process',
       },
     },
   };
@@ -265,6 +267,7 @@ const ComparativeAnalysis = () => {
             <Text>Average Overall Score: {stats.average}</Text>
             <Text>Highest Overall Score: {stats.max}</Text>
             <Text>Lowest Overall Score: {stats.min}</Text>
+            <Text>Total Cost of Downtime (all processes): ${stats.totalCostOfDowntime}</Text>
           </Box>
           <Box height="400px">
             <Bar data={chartData} options={chartOptions} />
@@ -274,22 +277,36 @@ const ComparativeAnalysis = () => {
               <Thead>
                 <Tr>
                   <Th onClick={() => requestSort('processName')}>Process Name</Th>
-                  <Th onClick={() => requestSort('owner')}>Owner</Th>
                   <Th onClick={() => requestSort('overallScore')}>Overall Score</Th>
                   <Th onClick={() => requestSort('criticalityTier')}>Criticality Tier</Th>
-                  <Th onClick={() => requestSort('rto')}>RTO</Th>
-                  <Th onClick={() => requestSort('rpo')}>RPO</Th>
+                  <Th onClick={() => requestSort('totalCostOfDowntime')}>Total Cost of Downtime</Th>
+                  <Th onClick={() => requestSort('revenueScore')}>Revenue Score</Th>
+                  <Th onClick={() => requestSort('productivityScore')}>Productivity Score</Th>
+                  <Th onClick={() => requestSort('operatingCostsScore')}>Operating Costs Score</Th>
+                  <Th onClick={() => requestSort('financialPenaltiesScore')}>Financial Penalties Score</Th>
+                  <Th onClick={() => requestSort('customersScore')}>Customers Score</Th>
+                  <Th onClick={() => requestSort('staffScore')}>Staff Score</Th>
+                  <Th onClick={() => requestSort('partnersScore')}>Partners Score</Th>
+                  <Th onClick={() => requestSort('complianceScore')}>Compliance Score</Th>
+                  <Th onClick={() => requestSort('healthSafetyScore')}>Health & Safety Score</Th>
                 </Tr>
               </Thead>
               <Tbody>
                 {sortedAnalyses.map((analysis) => (
                   <Tr key={analysis._id}>
                     <Td>{analysis.processName}</Td>
-                    <Td>{analysis.owner}</Td>
                     <Td>{analysis.overallScore?.toFixed(2) || 'N/A'}</Td>
                     <Td>{analysis.criticalityTier || 'N/A'}</Td>
-                    <Td>{analysis.rto}</Td>
-                    <Td>{analysis.rpo}</Td>
+                    <Td>${analysis.totalCostOfDowntime?.toLocaleString() || 'N/A'}</Td>
+                    <Td>{analysis.revenueScore?.toFixed(2) || 'N/A'}</Td>
+                    <Td>{analysis.productivityScore?.toFixed(2) || 'N/A'}</Td>
+                    <Td>{analysis.operatingCostsScore?.toFixed(2) || 'N/A'}</Td>
+                    <Td>{analysis.financialPenaltiesScore?.toFixed(2) || 'N/A'}</Td>
+                    <Td>{analysis.customersScore?.toFixed(2) || 'N/A'}</Td>
+                    <Td>{analysis.staffScore?.toFixed(2) || 'N/A'}</Td>
+                    <Td>{analysis.partnersScore?.toFixed(2) || 'N/A'}</Td>
+                    <Td>{analysis.complianceScore?.toFixed(2) || 'N/A'}</Td>
+                    <Td>{analysis.healthSafetyScore?.toFixed(2) || 'N/A'}</Td>
                   </Tr>
                 ))}
               </Tbody>
