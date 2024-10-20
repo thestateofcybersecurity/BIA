@@ -558,7 +558,6 @@ export async function generateBCPPDF(data) {
     // Finalize the PDF
     doc.end();
   });
-}
 
 // Helper function to add sections
 function addSection(doc, title, content) {
