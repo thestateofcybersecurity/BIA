@@ -3,6 +3,7 @@ import { useUser } from '@auth0/nextjs-auth0/client';
 import { Box, Heading, SimpleGrid, Text, VStack, HStack, Progress, Button } from '@chakra-ui/react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
+import GenerateBCPButton from '../components/GenerateBCPButton';
 
 const Dashboard = () => {
   const { user, error, isLoading } = useUser();
@@ -83,6 +84,11 @@ const Dashboard = () => {
         <Box p={5} shadow="md" borderWidth="1px">
           <Heading fontSize="xl" mb={4}>Comparative Analysis</Heading>
           <Button mt={4} onClick={() => navigateTo('/comparative-analysis')}>Compare Processes</Button>
+        </Box>
+
+        <Box p={5} shadow="md" borderWidth="1px">
+          <Heading fontSize="xl" mb={4}>Business Continuity Plan</Heading>
+          <GenerateBCPButton />
         </Box>
       </SimpleGrid>
     </Box>
