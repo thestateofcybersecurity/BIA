@@ -16,7 +16,7 @@ import {
 } from '@chakra-ui/react';
 import axios from 'axios';
 
-const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
+const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) => {
   const { user, error, isLoading } = useUser();
   const toast = useToast();
   const [processes, setProcesses] = useState([]);
@@ -103,16 +103,18 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
   useEffect(() => {
     if (user) {
       fetchProcesses();
-      if (analysisId) {
-        fetchAnalysis(analysisId);
+      if (initialData) {
+        setFormData(initialData);
+        setSelectedProcess(initialData.businessProcess);
+        calculateScores(initialData);
       }
     }
-  }, [user, analysisId]);
+  }, [user, initialData]);
 
   useEffect(() => {
     calculateScores();
   }, [formData]);
-
+  
   const fetchProcesses = async () => {
     try {
       const response = await axios.get('/api/business-processes');
@@ -306,7 +308,7 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
 
   return (
     <Box className="container" bg="white" p={6} rounded="md" shadow="md">
-      <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
+      <Heading as="h2" size="lg" mb={6}>{analysisId ? 'Edit' : 'New'} Impact Analysis</Heading>
       <form onSubmit={handleSubmit}>
         <VStack spacing={4} align="flex-start">
           <FormControl id="processSelect" isRequired>
@@ -448,7 +450,9 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
           <Text fontWeight="bold">Overall Score: {scores.overallScore.toFixed(2)}</Text>
           <Text fontWeight="bold">Criticality Tier: {scores.criticalityTier}</Text>
           
-          <Button type="submit" colorScheme="blue" mt={6}>Save Impact Analysis</Button>
+          <Button type="submit" colorScheme="blue" mt={6}>
+            {analysisId ? 'Update' : 'Create'} Impact Analysis
+          </Button>
         </VStack>
       </form>
     </Box>
