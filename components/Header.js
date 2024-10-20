@@ -11,7 +11,7 @@ const Header = () => {
 
   if (error) {
     console.error('Auth0 error:', error);
-    return null; // Or render an error message
+    return null;
   }
 
   return (
