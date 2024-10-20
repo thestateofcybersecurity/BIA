@@ -74,9 +74,14 @@ const ComparativeAnalysis = () => {
       console.log('Business Process Response:', businessProcessResponse.data);
       console.log('RTO/RPO Response:', rtoRpoResponse.data);
   
-      const combinedData = impactResponse.data.map(impact => {
-        const businessProcess = businessProcessResponse.data.find(bp => bp._id === impact.businessProcess);
-        const rtoRpo = rtoRpoResponse.data.find(rr => rr.businessProcessId === impact.businessProcess);
+      const impactAnalyses = Array.isArray(impactResponse.data) ? impactResponse.data : [];
+      const businessProcesses = Array.isArray(businessProcessResponse.data) ? businessProcessResponse.data : 
+                                (businessProcessResponse.data && Array.isArray(businessProcessResponse.data.data)) ? businessProcessResponse.data.data : [];
+      const rtoRpoAnalyses = Array.isArray(rtoRpoResponse.data) ? rtoRpoResponse.data : [];
+  
+      const combinedData = impactAnalyses.map(impact => {
+        const businessProcess = businessProcesses.find(bp => bp._id === impact.businessProcess);
+        const rtoRpo = rtoRpoAnalyses.find(rr => rr.businessProcessId === impact.businessProcess);
   
         return {
           ...impact,
