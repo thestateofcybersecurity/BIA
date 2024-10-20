@@ -13,27 +13,34 @@ import {
   Text,
   SimpleGrid,
   useToast,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Table,
   Thead,
   Tbody,
   Tr,
   Th,
   Td,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react';
 import axios from 'axios';
 
 const ImpactAnalysisForm = () => {
   const { user, error, isLoading } = useUser();
   const toast = useToast();
-  const [processes, setProcesses] = useState([]);
-  const [completedAnalyses, setCompletedAnalyses] = useState([]);
-  const [selectedProcess, setSelectedProcess] = useState('');
-  const [editMode, setEditMode] = useState(false);
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [analyses, setAnalyses] = useState([]);
+  const [editingAnalysis, setEditingAnalysis] = useState(null);
   const [formData, setFormData] = useState({
     processName: '',
     clientFacingAvailability: '',
@@ -113,34 +120,60 @@ const ImpactAnalysisForm = () => {
     ],
   };
 
- useEffect(() => {
+  useEffect(() => {
     if (user) {
-      fetchProcesses();
-      fetchCompletedAnalyses();
+      fetchAnalyses();
     }
   }, [user]);
 
-  const fetchCompletedAnalyses = async () => {
+  const fetchAnalyses = async () => {
     try {
-      const response = await axios.get('/api/impact-analysis?completed=true');
-      setCompletedAnalyses(response.data);
+      const response = await axios.get('/api/impact-analysis');
+      setAnalyses(response.data);
     } catch (error) {
-      console.error('Error fetching completed analyses:', error);
+      console.error('Error fetching analyses:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch completed analyses.",
-        status: "error",
+        title: 'Error',
+        description: 'Failed to fetch impact analyses.',
+        status: 'error',
         duration: 5000,
         isClosable: true,
       });
     }
   };
 
-  const handleEditAnalysis = (analysis) => {
+  const handleEdit = (analysis) => {
+    setEditingAnalysis(analysis);
     setFormData(analysis);
-    setSelectedProcess(analysis.businessProcessId);
-    setEditMode(true);
-    calculateScores(); // Recalculate scores based on the loaded data
+    calculateScores(analysis);
+    onOpen();
+  };
+
+  const handleSave = async () => {
+    try {
+      await axios.put(`/api/impact-analysis/${editingAnalysis._id}`, {
+        ...formData,
+        ...scores,
+      });
+      onClose();
+      fetchAnalyses();
+      toast({
+        title: 'Success',
+        description: 'Impact analysis updated successfully.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error updating analysis:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update impact analysis.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
