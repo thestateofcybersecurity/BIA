@@ -447,7 +447,10 @@ export async function generateBCPPDF(data) {
       .text('• As part of the initial notification process outlined above, the CMT Leader notifies the CMT and other staff as needed.', { align: 'justify' })
       .text('• Communication is conducted by cell phone if the phone system is down. All managers and members of recovery teams maintain contact information for other managers and team members on their business phones and have access to a formal contact list as a backup if required.', { align: 'justify' }).moveDown();
     
-      // Section 9: BC Awareness and Training
+    // Add spacing at the end of the section
+    doc.moveDown();  
+  
+    // Section 9: BC Awareness and Training
     doc.addPage()
       .fontSize(16).text('9. BC Awareness and Training', { underline: true }).moveDown();
     
@@ -471,8 +474,11 @@ export async function generateBCPPDF(data) {
       .text('• Alternates for each role.', { align: 'justify' })
       .text('• Specific responsibilities.', { align: 'justify' })
       .text('• Authority to declare a disaster.', { align: 'justify' }).moveDown();
+
+    // Add spacing at the end of the section
+    doc.moveDown();
     
-      // Section 10: Testing and Maintenance
+    // Section 10: Testing and Maintenance
     doc.addPage()
       .fontSize(16).text('10. Testing and Maintenance', { underline: true }).moveDown();
     
@@ -530,8 +536,11 @@ export async function generateBCPPDF(data) {
     doc.font('Helvetica')
       .text('• Validate that required updates identified through testing and change management have been incorporated in the BCP.', { align: 'justify' })
       .text('• Provide a focused review of elements of the BCP that have undergone significant change.', { align: 'justify' }).moveDown();
-    
-     // Section 11: Summary
+
+    // Add spacing at the end of the section
+    doc.moveDown();
+  
+    // Section 11: Summary
     doc.addPage()
       .fontSize(16).text('11. Summary', { underline: true }).moveDown();
     
@@ -542,6 +551,9 @@ export async function generateBCPPDF(data) {
       .text('• Clearly defined BC requirements through a business impact analysis.', { align: 'justify' })
       .text('• Ongoing evaluation of our BC strategy and BC capabilities to reduce RTO and RPO values where they exceed acceptable values.', { align: 'justify' })
       .text('• Rigorous BC change management practices to ensure our BCP stays current.', { align: 'justify' }).moveDown();
+
+    // Add spacing at the end of the section
+    doc.moveDown();
      
     // Finalize the PDF
     doc.end();
