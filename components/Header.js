@@ -31,6 +31,7 @@ const Header = () => {
               <MenuItem as={Link} href="/maturity-scorecard">Maturity Scorecard</MenuItem>
               <MenuItem as={Link} href="/tabletop-scenario">Tabletop Scenario</MenuItem>
               <MenuItem as={Link} href="/comparative-analysis">Comparative Analysis</MenuItem>
+              <MenuItem as={Link} href="/generate-bcp">Generate BCP</MenuItem>
             </MenuList>
           </Menu>
         )}
