@@ -13,36 +13,13 @@ import {
   Text,
   SimpleGrid,
   useToast,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  useDisclosure,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
 } from '@chakra-ui/react';
 import axios from 'axios';
 
-const ImpactAnalysisForm = () => {
+const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
   const { user, error, isLoading } = useUser();
   const toast = useToast();
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const [analyses, setAnalyses] = useState([]);
   const [processes, setProcesses] = useState([]);
-  const [selectedProcess, setSelectedProcess] = useState('');
-  const [editingAnalysis, setEditingAnalysis] = useState(null);
   const [formData, setFormData] = useState({
     processName: '',
     clientFacingAvailability: '',
@@ -122,29 +99,18 @@ const ImpactAnalysisForm = () => {
     ],
   };
 
-
   useEffect(() => {
     if (user) {
-      fetchAnalyses();
       fetchProcesses();
+      if (analysisId) {
+        fetchAnalysis(analysisId);
+      }
     }
-  }, [user]);
+  }, [user, analysisId]);
 
-  const fetchAnalyses = async () => {
-    try {
-      const response = await axios.get('/api/impact-analysis');
-      setAnalyses(response.data);
-    } catch (error) {
-      console.error('Error fetching analyses:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch impact analyses.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
+  useEffect(() => {
+    calculateScores();
+  }, [formData]);
 
   const fetchProcesses = async () => {
     try {
@@ -162,35 +128,15 @@ const ImpactAnalysisForm = () => {
     }
   };
 
-  const handleEdit = (analysis) => {
-    setEditingAnalysis(analysis);
-    setFormData(analysis);
-    setSelectedProcess(analysis.businessProcess);
-    calculateScores(analysis);
-    onOpen();
-  };
-
-  const handleSave = async () => {
+  const fetchAnalysis = async (id) => {
     try {
-      await axios.put(`/api/impact-analysis/${editingAnalysis._id}`, {
-        ...formData,
-        ...scores,
-        businessProcess: selectedProcess,
-      });
-      onClose();
-      fetchAnalyses();
-      toast({
-        title: 'Success',
-        description: 'Impact analysis updated successfully.',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
+      const response = await axios.get(`/api/impact-analysis/${id}`);
+      setFormData(response.data);
     } catch (error) {
-      console.error('Error updating analysis:', error);
+      console.error('Error fetching analysis:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update impact analysis.',
+        description: 'Failed to fetch impact analysis.',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -201,26 +147,26 @@ const ImpactAnalysisForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/api/impact-analysis', {
+      const url = analysisId ? `/api/impact-analysis/${analysisId}` : '/api/impact-analysis';
+      const method = analysisId ? 'put' : 'post';
+      const response = await axios[method](url, {
         ...formData,
         ...scores,
-        businessProcess: selectedProcess,
       });
       toast({
-        title: "Success",
-        description: "Impact analysis saved successfully!",
-        status: "success",
+        title: 'Success',
+        description: `Impact analysis ${analysisId ? 'updated' : 'created'} successfully!`,
+        status: 'success',
         duration: 5000,
         isClosable: true,
       });
-      fetchAnalyses();
-      resetForm();
+      if (onSave) onSave(response.data);
     } catch (error) {
       console.error('Error saving impact analysis:', error.response?.data || error.message);
       toast({
-        title: "Error",
-        description: `Failed to save impact analysis: ${error.response?.data?.error || error.message}`,
-        status: "error",
+        title: 'Error',
+        description: `Failed to ${analysisId ? 'update' : 'create'} impact analysis: ${error.response?.data?.error || error.message}`,
+        status: 'error',
         duration: 5000,
         isClosable: true,
       });
@@ -232,58 +178,6 @@ const ImpactAnalysisForm = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const resetForm = () => {
-    setFormData({
-      processName: '',
-      clientFacingAvailability: '',
-      additionalAvailability: '',
-      criticalityRating: '',
-      lossOfRevenue: '',
-      lossOfProductivity: '',
-      increasedOperatingCosts: '',
-      financialPenalties: '',
-      impactOnCustomers: '',
-      impactOnStaff: '',
-      impactOnPartners: '',
-      complianceImpact: '',
-      healthSafetyRisk: '',
-    });
-    setSelectedProcess('');
-    setScores({
-      revenueScore: 0,
-      productivityScore: 0,
-      operatingCostsScore: 0,
-      financialPenaltiesScore: 0,
-      customersScore: 0,
-      staffScore: 0,
-      partnersScore: 0,
-      complianceScore: 0,
-      healthSafetyScore: 0,
-      totalCostOfDowntime: 0,
-      totalImpactScore: 0,
-      overallScore: 0,
-      criticalityTier: '',
-    });
-  };
-
-  useEffect(() => {
-    calculateScores();
-  }, [formData]); // Recalculate scores whenever formData changes
-  
-  const handleProcessChange = (e) => {
-    setSelectedProcess(e.target.value);
-    const process = processes.find(p => p._id === e.target.value);
-    if (process) {
-      setFormData(prevData => ({
-        ...prevData,
-        processName: process.processName,
-        description: process.description,
-        owner: process.owner,
-        // ... (set other relevant fields)
-      }));
-    }
-  };
-  
   const calculateScores = () => {
     const newScores = { ...scores };
 
@@ -393,179 +287,159 @@ const ImpactAnalysisForm = () => {
     ));
   };
 
-  const renderForm = (isEditing = false) => (
-    <VStack spacing={4} align="flex-start">
-      <FormControl id="processSelect" isRequired>
-        <FormLabel>Select Business Process</FormLabel>
-        <Select 
-          value={selectedProcess} 
-          onChange={(e) => setSelectedProcess(e.target.value)}
-          isDisabled={isEditing}
-        >
-          <option value="">Select a process</option>
-          {processes.map(process => (
-            <option key={process._id} value={process._id}>{process.processName}</option>
-          ))}
-        </Select>
-      </FormControl>
-
-      <FormControl id="clientFacingAvailability">
-        <FormLabel>Client-Facing Availability Requirements</FormLabel>
-        <Input type="text" name="clientFacingAvailability" value={formData.clientFacingAvailability} onChange={handleChange} />
-      </FormControl>
-      
-      <FormControl id="additionalAvailability">
-        <FormLabel>Additional Availability Requirements</FormLabel>
-        <Input type="text" name="additionalAvailability" value={formData.additionalAvailability} onChange={handleChange} />
-      </FormControl>
-      
-      <FormControl id="criticalityRating" isRequired>
-        <FormLabel>Criticality Rating</FormLabel>
-        <Select name="criticalityRating" value={formData.criticalityRating} onChange={handleChange}>
-          <option value="">Select a rating</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="critical">Critical</option>
-        </Select>
-      </FormControl>
-
-      <FormControl id="lossOfRevenue" isRequired>
-        <FormLabel>Loss of Revenue</FormLabel>
-        <Select name="lossOfRevenue" value={formData.lossOfRevenue} onChange={handleChange}>
-          <option value="">Select an option</option>
-          {renderOptions('lossOfRevenue')}
-        </Select>
-      </FormControl>
-
-      <FormControl id="lossOfProductivity" isRequired>
-        <FormLabel>Loss of Productivity</FormLabel>
-        <Select name="lossOfProductivity" value={formData.lossOfProductivity} onChange={handleChange}>
-          <option value="">Select an option</option>
-          {renderOptions('lossOfProductivity')}
-        </Select>
-      </FormControl>
-
-      <FormControl id="increasedOperatingCosts" isRequired>
-        <FormLabel>Increased Operating Costs</FormLabel>
-        <Select name="increasedOperatingCosts" value={formData.increasedOperatingCosts} onChange={handleChange}>
-          <option value="">Select an option</option>
-          {renderOptions('increasedOperatingCosts')}
-        </Select>
-      </FormControl>
-
-      <FormControl id="financialPenalties" isRequired>
-        <FormLabel>Financial Penalties</FormLabel>
-        <Select name="financialPenalties" value={formData.financialPenalties} onChange={handleChange}>
-          <option value="">Select an option</option>
-          {renderOptions('financialPenalties')}
-        </Select>
-      </FormControl>
-
-      <FormControl id="impactOnCustomers" isRequired>
-        <FormLabel>Impact on Customers</FormLabel>
-        <Select name="impactOnCustomers" value={formData.impactOnCustomers} onChange={handleChange}>
-          <option value="">Select an option</option>
-          <option value="Low Impact">Low Impact</option>
-          <option value="Medium Impact">Medium Impact</option>
-          <option value="High Impact">High Impact</option>
-          <option value="Critical Impact">Critical Impact</option>
-        </Select>
-      </FormControl>
-
-      <FormControl id="impactOnStaff" isRequired>
-        <FormLabel>Impact on Internal Staff</FormLabel>
-        <Select name="impactOnStaff" value={formData.impactOnStaff} onChange={handleChange}>
-          <option value="">Select an option</option>
-          <option value="Low Impact">Low Impact</option>
-          <option value="Medium Impact">Medium Impact</option>
-          <option value="High Impact">High Impact</option>
-          <option value="Critical Impact">Critical Impact</option>
-        </Select>
-      </FormControl>
-
-      <FormControl id="impactOnPartners" isRequired>
-        <FormLabel>Impact on Business Partners</FormLabel>
-        <Select name="impactOnPartners" value={formData.impactOnPartners} onChange={handleChange}>
-          <option value="">Select an option</option>
-          <option value="Low Impact">Low Impact</option>
-          <option value="Medium Impact">Medium Impact</option>
-          <option value="High Impact">High Impact</option>
-          <option value="Critical Impact">Critical Impact</option>
-        </Select>
-      </FormControl>
-
-      <FormControl id="complianceImpact" isRequired>
-        <FormLabel>Compliance (e.g. Legal/ Regulatory) Impact</FormLabel>
-        <Select name="complianceImpact" value={formData.complianceImpact} onChange={handleChange}>
-          <option value="">Select an option</option>
-          <option value="Low Impact">Low Impact</option>
-          <option value="Medium Impact">Medium Impact</option>
-          <option value="High Impact">High Impact</option>
-          <option value="Critical Impact">Critical Impact</option>
-        </Select>
-      </FormControl>
-
-      <FormControl id="healthSafetyRisk" isRequired>
-        <FormLabel>Health or Safety Risk</FormLabel>
-        <Select name="healthSafetyRisk" value={formData.healthSafetyRisk} onChange={handleChange}>
-          <option value="">Select an option</option>
-          <option value="Some degradation of health/safety services">Some degradation of health/safety services</option>
-          <option value="High degradation of health/safety services">High degradation of health/safety services</option>
-          <option value="Some risk of loss-of-life/serious harm">Some risk of loss-of-life/serious harm</option>
-          <option value="High risk of loss-of-life/serious harm">High risk of loss-of-life/serious harm</option>
-        </Select>
-      </FormControl>
-          
-      <Heading as="h3" size="md" mt={6}>Impact Scores</Heading>
-      <SimpleGrid columns={2} spacing={4}>
-        <Text>Revenue Score: {scores.revenueScore.toFixed(2)}</Text>
-        <Text>Productivity Score: {scores.productivityScore.toFixed(2)}</Text>
-        <Text>Operating Costs Score: {scores.operatingCostsScore.toFixed(2)}</Text>
-        <Text>Financial Penalties Score: {scores.financialPenaltiesScore.toFixed(2)}</Text>
-        <Text>Customers Score: {scores.customersScore}</Text>
-        <Text>Staff Score: {scores.staffScore}</Text>
-        <Text>Partners Score: {scores.partnersScore}</Text>
-        <Text>Compliance Score: {scores.complianceScore}</Text>
-        <Text>Health & Safety Score: {scores.healthSafetyScore}</Text>
-      </SimpleGrid>
-      <Text fontWeight="bold">Total Cost of Downtime per 24 Hours: ${scores.totalCostOfDowntime.toLocaleString()}</Text>
-      <Text fontWeight="bold">Total Impact on Goodwill, Compliance & Safety: {scores.totalImpactScore}</Text>
-      <Text fontWeight="bold">Overall Score: {scores.overallScore.toFixed(2)}</Text>
-      <Text fontWeight="bold">Criticality Tier: {scores.criticalityTier}</Text>
-    </VStack>
-  );
-
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>{error.message}</div>;
 
   return (
-    <Box>
-      <Box className="container" bg="white" p={6} rounded="md" shadow="md">
-        <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
-        <Tabs>
-          <TabPanels>
-            <TabPanel>
-              <form onSubmit={handleSubmit}>
-                {renderForm()}
-                <Button type="submit" colorScheme="blue" mt={6}>Save Impact Analysis</Button>
-              </form>
-            </TabPanel>
-            <TabPanel>
-              <Table variant="simple">
-                <Thead>
-                  <Tr>
-                    <Th>Process Name</Th>
-                    <Th>Overall Score</Th>
-                    <Th>Criticality Tier</Th>
-                    <Th>Actions</Th>
-                  </Tr>
-                </Thead>
-              </Table>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </Box>
+    <Box className="container" bg="white" p={6} rounded="md" shadow="md">
+      <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
+      <form onSubmit={handleSubmit}>
+        <VStack spacing={4} align="flex-start">
+          <FormControl id="processSelect" isRequired>
+            <FormLabel>Select Business Process</FormLabel>
+            <Select 
+              name="businessProcess"
+              value={formData.businessProcess} 
+              onChange={handleChange}
+              isDisabled={analysisId}
+            >
+              <option value="">Select a process</option>
+              {processes.map(process => (
+                <option key={process._id} value={process._id}>{process.processName}</option>
+              ))}
+            </Select>
+          </FormControl>
+
+            <FormControl id="clientFacingAvailability">
+              <FormLabel>Client-Facing Availability Requirements</FormLabel>
+              <Input type="text" name="clientFacingAvailability" value={formData.clientFacingAvailability} onChange={handleChange} />
+            </FormControl>
+            
+            <FormControl id="additionalAvailability">
+              <FormLabel>Additional Availability Requirements</FormLabel>
+              <Input type="text" name="additionalAvailability" value={formData.additionalAvailability} onChange={handleChange} />
+            </FormControl>
+            
+            <FormControl id="criticalityRating" isRequired>
+              <FormLabel>Criticality Rating</FormLabel>
+              <Select name="criticalityRating" value={formData.criticalityRating} onChange={handleChange}>
+                <option value="">Select a rating</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </Select>
+            </FormControl>
+
+            <FormControl id="lossOfRevenue" isRequired>
+              <FormLabel>Loss of Revenue</FormLabel>
+              <Select name="lossOfRevenue" value={formData.lossOfRevenue} onChange={handleChange}>
+                <option value="">Select an option</option>
+                {renderOptions('lossOfRevenue')}
+              </Select>
+            </FormControl>
+
+            <FormControl id="lossOfProductivity" isRequired>
+              <FormLabel>Loss of Productivity</FormLabel>
+              <Select name="lossOfProductivity" value={formData.lossOfProductivity} onChange={handleChange}>
+                <option value="">Select an option</option>
+                {renderOptions('lossOfProductivity')}
+              </Select>
+            </FormControl>
+
+            <FormControl id="increasedOperatingCosts" isRequired>
+              <FormLabel>Increased Operating Costs</FormLabel>
+              <Select name="increasedOperatingCosts" value={formData.increasedOperatingCosts} onChange={handleChange}>
+                <option value="">Select an option</option>
+                {renderOptions('increasedOperatingCosts')}
+              </Select>
+            </FormControl>
+
+            <FormControl id="financialPenalties" isRequired>
+              <FormLabel>Financial Penalties</FormLabel>
+              <Select name="financialPenalties" value={formData.financialPenalties} onChange={handleChange}>
+                <option value="">Select an option</option>
+                {renderOptions('financialPenalties')}
+              </Select>
+            </FormControl>
+    
+            <FormControl id="impactOnCustomers" isRequired>
+              <FormLabel>Impact on Customers</FormLabel>
+              <Select name="impactOnCustomers" value={formData.impactOnCustomers} onChange={handleChange}>
+                <option value="">Select an option</option>
+                <option value="Low Impact">Low Impact</option>
+                <option value="Medium Impact">Medium Impact</option>
+                <option value="High Impact">High Impact</option>
+                <option value="Critical Impact">Critical Impact</option>
+              </Select>
+            </FormControl>
+
+            <FormControl id="impactOnStaff" isRequired>
+              <FormLabel>Impact on Internal Staff</FormLabel>
+              <Select name="impactOnStaff" value={formData.impactOnStaff} onChange={handleChange}>
+                <option value="">Select an option</option>
+                <option value="Low Impact">Low Impact</option>
+                <option value="Medium Impact">Medium Impact</option>
+                <option value="High Impact">High Impact</option>
+                <option value="Critical Impact">Critical Impact</option>
+              </Select>
+            </FormControl>
+
+            <FormControl id="impactOnPartners" isRequired>
+              <FormLabel>Impact on Business Partners</FormLabel>
+              <Select name="impactOnPartners" value={formData.impactOnPartners} onChange={handleChange}>
+                <option value="">Select an option</option>
+                <option value="Low Impact">Low Impact</option>
+                <option value="Medium Impact">Medium Impact</option>
+                <option value="High Impact">High Impact</option>
+                <option value="Critical Impact">Critical Impact</option>
+              </Select>
+            </FormControl>
+
+            <FormControl id="complianceImpact" isRequired>
+              <FormLabel>Compliance (e.g. Legal/ Regulatory) Impact</FormLabel>
+              <Select name="complianceImpact" value={formData.complianceImpact} onChange={handleChange}>
+                <option value="">Select an option</option>
+                <option value="Low Impact">Low Impact</option>
+                <option value="Medium Impact">Medium Impact</option>
+                <option value="High Impact">High Impact</option>
+                <option value="Critical Impact">Critical Impact</option>
+              </Select>
+            </FormControl>
+
+            <FormControl id="healthSafetyRisk" isRequired>
+              <FormLabel>Health or Safety Risk</FormLabel>
+              <Select name="healthSafetyRisk" value={formData.healthSafetyRisk} onChange={handleChange}>
+                <option value="">Select an option</option>
+                <option value="Some degradation of health/safety services">Some degradation of health/safety services</option>
+                <option value="High degradation of health/safety services">High degradation of health/safety services</option>
+                <option value="Some risk of loss-of-life/serious harm">Some risk of loss-of-life/serious harm</option>
+                <option value="High risk of loss-of-life/serious harm">High risk of loss-of-life/serious harm</option>
+              </Select>
+            </FormControl>
+                
+            <Heading as="h3" size="md" mt={6}>Impact Scores</Heading>
+            <SimpleGrid columns={2} spacing={4}>
+              <Text>Revenue Score: {scores.revenueScore.toFixed(2)}</Text>
+              <Text>Productivity Score: {scores.productivityScore.toFixed(2)}</Text>
+              <Text>Operating Costs Score: {scores.operatingCostsScore.toFixed(2)}</Text>
+              <Text>Financial Penalties Score: {scores.financialPenaltiesScore.toFixed(2)}</Text>
+              <Text>Customers Score: {scores.customersScore}</Text>
+              <Text>Staff Score: {scores.staffScore}</Text>
+              <Text>Partners Score: {scores.partnersScore}</Text>
+              <Text>Compliance Score: {scores.complianceScore}</Text>
+              <Text>Health & Safety Score: {scores.healthSafetyScore}</Text>
+            </SimpleGrid>
+            <Text fontWeight="bold">Total Cost of Downtime per 24 Hours: ${scores.totalCostOfDowntime.toLocaleString()}</Text>
+            <Text fontWeight="bold">Total Impact on Goodwill, Compliance & Safety: {scores.totalImpactScore}</Text>
+            <Text fontWeight="bold">Overall Score: {scores.overallScore.toFixed(2)}</Text>
+            <Text fontWeight="bold">Criticality Tier: {scores.criticalityTier}</Text>
+            
+            <Button type="submit" colorScheme="blue" mt={6}>Save Impact Analysis</Button>
+         </Button>
+        </VStack>
+      </form>
+    </Box>
   );
 };
 
