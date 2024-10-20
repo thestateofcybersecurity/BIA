@@ -7,7 +7,11 @@ const ImpactAnalysisSchema = new mongoose.Schema({
   processName: { type: String, required: true },
   clientFacingAvailability: String,
   additionalAvailability: String,
-  criticalityRating: { type: String, enum: ['low', 'medium', 'high', 'critical'], required: true },
+  criticalityRating: { 
+    type: String, 
+    enum: ['Critical', 'High', 'Medium', 'Low'],
+    required: true 
+  },
   lossOfRevenue: { type: Number, required: true },
   lossOfProductivity: { type: Number, required: true },
   increasedOperatingCosts: { type: Number, required: true },
@@ -29,7 +33,11 @@ const ImpactAnalysisSchema = new mongoose.Schema({
   totalCostOfDowntime: { type: Number, required: true },
   totalImpactScore: { type: Number, required: true },
   overallScore: { type: Number, required: true },
-  criticalityTier: { type: String, required: true },
+  criticalityTier: { 
+    type: String, 
+    enum: ['Tier 1 (Gold)', 'Tier 2 (Silver)', 'Tier 3 (Bronze)', 'Non-critical'],
+    default: 'Non-critical'
+  },
 }, { timestamps: true });
 
 export default mongoose.models.ImpactAnalysis || mongoose.model('ImpactAnalysis', ImpactAnalysisSchema);
