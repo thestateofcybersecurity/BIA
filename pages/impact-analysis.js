@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { Box, Heading, VStack, Tabs, TabList, TabPanels, Tab, TabPanel } from '@chakra-ui/react';
+import { 
+  Box, 
+  Heading, 
+  VStack, 
+  Tabs, 
+  TabList, 
+  TabPanels, 
+  Tab, 
+  TabPanel,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Button,
+  useDisclosure
+} from '@chakra-ui/react';
 import ImpactAnalysisForm from '../components/ImpactAnalysisForm';
 import ImpactAnalysisBulkUpload from '../components/ImpactAnalysisBulkUpload';
+import axios from 'axios';
 
 const ImpactAnalysisPage = () => {
   const { user, error, isLoading } = useUser();
   const [analyses, setAnalyses] = useState([]);
+  const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   useEffect(() => {
     if (user) {
@@ -15,8 +35,23 @@ const ImpactAnalysisPage = () => {
   }, [user]);
 
   const fetchAnalyses = async () => {
-    // Implement fetchAnalyses function
-    // This should fetch analyses from your API and update the analyses state
+    try {
+      const response = await axios.get('/api/impact-analysis');
+      setAnalyses(response.data);
+    } catch (error) {
+      console.error('Error fetching analyses:', error);
+    }
+  };
+
+  const handleEditAnalysis = (analysis) => {
+    setSelectedAnalysis(analysis);
+    onOpen();
+  };
+
+  const handleAnalysisSaved = () => {
+    fetchAnalyses();
+    setSelectedAnalysis(null);
+    onClose();
   };
 
   if (isLoading) return <div>Loading...</div>;
@@ -35,10 +70,38 @@ const ImpactAnalysisPage = () => {
             </TabList>
             <TabPanels>
               <TabPanel>
-                <ImpactAnalysisForm onAnalysisAdded={fetchAnalyses} />
+                <ImpactAnalysisForm onSave={handleAnalysisSaved} />
               </TabPanel>
               <TabPanel>
-                <ImpactAnalysisForm analyses={analyses} onAnalysisUpdated={fetchAnalyses} />
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Process Name</Th>
+                      <Th>Overall Score</Th>
+                      <Th>Criticality Tier</Th>
+                      <Th>Actions</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {analyses.map((analysis) => (
+                      <Tr key={analysis._id}>
+                        <Td>{analysis.processName}</Td>
+                        <Td>{analysis.overallScore?.toFixed(2)}</Td>
+                        <Td>{analysis.criticalityTier}</Td>
+                        <Td>
+                          <Button onClick={() => handleEditAnalysis(analysis)}>Edit</Button>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+                {isOpen && (
+                  <ImpactAnalysisForm 
+                    analysisId={selectedAnalysis._id} 
+                    initialData={selectedAnalysis}
+                    onSave={handleAnalysisSaved}
+                  />
+                )}
               </TabPanel>
               <TabPanel>
                 <ImpactAnalysisBulkUpload onUploadComplete={fetchAnalyses} />
