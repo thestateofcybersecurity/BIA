@@ -181,19 +181,6 @@ export async function generateBCPPDF(data) {
     // End of Section 2
     doc.moveDown();
 
-      // Dependencies (Formatted in Human Readable way)
-      const dependencyTypes = ['people', 'itApplications', 'devices', 'facilityLocation', 'suppliers'];
-      dependencyTypes.forEach(type => {
-        if (process.dependencies[type] && process.dependencies[type].length > 0) {
-          doc.font('Helvetica-Bold').text(`${capitalizeFirstLetter(type)}:`);
-          process.dependencies[type].forEach(item => {
-            doc.font('Helvetica').text(`- ${item}`, { indent: 20 });
-          });
-        }
-      });
-      doc.moveDown();
-    });
-
     // Section 3: RTO and RPO Summary
     doc.addPage()
       .fontSize(16).text('3. RTO and RPO Summary for Tier 1, 2, and 3 Business Processes', { underline: true }).moveDown();
@@ -558,7 +545,7 @@ export async function generateBCPPDF(data) {
     // Finalize the PDF
     doc.end();
   });
-
+}
 // Helper function to add sections
 function addSection(doc, title, content) {
   doc.addPage().fontSize(16).text(title, { underline: true }).moveDown();
