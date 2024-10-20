@@ -37,10 +37,33 @@ export default async function handler(req, res) {
 
     case 'GET':
       try {
-        const analyses = await ImpactAnalysis.find({ userId: session.user.sub }).populate('businessProcess');
+        const { completed } = req.query;
+        let query = { userId: session.user.sub };
+        if (completed === 'true') {
+          query.impactAnalysisCompleted = true;
+        }
+        const analyses = await ImpactAnalysis.find(query).populate('businessProcess');
         res.status(200).json(analyses);
       } catch (error) {
         console.error('Error fetching impact analyses:', error);
+        res.status(400).json({ error: error.message });
+      }
+      break;
+
+    case 'PUT':
+      try {
+        const { id } = req.query;
+        const updatedAnalysis = await ImpactAnalysis.findByIdAndUpdate(
+          id,
+          { ...req.body, updatedAt: Date.now() },
+          { new: true, runValidators: true }
+        );
+        if (!updatedAnalysis) {
+          return res.status(404).json({ error: 'Impact analysis not found' });
+        }
+        res.status(200).json(updatedAnalysis);
+      } catch (error) {
+        console.error('Error updating impact analysis:', error);
         res.status(400).json({ error: error.message });
       }
       break;
