@@ -12,44 +12,51 @@ export default async function handler(req, res) {
 
   await connectDB();
 
-  switch (req.method) {
-    case 'POST':
-      if (req.query.bulkUpload) {
+  if (req.method === 'POST' && req.query.bulkUpload) {
+    try {
+      const { data } = req.body;
+      const uploadedAnalyses = [];
+      const errors = [];
+
+      for (const row of data) {
         try {
-          const { data } = req.body;
-          const uploadedAnalyses = [];
+          const businessProcess = await BusinessProcess.findOne({
+            processName: row.processName,
+            userId: session.user.sub,
+          });
 
-          for (const row of data) {
-            const businessProcess = await BusinessProcess.findOne({
-              processName: row.processName,
-              userId: session.user.sub,
-            });
-
-            if (!businessProcess) {
-              continue; // Skip if business process not found
-            }
-
-            const impactAnalysis = new ImpactAnalysis({
-              ...row,
-              userId: session.user.sub,
-              businessProcess: businessProcess._id,
-            });
-
-            await impactAnalysis.save();
-            uploadedAnalyses.push(impactAnalysis);
-
-            await BusinessProcess.findByIdAndUpdate(businessProcess._id, {
-              impactAnalysisCompleted: true,
-              impactAnalysis: impactAnalysis._id,
-            });
+          if (!businessProcess) {
+            errors.push(`Business process not found for: ${row.processName}`);
+            continue;
           }
 
-          res.status(201).json({ uploadedCount: uploadedAnalyses.length });
+          const impactAnalysis = new ImpactAnalysis({
+            ...row,
+            userId: session.user.sub,
+            businessProcess: businessProcess._id,
+          });
+
+          await impactAnalysis.save();
+          uploadedAnalyses.push(impactAnalysis);
+
+          await BusinessProcess.findByIdAndUpdate(businessProcess._id, {
+            impactAnalysisCompleted: true,
+            impactAnalysis: impactAnalysis._id,
+          });
         } catch (error) {
-          console.error('Error bulk uploading impact analyses:', error);
-          res.status(400).json({ error: error.message });
+          errors.push(`Error processing ${row.processName}: ${error.message}`);
         }
-      } else {
+      }
+
+      res.status(201).json({ 
+        uploadedCount: uploadedAnalyses.length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error) {
+      console.error('Error bulk uploading impact analyses:', error);
+      res.status(400).json({ error: error.message });
+    }
+  } else {
         try {
           const { businessProcessId, ...impactData } = req.body;
           const impactAnalysis = new ImpactAnalysis({
@@ -58,12 +65,12 @@ export default async function handler(req, res) {
             businessProcess: businessProcessId
           });
           await impactAnalysis.save();
-
+  
           await BusinessProcess.findByIdAndUpdate(businessProcessId, { 
             impactAnalysisCompleted: true,
             impactAnalysis: impactAnalysis._id
           });
-
+  
           res.status(201).json(impactAnalysis);
         } catch (error) {
           console.error('Error creating impact analysis:', error);
