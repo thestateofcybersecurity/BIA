@@ -63,16 +63,21 @@ const ComparativeAnalysis = () => {
 
   const fetchAnalyses = async () => {
     try {
+      console.log('Fetching analyses...');
       const [impactResponse, businessProcessResponse, rtoRpoResponse] = await Promise.all([
         axios.get('/api/impact-analysis'),
         axios.get('/api/business-process'),
         axios.get('/api/rto-rpo-analysis'),
       ]);
-
+  
+      console.log('Impact Analysis Response:', impactResponse.data);
+      console.log('Business Process Response:', businessProcessResponse.data);
+      console.log('RTO/RPO Response:', rtoRpoResponse.data);
+  
       const combinedData = impactResponse.data.map(impact => {
         const businessProcess = businessProcessResponse.data.find(bp => bp._id === impact.businessProcess);
         const rtoRpo = rtoRpoResponse.data.find(rr => rr.businessProcessId === impact.businessProcess);
-
+  
         return {
           ...impact,
           processName: businessProcess?.processName || 'N/A',
@@ -81,11 +86,22 @@ const ComparativeAnalysis = () => {
           rpo: rtoRpo?.achievableTime || 'N/A',
         };
       });
-
+  
+      console.log('Combined Data:', combinedData);
+  
       setAnalyses(combinedData);
       setFilteredAnalyses(combinedData);
     } catch (error) {
       console.error('Error fetching analyses:', error);
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+      } else {
+        console.error('Error setting up request:', error.message);
+      }
       setError('Failed to fetch comparative analysis data. Please try again.');
     }
   };
