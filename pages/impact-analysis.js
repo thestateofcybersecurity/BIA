@@ -216,34 +216,6 @@ const ImpactAnalysisForm = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await axios.post('/api/impact-analysis', {
-        ...formData,
-        businessProcessId: selectedProcess,
-        ...scores
-      });
-      toast({
-        title: "Success",
-        description: "Impact analysis saved successfully!",
-        status: "success",
-        duration: 5000,
-        isClosable: true,
-      });
-      fetchProcesses();
-    } catch (error) {
-      console.error('Error saving impact analysis:', error.response?.data || error.message);
-      toast({
-        title: "Error",
-        description: `Failed to save impact analysis: ${error.response?.data?.error || error.message}`,
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
   
   const calculateScores = () => {
     const newScores = { ...scores };
