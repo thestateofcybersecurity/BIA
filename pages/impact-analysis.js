@@ -1,13 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { Box, Button, FormControl, FormLabel, Input, Select, Heading, VStack, Text, SimpleGrid, useToast } from '@chakra-ui/react';
+import {
+  Box,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  Select,
+  Heading,
+  VStack,
+  Text,
+  SimpleGrid,
+  useToast,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+} from '@chakra-ui/react';
 import axios from 'axios';
 
 const ImpactAnalysisForm = () => {
   const { user, error, isLoading } = useUser();
   const toast = useToast();
   const [processes, setProcesses] = useState([]);
+  const [completedAnalyses, setCompletedAnalyses] = useState([]);
   const [selectedProcess, setSelectedProcess] = useState('');
+  const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
     processName: '',
     clientFacingAvailability: '',
@@ -87,15 +112,82 @@ const ImpactAnalysisForm = () => {
     ],
   };
 
-  useEffect(() => {
+ useEffect(() => {
     if (user) {
       fetchProcesses();
+      fetchCompletedAnalyses();
     }
   }, [user]);
+
+  const fetchCompletedAnalyses = async () => {
+    try {
+      const response = await axios.get('/api/impact-analysis?completed=true');
+      setCompletedAnalyses(response.data);
+    } catch (error) {
+      console.error('Error fetching completed analyses:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch completed analyses.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleEditAnalysis = (analysis) => {
+    setFormData(analysis);
+    setSelectedProcess(analysis.businessProcessId);
+    setEditMode(true);
+    calculateScores(); // Recalculate scores based on the loaded data
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const url = editMode ? `/api/impact-analysis/${formData._id}` : '/api/impact-analysis';
+      const method = editMode ? 'put' : 'post';
+      const response = await axios[method](url, {
+        ...formData,
+        businessProcessId: selectedProcess,
+        ...scores
+      });
+      toast({
+        title: "Success",
+        description: `Impact analysis ${editMode ? 'updated' : 'saved'} successfully!`,
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
+      fetchProcesses();
+      fetchCompletedAnalyses();
+      setEditMode(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving impact analysis:', error.response?.data || error.message);
+      toast({
+        title: "Error",
+        description: `Failed to ${editMode ? 'update' : 'save'} impact analysis: ${error.response?.data?.error || error.message}`,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
 
   useEffect(() => {
     calculateScores();
   }, [formData]); // Recalculate scores whenever formData changes
+
+  const resetForm = () => {
+    setFormData({
+      // Reset all form fields to initial state
+    });
+    setSelectedProcess('');
+    setScores({
+      // Reset all score fields to initial state
+    });
+  };
 
   const fetchProcesses = async () => {
     try {
