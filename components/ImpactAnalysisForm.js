@@ -291,24 +291,20 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
   if (error) return <div>{error.message}</div>;
 
   return (
-    <Box className="container" bg="white" p={6} rounded="md" shadow="md">
-      <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4} align="flex-start">
-          <FormControl id="processSelect" isRequired>
-            <FormLabel>Select Business Process</FormLabel>
-            <Select 
-              name="businessProcess"
-              value={formData.businessProcess} 
-              onChange={handleChange}
-              isDisabled={analysisId}
-            >
-              <option value="">Select a process</option>
-              {processes.map(process => (
-                <option key={process._id} value={process._id}>{process.processName}</option>
-              ))}
-            </Select>
-          </FormControl>
+    <Box>
+      <Box className="container" bg="white" p={6} rounded="md" shadow="md">
+        <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={4} align="flex-start">
+            <FormControl id="processSelect" isRequired>
+              <FormLabel>Select Business Process</FormLabel>
+              <Select value={selectedProcess} onChange={handleProcessChange}>
+                <option value="">Select a process</option>
+                {processes.map(process => (
+                  <option key={process._id} value={process._id}>{process.processName}</option>
+                ))}
+              </Select>
+            </FormControl>
 
             <FormControl id="clientFacingAvailability">
               <FormLabel>Client-Facing Availability Requirements</FormLabel>
@@ -436,9 +432,9 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
             <Text fontWeight="bold">Criticality Tier: {scores.criticalityTier}</Text>
             
             <Button type="submit" colorScheme="blue" mt={6}>Save Impact Analysis</Button>
-         </Button>
-        </VStack>
-      </form>
+          </VStack>
+        </form>
+      </Box>
     </Box>
   );
 };
