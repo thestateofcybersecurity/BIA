@@ -18,6 +18,7 @@ import {
   Input,
   useToast,
   Text,
+  Flex,
 } from '@chakra-ui/react';
 import axios from 'axios';
 import { CSVLink } from 'react-csv';
@@ -63,7 +64,7 @@ const ComparativeAnalysis = () => {
   const fetchAnalyses = async () => {
     try {
       const [impactResponse, businessProcessResponse, rtoRpoResponse] = await Promise.all([
-        axios.get('/api/impact-analysis?completed=true'),
+        axios.get('/api/impact-analysis'),
         axios.get('/api/business-process'),
         axios.get('/api/rto-rpo-analysis'),
       ]);
@@ -239,12 +240,13 @@ const ComparativeAnalysis = () => {
               {error}
             </Alert>
           )}
-          <HStack spacing={4}>
+          <Flex direction={{ base: 'column', md: 'row' }} wrap="wrap" justify="space-between" align="center" gap={4}>
             <Select
               placeholder="Criticality Tier"
               name="criticalityTier"
               value={filterCriteria.criticalityTier}
               onChange={handleFilterChange}
+              width={{ base: '100%', md: 'auto' }}
             >
               <option value="Tier 1 (Gold)">Tier 1 (Gold)</option>
               <option value="Tier 2 (Silver)">Tier 2 (Silver)</option>
@@ -257,6 +259,7 @@ const ComparativeAnalysis = () => {
               type="number"
               value={filterCriteria.minOverallScore}
               onChange={handleFilterChange}
+              width={{ base: '100%', md: 'auto' }}
             />
             <Input
               placeholder="Max Overall Score"
@@ -264,9 +267,14 @@ const ComparativeAnalysis = () => {
               type="number"
               value={filterCriteria.maxOverallScore}
               onChange={handleFilterChange}
+              width={{ base: '100%', md: 'auto' }}
             />
-            <Button onClick={applyFilters}>Apply Filters</Button>
-            <Button onClick={resetFilters}>Reset Filters</Button>
+            <Button onClick={applyFilters} colorScheme="blue" width={{ base: '100%', md: 'auto' }}>
+              Apply Filters
+            </Button>
+            <Button onClick={resetFilters} colorScheme="gray" width={{ base: '100%', md: 'auto' }}>
+              Reset Filters
+            </Button>
             <CSVLink
               data={exportData()}
               filename="comparative_analysis.csv"
@@ -281,9 +289,11 @@ const ComparativeAnalysis = () => {
                 });
               }}
             >
-              <Button>Export to CSV</Button>
+              <Button colorScheme="green" width={{ base: '100%', md: 'auto' }}>
+                Export to CSV
+              </Button>
             </CSVLink>
-          </HStack>
+          </Flex>
           <Box>
             <Text>Average Overall Score: {stats.average}</Text>
             <Text>Highest Overall Score: {stats.max}</Text>
