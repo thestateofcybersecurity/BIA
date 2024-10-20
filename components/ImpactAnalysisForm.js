@@ -20,6 +20,7 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
   const { user, error, isLoading } = useUser();
   const toast = useToast();
   const [processes, setProcesses] = useState([]);
+  const [selectedProcess, setSelectedProcess] = useState('');
   const [formData, setFormData] = useState({
     processName: '',
     clientFacingAvailability: '',
