@@ -24,6 +24,7 @@ import {
   ModalFooter,
   ModalBody,
   ModalCloseButton,
+  useToast,
 } from '@chakra-ui/react';
 import ImpactAnalysisForm from '../components/ImpactAnalysisForm';
 import ImpactAnalysisBulkUpload from '../components/ImpactAnalysisBulkUpload';
@@ -34,6 +35,7 @@ const ImpactAnalysisPage = () => {
   const [analyses, setAnalyses] = useState([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const toast = useToast();
 
   useEffect(() => {
     if (user) {
@@ -47,12 +49,44 @@ const ImpactAnalysisPage = () => {
       setAnalyses(response.data);
     } catch (error) {
       console.error('Error fetching analyses:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch impact analyses.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
 
   const handleEditAnalysis = (analysis) => {
     setSelectedAnalysis(analysis);
     onOpen();
+  };
+
+  const handleDeleteAnalysis = async (id) => {
+    if (window.confirm('Are you sure you want to delete this impact analysis?')) {
+      try {
+        await axios.delete(`/api/impact-analysis?id=${id}`);
+        toast({
+          title: 'Success',
+          description: 'Impact analysis deleted successfully.',
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+        fetchAnalyses();
+      } catch (error) {
+        console.error('Error deleting impact analysis:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to delete impact analysis.',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    }
   };
 
   const handleAnalysisSaved = () => {
@@ -95,7 +129,8 @@ const ImpactAnalysisPage = () => {
                         <Td>{analysis.overallScore?.toFixed(2)}</Td>
                         <Td>{analysis.criticalityTier}</Td>
                         <Td>
-                          <Button onClick={() => handleEditAnalysis(analysis)}>Edit</Button>
+                          <Button onClick={() => handleEditAnalysis(analysis)} mr={2}>Edit</Button>
+                          <Button onClick={() => handleDeleteAnalysis(analysis._id)} colorScheme="red">Delete</Button>
                         </Td>
                       </Tr>
                     ))}
