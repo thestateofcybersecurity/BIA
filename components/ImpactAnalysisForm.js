@@ -544,10 +544,6 @@ const ImpactAnalysisForm = () => {
       <Box className="container" bg="white" p={6} rounded="md" shadow="md">
         <Heading as="h2" size="lg" mb={6}>Impact Analysis</Heading>
         <Tabs>
-          <TabList>
-            <Tab>New Analysis</Tab>
-            <Tab>Existing Analyses</Tab>
-          </TabList>
           <TabPanels>
             <TabPanel>
               <form onSubmit={handleSubmit}>
@@ -565,41 +561,11 @@ const ImpactAnalysisForm = () => {
                     <Th>Actions</Th>
                   </Tr>
                 </Thead>
-                <Tbody>
-                  {analyses.map((analysis) => (
-                    <Tr key={analysis._id}>
-                      <Td>{analysis.processName}</Td>
-                      <Td>{analysis.overallScore?.toFixed(2)}</Td>
-                      <Td>{analysis.criticalityTier}</Td>
-                      <Td>
-                        <Button onClick={() => handleEdit(analysis)}>Edit</Button>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
               </Table>
             </TabPanel>
           </TabPanels>
         </Tabs>
       </Box>
-
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Edit Impact Analysis</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            {renderForm(true)}
-          </ModalBody>
-          <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={handleSave}>
-              Save
-            </Button>
-            <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </Box>
   );
 };
 
