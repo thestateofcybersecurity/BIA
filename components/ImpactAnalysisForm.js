@@ -132,6 +132,7 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
     try {
       const response = await axios.get(`/api/impact-analysis/${id}`);
       setFormData(response.data);
+      setSelectedProcess(response.data.businessProcess);
     } catch (error) {
       console.error('Error fetching analysis:', error);
       toast({
@@ -152,6 +153,7 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
       const response = await axios[method](url, {
         ...formData,
         ...scores,
+        businessProcess: selectedProcess,
       });
       toast({
         title: 'Success',
@@ -176,6 +178,17 @@ const ImpactAnalysisForm = ({ analysisId = null, onSave }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleProcessChange = (e) => {
+    setSelectedProcess(e.target.value);
+    const process = processes.find(p => p._id === e.target.value);
+    if (process) {
+      setFormData(prevData => ({
+        ...prevData,
+        processName: process.processName,
+      }));
+    }
   };
 
   const calculateScores = () => {
