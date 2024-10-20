@@ -17,9 +17,29 @@ import {
   HStack,
   Input,
   useToast,
+  Text,
 } from '@chakra-ui/react';
 import axios from 'axios';
 import { CSVLink } from 'react-csv';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const ComparativeAnalysis = () => {
   const { user, error: authError, isLoading } = useUser();
@@ -31,6 +51,7 @@ const ComparativeAnalysis = () => {
     minOverallScore: '',
     maxOverallScore: '',
   });
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
   const toast = useToast();
 
   useEffect(() => {
@@ -98,15 +119,6 @@ const ComparativeAnalysis = () => {
       'Owner': analysis.owner,
       'Overall Score': analysis.overallScore?.toFixed(2) || 'N/A',
       'Criticality Tier': analysis.criticalityTier || 'N/A',
-      'Revenue Score': analysis.revenueScore?.toFixed(2) || 'N/A',
-      'Productivity Score': analysis.productivityScore?.toFixed(2) || 'N/A',
-      'Operating Costs Score': analysis.operatingCostsScore?.toFixed(2) || 'N/A',
-      'Financial Penalties Score': analysis.financialPenaltiesScore?.toFixed(2) || 'N/A',
-      'Customers Score': analysis.customersScore?.toFixed(2) || 'N/A',
-      'Staff Score': analysis.staffScore?.toFixed(2) || 'N/A',
-      'Partners Score': analysis.partnersScore?.toFixed(2) || 'N/A',
-      'Compliance Score': analysis.complianceScore?.toFixed(2) || 'N/A',
-      'Health & Safety Score': analysis.healthSafetyScore?.toFixed(2) || 'N/A',
       'RTO': analysis.rto,
       'RPO': analysis.rpo,
     }));
@@ -114,8 +126,67 @@ const ComparativeAnalysis = () => {
     return csvData;
   };
 
+  const requestSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedAnalyses = React.useMemo(() => {
+    let sortableItems = [...filteredAnalyses];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [filteredAnalyses, sortConfig]);
+
+  const getStatistics = () => {
+    const overallScores = filteredAnalyses.map(a => a.overallScore).filter(score => !isNaN(score));
+    const average = overallScores.reduce((a, b) => a + b, 0) / overallScores.length;
+    const max = Math.max(...overallScores);
+    const min = Math.min(...overallScores);
+
+    return { average: average.toFixed(2), max: max.toFixed(2), min: min.toFixed(2) };
+  };
+
+  const chartData = {
+    labels: sortedAnalyses.map(a => a.processName),
+    datasets: [
+      {
+        label: 'Overall Score',
+        data: sortedAnalyses.map(a => a.overallScore),
+        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: 'Overall Scores by Business Process',
+      },
+    },
+  };
+
   if (isLoading) return <div>Loading...</div>;
   if (authError) return <div>{authError.message}</div>;
+
+  const stats = getStatistics();
 
   return (
     <Box>
@@ -173,43 +244,33 @@ const ComparativeAnalysis = () => {
               <Button>Export to CSV</Button>
             </CSVLink>
           </HStack>
-          {filteredAnalyses.length > 0 ? (
+          <Box>
+            <Text>Average Overall Score: {stats.average}</Text>
+            <Text>Highest Overall Score: {stats.max}</Text>
+            <Text>Lowest Overall Score: {stats.min}</Text>
+          </Box>
+          <Box height="400px">
+            <Bar data={chartData} options={chartOptions} />
+          </Box>
+          {sortedAnalyses.length > 0 ? (
             <Table variant="simple">
               <Thead>
                 <Tr>
-                  <Th>Process Name</Th>
-                  <Th>Owner</Th>
-                  <Th>Overall Score</Th>
-                  <Th>Criticality Tier</Th>
-                  <Th>Revenue Score</Th>
-                  <Th>Productivity Score</Th>
-                  <Th>Operating Costs Score</Th>
-                  <Th>Financial Penalties Score</Th>
-                  <Th>Customers Score</Th>
-                  <Th>Staff Score</Th>
-                  <Th>Partners Score</Th>
-                  <Th>Compliance Score</Th>
-                  <Th>Health & Safety Score</Th>
-                  <Th>RTO</Th>
-                  <Th>RPO</Th>
+                  <Th onClick={() => requestSort('processName')}>Process Name</Th>
+                  <Th onClick={() => requestSort('owner')}>Owner</Th>
+                  <Th onClick={() => requestSort('overallScore')}>Overall Score</Th>
+                  <Th onClick={() => requestSort('criticalityTier')}>Criticality Tier</Th>
+                  <Th onClick={() => requestSort('rto')}>RTO</Th>
+                  <Th onClick={() => requestSort('rpo')}>RPO</Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {filteredAnalyses.map((analysis) => (
+                {sortedAnalyses.map((analysis) => (
                   <Tr key={analysis._id}>
                     <Td>{analysis.processName}</Td>
                     <Td>{analysis.owner}</Td>
                     <Td>{analysis.overallScore?.toFixed(2) || 'N/A'}</Td>
                     <Td>{analysis.criticalityTier || 'N/A'}</Td>
-                    <Td>{analysis.revenueScore?.toFixed(2) || 'N/A'}</Td>
-                    <Td>{analysis.productivityScore?.toFixed(2) || 'N/A'}</Td>
-                    <Td>{analysis.operatingCostsScore?.toFixed(2) || 'N/A'}</Td>
-                    <Td>{analysis.financialPenaltiesScore?.toFixed(2) || 'N/A'}</Td>
-                    <Td>{analysis.customersScore?.toFixed(2) || 'N/A'}</Td>
-                    <Td>{analysis.staffScore?.toFixed(2) || 'N/A'}</Td>
-                    <Td>{analysis.partnersScore?.toFixed(2) || 'N/A'}</Td>
-                    <Td>{analysis.complianceScore?.toFixed(2) || 'N/A'}</Td>
-                    <Td>{analysis.healthSafetyScore?.toFixed(2) || 'N/A'}</Td>
                     <Td>{analysis.rto}</Td>
                     <Td>{analysis.rpo}</Td>
                   </Tr>
