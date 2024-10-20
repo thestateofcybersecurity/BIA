@@ -50,25 +50,25 @@ export default async function handler(req, res) {
           res.status(400).json({ error: error.message });
         }
       } else {
-    case 'POST':
-      try {
-        const { businessProcessId, ...impactData } = req.body;
-        const impactAnalysis = new ImpactAnalysis({
-          ...impactData,
-          userId: session.user.sub,
-          businessProcess: businessProcessId
-        });
-        await impactAnalysis.save();
+        try {
+          const { businessProcessId, ...impactData } = req.body;
+          const impactAnalysis = new ImpactAnalysis({
+            ...impactData,
+            userId: session.user.sub,
+            businessProcess: businessProcessId
+          });
+          await impactAnalysis.save();
 
-        await BusinessProcess.findByIdAndUpdate(businessProcessId, { 
-          impactAnalysisCompleted: true,
-          impactAnalysis: impactAnalysis._id
-        });
+          await BusinessProcess.findByIdAndUpdate(businessProcessId, { 
+            impactAnalysisCompleted: true,
+            impactAnalysis: impactAnalysis._id
+          });
 
-        res.status(201).json(impactAnalysis);
-      } catch (error) {
-        console.error('Error creating impact analysis:', error);
-        res.status(400).json({ error: error.message });
+          res.status(201).json(impactAnalysis);
+        } catch (error) {
+          console.error('Error creating impact analysis:', error);
+          res.status(400).json({ error: error.message });
+        }
       }
       break;
 
