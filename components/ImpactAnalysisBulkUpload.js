@@ -71,9 +71,9 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
     scores.overallScore = Object.values(scores).reduce((sum, score) => sum + score, 0) / 9;
 
     scores.criticalityTier = 
-      scores.overallScore >= 3.5 ? 'Tier 0 (Gold)' :
-      scores.overallScore >= 3 ? 'Tier 1 (Silver)' :
-      scores.overallScore >= 2.5 ? 'Tier 2 (Bronze)' :
+      scores.overallScore >= 3.5 ? 'Tier 1 (Gold)' :
+      scores.overallScore >= 3 ? 'Tier 2 (Silver)' :
+      scores.overallScore >= 2.5 ? 'Tier 3 (Bronze)' :
       'Non-critical';
 
     return scores;
