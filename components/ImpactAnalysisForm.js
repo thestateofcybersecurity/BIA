@@ -195,29 +195,21 @@ const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) =
   };
 
   const calculateScores = () => {
-    const newScores = { ...scores };
+    const newScores = {
+      revenueScore: calculateImpactScore('lossOfRevenue', formData.lossOfRevenue),
+      productivityScore: calculateImpactScore('lossOfProductivity', formData.lossOfProductivity),
+      operatingCostsScore: calculateImpactScore('increasedOperatingCosts', formData.increasedOperatingCosts),
+      financialPenaltiesScore: calculateImpactScore('financialPenalties', formData.financialPenalties),
+      customersScore: calculateGoodwillScore(formData.impactOnCustomers),
+      staffScore: calculateGoodwillScore(formData.impactOnStaff),
+      partnersScore: calculateGoodwillScore(formData.impactOnPartners),
+      complianceScore: calculateComplianceScore(formData.complianceImpact),
+      healthSafetyScore: calculateHealthSafetyScore(formData.healthSafetyRisk),
+    };
 
-    // Calculate individual scores
-    newScores.revenueScore = calculateImpactScore('lossOfRevenue', formData.lossOfRevenue);
-    newScores.productivityScore = calculateImpactScore('lossOfProductivity', formData.lossOfProductivity);
-    newScores.operatingCostsScore = calculateImpactScore('increasedOperatingCosts', formData.increasedOperatingCosts);
-    newScores.financialPenaltiesScore = calculateImpactScore('financialPenalties', formData.financialPenalties);
-    newScores.customersScore = calculateGoodwillScore(formData.impactOnCustomers);
-    newScores.staffScore = calculateGoodwillScore(formData.impactOnStaff);
-    newScores.partnersScore = calculateGoodwillScore(formData.impactOnPartners);
-    newScores.complianceScore = calculateComplianceScore(formData.complianceImpact);
-    newScores.healthSafetyScore = calculateHealthSafetyScore(formData.healthSafetyRisk);
-
-    // Calculate Total Cost of Downtime per 24 Hours
     newScores.totalCostOfDowntime = calculateTotalCostOfDowntime(formData);
-
-    // Calculate Total Impact on Goodwill, Compliance & Safety
     newScores.totalImpactScore = calculateTotalImpactScore(newScores);
-
-    // Calculate overall score
-    newScores.overallScore = calculateOverallScore(newScores);
-
-    // Determine criticality tier
+    newScores.overallScore = calculateOverallScore(newScores, formData.criticalityRating);
     newScores.criticalityTier = determineCriticalityTier(newScores.overallScore);
 
     setScores(newScores);
@@ -278,19 +270,28 @@ const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) =
     );
   };
 
-  const calculateOverallScore = (scores) => {
-    const totalScore = Object.values(scores).reduce((sum, score) => {
+  const calculateOverallScore = (scores, criticalityRating) => {
+    let baseScore = Object.values(scores).reduce((sum, score) => {
       if (typeof score === 'number' && score !== scores.totalCostOfDowntime && score !== scores.totalImpactScore) {
         return sum + score;
       }
       return sum;
-    }, 0);
-    return totalScore / 9; // Divide by the number of scored categories
+    }, 0) / 9;
+
+    // Apply criticality rating multiplier
+    const criticalityMultiplier = {
+      'Critical': 1.3,
+      'High': 1.2,
+      'Medium': 1.1,
+      'Low': 1.0
+    };
+
+    return baseScore * (criticalityMultiplier[criticalityRating] || 1.0);
   };
 
   const determineCriticalityTier = (score) => {
     if (score >= 3.5) return 'Tier 1 (Gold)';
-    if (score >= 3) return 'Tier 2 (Silver)';
+    if (score >= 3.0) return 'Tier 2 (Silver)';
     if (score >= 2.5) return 'Tier 3 (Bronze)';
     return 'Non-critical';
   };
