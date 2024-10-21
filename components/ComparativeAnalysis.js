@@ -79,16 +79,24 @@ const ComparativeAnalysis = () => {
                                 (businessProcessResponse.data && Array.isArray(businessProcessResponse.data.data)) ? businessProcessResponse.data.data : [];
       const rtoRpoAnalyses = Array.isArray(rtoRpoResponse.data) ? rtoRpoResponse.data : [];
   
+      console.log('Processed Impact Analyses:', impactAnalyses);
+      console.log('Processed Business Processes:', businessProcesses);
+      console.log('Processed RTO/RPO Analyses:', rtoRpoAnalyses);
+  
       const combinedData = impactAnalyses.map(impact => {
         const businessProcess = businessProcesses.find(bp => bp._id === impact.businessProcess);
         const rtoRpo = rtoRpoAnalyses.find(rr => rr.businessProcessId === impact.businessProcess);
   
+        console.log('Matching for impact:', impact);
+        console.log('Matched business process:', businessProcess);
+        console.log('Matched RTO/RPO:', rtoRpo);
+  
         return {
           ...impact,
-          processName: businessProcess?.processName || 'N/A',
-          owner: businessProcess?.owner || 'N/A',
-          rto: rtoRpo?.acceptableTime || 'N/A',
-          rpo: rtoRpo?.achievableTime || 'N/A',
+          processName: businessProcess ? businessProcess.processName : impact.processName || 'N/A',
+          owner: businessProcess ? businessProcess.owner : impact.owner || 'N/A',
+          rto: rtoRpo ? rtoRpo.acceptableTime : 'N/A',
+          rpo: rtoRpo ? rtoRpo.achievableTime : 'N/A',
         };
       });
   
@@ -110,7 +118,7 @@ const ComparativeAnalysis = () => {
       setError('Failed to fetch comparative analysis data. Please try again.');
     }
   };
-
+  
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilterCriteria(prev => ({ ...prev, [name]: value }));
