@@ -66,7 +66,7 @@ const ComparativeAnalysis = () => {
       console.log('Fetching analyses...');
       const [impactResponse, businessProcessResponse, rtoRpoResponse] = await Promise.all([
         axios.get('/api/impact-analysis'),
-        axios.get('/api/business-process'),
+        axios.get('/api/business-processes'), // Note: Changed from 'business-process' to 'business-processes'
         axios.get('/api/rto-rpo-analysis'),
       ]);
   
@@ -94,7 +94,7 @@ const ComparativeAnalysis = () => {
         return {
           ...impact,
           processName: businessProcess ? businessProcess.processName : impact.processName || 'N/A',
-          owner: businessProcess ? businessProcess.owner : impact.owner || 'N/A',
+          owner: businessProcess ? businessProcess.owner : 'N/A',
           rto: rtoRpo ? rtoRpo.acceptableTime : 'N/A',
           rpo: rtoRpo ? rtoRpo.achievableTime : 'N/A',
         };
