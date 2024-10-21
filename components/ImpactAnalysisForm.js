@@ -55,14 +55,14 @@ const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) =
 
   const scoringCriteria = {
     lossOfRevenue: [
-      { value: 500000, score: 4 },
-      { value: 375000, score: 3.5 },
-      { value: 250000, score: 3 },
-      { value: 187500, score: 2.5 },
-      { value: 125000, score: 2 },
-      { value: 75000, score: 1.5 },
-      { value: 25000, score: 1 },
-      { value: 12500, score: 0.5 },
+      { value: 5500000, score: 4 },
+      { value: 4125000, score: 3.5 },
+      { value: 2750000, score: 3 },
+      { value: 2062500, score: 2.5 },
+      { value: 1375000, score: 2 },
+      { value: 825000, score: 1.5 },
+      { value: 275000, score: 1 },
+      { value: 137500, score: 0.5 },
       { value: 0, score: 0 },
     ],
     lossOfProductivity: [
