@@ -9,7 +9,7 @@ const ImpactAnalysisSchema = new mongoose.Schema({
   additionalAvailability: String,
   criticalityRating: { 
     type: String, 
-    enum: ['Critical', 'High', 'Medium', 'Low'],
+    enum: ['Low', 'Medium', 'High', 'Critical'],
     required: true 
   },
   lossOfRevenue: { type: Number, required: true },
