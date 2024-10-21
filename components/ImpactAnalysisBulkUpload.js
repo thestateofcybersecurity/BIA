@@ -44,22 +44,22 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
 
   const calculateScores = (row) => {
     const scores = {
-      revenueScore: translateImpactScore(row.lossOfRevenue),
-      productivityScore: translateImpactScore(row.lossOfProductivity),
-      operatingCostsScore: translateImpactScore(row.increasedOperatingCosts),
-      financialPenaltiesScore: translateImpactScore(row.financialPenalties),
-      customersScore: translateImpactScore(row.impactOnCustomers),
-      staffScore: translateImpactScore(row.impactOnStaff),
-      partnersScore: translateImpactScore(row.impactOnPartners),
-      complianceScore: translateImpactScore(row.complianceImpact),
-      healthSafetyScore: translateImpactScore(row.healthSafetyRisk),
+      revenueScore: calculateImpactScore('lossOfRevenue', parseFloat(row.lossOfRevenue)),
+      productivityScore: calculateImpactScore('lossOfProductivity', parseFloat(row.lossOfProductivity)),
+      operatingCostsScore: calculateImpactScore('increasedOperatingCosts', parseFloat(row.increasedOperatingCosts)),
+      financialPenaltiesScore: calculateImpactScore('financialPenalties', parseFloat(row.financialPenalties)),
+      customersScore: calculateGoodwillScore(row.impactOnCustomers),
+      staffScore: calculateGoodwillScore(row.impactOnStaff),
+      partnersScore: calculateGoodwillScore(row.impactOnPartners),
+      complianceScore: calculateComplianceScore(row.complianceImpact),
+      healthSafetyScore: calculateHealthSafetyScore(row.healthSafetyRisk),
     };
 
     scores.totalCostOfDowntime = 
-      scores.revenueScore + 
-      scores.productivityScore + 
-      scores.operatingCostsScore + 
-      scores.financialPenaltiesScore;
+      parseFloat(row.lossOfRevenue) + 
+      parseFloat(row.lossOfProductivity) + 
+      parseFloat(row.increasedOperatingCosts) + 
+      parseFloat(row.financialPenalties);
 
     scores.totalImpactScore = 
       scores.customersScore + 
@@ -68,17 +68,94 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
       scores.complianceScore + 
       scores.healthSafetyScore;
 
-    scores.overallScore = Object.values(scores).reduce((sum, score) => sum + score, 0) / 9;
+    scores.overallScore = calculateOverallScore(scores, row.criticalityRating);
 
-    scores.criticalityTier = 
-      scores.overallScore >= 3.5 ? 'Tier 1 (Gold)' :
-      scores.overallScore >= 3 ? 'Tier 2 (Silver)' :
-      scores.overallScore >= 2.5 ? 'Tier 3 (Bronze)' :
-      'Non-critical';
+    scores.criticalityTier = determineCriticalityTier(scores.overallScore);
 
     return scores;
   };
 
+  const calculateImpactScore = (category, value) => {
+    const numValue = Number(value);
+    const criteriaItem = scoringCriteria[category].find(item => item.value === numValue);
+    return criteriaItem ? criteriaItem.score : 0;
+  };
+
+  const calculateGoodwillScore = (impact) => {
+    switch (impact) {
+      case 'Critical Impact': return 4;
+      case 'High Impact': return 3;
+      case 'Medium Impact': return 2;
+      case 'Low Impact': return 1;
+      default: return 0;
+    }
+  };
+
+  const calculateComplianceScore = (impact) => {
+    switch (impact) {
+      case 'Critical Impact': return 4;
+      case 'High Impact': return 3;
+      case 'Medium Impact': return 2;
+      case 'Low Impact': return 1;
+      default: return 0;
+    }
+  };
+
+  const calculateHealthSafetyScore = (impact) => {
+    switch (impact) {
+      case 'High risk of loss-of-life/serious harm': return 4;
+      case 'Some risk of loss-of-life/serious harm': return 3;
+      case 'High degradation of health/safety services': return 2;
+      case 'Some degradation of health/safety services': return 1;
+      default: return 0;
+    }
+  };
+
+  const calculateTotalCostOfDowntime = (data) => {
+    return (
+      Number(data.lossOfRevenue) +
+      Number(data.lossOfProductivity) +
+      Number(data.increasedOperatingCosts) +
+      Number(data.financialPenalties)
+    );
+  };
+
+  const calculateTotalImpactScore = (scores) => {
+    return (
+      scores.customersScore +
+      scores.staffScore +
+      scores.partnersScore +
+      scores.complianceScore +
+      scores.healthSafetyScore
+    );
+  };
+
+  const calculateOverallScore = (scores, criticalityRating) => {
+    let baseScore = Object.values(scores).reduce((sum, score) => {
+      if (typeof score === 'number' && score !== scores.totalCostOfDowntime && score !== scores.totalImpactScore) {
+        return sum + score;
+      }
+      return sum;
+    }, 0) / 9;
+
+    // Apply criticality rating multiplier
+    const criticalityMultiplier = {
+      'Critical': 1.3,
+      'High': 1.2,
+      'Medium': 1.1,
+      'Low': 1.0
+    };
+
+    return baseScore * (criticalityMultiplier[criticalityRating] || 1.0);
+  };
+
+  const determineCriticalityTier = (score) => {
+    if (score >= 3.0) return 'Tier 1 (Gold)';
+    if (score >= 2.5) return 'Tier 2 (Silver)';
+    if (score >= 2.0) return 'Tier 3 (Bronze)';
+    return 'Non-critical';
+  };
+  
   const preprocessData = (data) => {
     return data.map(row => ({
       ...row,
