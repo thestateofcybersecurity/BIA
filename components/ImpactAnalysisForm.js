@@ -382,6 +382,7 @@ const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) =
             <FormLabel>Impact on Customers</FormLabel>
             <Select name="impactOnCustomers" value={formData.impactOnCustomers} onChange={handleChange}>
               <option value="">Select an option</option>
+              <option value="No Impact">No Impact</option>
               <option value="Low Impact">Low Impact</option>
               <option value="Medium Impact">Medium Impact</option>
               <option value="High Impact">High Impact</option>
@@ -393,6 +394,7 @@ const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) =
             <FormLabel>Impact on Internal Staff</FormLabel>
             <Select name="impactOnStaff" value={formData.impactOnStaff} onChange={handleChange}>
               <option value="">Select an option</option>
+              <option value="No Impact">No Impact</option>
               <option value="Low Impact">Low Impact</option>
               <option value="Medium Impact">Medium Impact</option>
               <option value="High Impact">High Impact</option>
@@ -404,6 +406,7 @@ const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) =
             <FormLabel>Impact on Business Partners</FormLabel>
             <Select name="impactOnPartners" value={formData.impactOnPartners} onChange={handleChange}>
               <option value="">Select an option</option>
+              <option value="No Impact">No Impact</option>
               <option value="Low Impact">Low Impact</option>
               <option value="Medium Impact">Medium Impact</option>
               <option value="High Impact">High Impact</option>
@@ -415,6 +418,7 @@ const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) =
             <FormLabel>Compliance (e.g. Legal/ Regulatory) Impact</FormLabel>
             <Select name="complianceImpact" value={formData.complianceImpact} onChange={handleChange}>
               <option value="">Select an option</option>
+              <option value="No Impact">No Impact</option>
               <option value="Low Impact">Low Impact</option>
               <option value="Medium Impact">Medium Impact</option>
               <option value="High Impact">High Impact</option>
@@ -426,6 +430,7 @@ const ImpactAnalysisForm = ({ analysisId = null, initialData = null, onSave }) =
             <FormLabel>Health or Safety Risk</FormLabel>
             <Select name="healthSafetyRisk" value={formData.healthSafetyRisk} onChange={handleChange}>
               <option value="">Select an option</option>
+              <option value="No Impact">No Impact</option>
               <option value="Some degradation of health/safety services">Some degradation of health/safety services</option>
               <option value="High degradation of health/safety services">High degradation of health/safety services</option>
               <option value="Some risk of loss-of-life/serious harm">Some risk of loss-of-life/serious harm</option>
