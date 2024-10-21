@@ -2,6 +2,7 @@
 import { getSession } from '@auth0/nextjs-auth0';
 import connectDB from '../../../config/database';
 import ImpactAnalysis from '../../../models/ImpactAnalysis';
+import BusinessProcess from '../../../models/BusinessProcess';
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
@@ -37,6 +38,25 @@ export default async function handler(req, res) {
       res.status(200).json(analysis);
     } catch (error) {
       console.error('Error fetching impact analysis:', error);
+      res.status(400).json({ error: error.message });
+    }
+  } else if (req.method === 'DELETE') {
+    try {
+      const deletedAnalysis = await ImpactAnalysis.findByIdAndDelete(id);
+      
+      if (!deletedAnalysis) {
+        return res.status(404).json({ error: 'Impact analysis not found' });
+      }
+
+      // Update the associated BusinessProcess
+      await BusinessProcess.findByIdAndUpdate(deletedAnalysis.businessProcess, {
+        impactAnalysisCompleted: false,
+        impactAnalysis: null
+      });
+
+      res.status(200).json({ message: 'Impact analysis deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting impact analysis:', error);
       res.status(400).json({ error: error.message });
     }
   } else {
