@@ -150,9 +150,9 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
   };
 
   const determineCriticalityTier = (score) => {
-    if (score >= 3.0) return 'Tier 1 (Gold)';
-    if (score >= 2.5) return 'Tier 2 (Silver)';
-    if (score >= 2.0) return 'Tier 3 (Bronze)';
+    if (score >= 3.5) return 'Tier 1 (Gold)';
+    if (score >= 3.0) return 'Tier 2 (Silver)';
+    if (score >= 2.5) return 'Tier 3 (Bronze)';
     return 'Non-critical';
   };
   
