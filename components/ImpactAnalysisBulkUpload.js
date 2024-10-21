@@ -23,6 +23,53 @@ const ImpactAnalysisBulkUpload = ({ onUploadComplete }) => {
   const [uploadErrors, setUploadErrors] = useState([]);
   const toast = useToast();
 
+  const scoringCriteria = {
+    lossOfRevenue: [
+      { value: 5500000, score: 4 },
+      { value: 4125000, score: 3.5 },
+      { value: 2750000, score: 3 },
+      { value: 2062500, score: 2.5 },
+      { value: 1375000, score: 2 },
+      { value: 825000, score: 1.5 },
+      { value: 275000, score: 1 },
+      { value: 137500, score: 0.5 },
+      { value: 0, score: 0 },
+    ],
+    lossOfProductivity: [
+      { value: 100000, score: 4 },
+      { value: 75000, score: 3.5 },
+      { value: 50000, score: 3 },
+      { value: 37500, score: 2.5 },
+      { value: 25000, score: 2 },
+      { value: 15000, score: 1.5 },
+      { value: 5000, score: 1 },
+      { value: 2500, score: 0.5 },
+      { value: 0, score: 0 },
+    ],
+    increasedOperatingCosts: [
+      { value: 50000, score: 4 },
+      { value: 37500, score: 3.5 },
+      { value: 25000, score: 3 },
+      { value: 18750, score: 2.5 },
+      { value: 12500, score: 2 },
+      { value: 7500, score: 1.5 },
+      { value: 2500, score: 1 },
+      { value: 1250, score: 0.5 },
+      { value: 0, score: 0 },
+    ],
+    financialPenalties: [
+      { value: 10000, score: 4 },
+      { value: 7500, score: 3.5 },
+      { value: 5000, score: 3 },
+      { value: 3750, score: 2.5 },
+      { value: 2500, score: 2 },
+      { value: 1500, score: 1.5 },
+      { value: 500, score: 1 },
+      { value: 250, score: 0.5 },
+      { value: 0, score: 0 },
+    ],
+  };
+
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
     setUploadErrors([]);
