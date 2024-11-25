@@ -67,7 +67,7 @@ const ImpactAnalysisPage = () => {
   const handleDeleteAnalysis = async (id) => {
     if (window.confirm('Are you sure you want to delete this impact analysis?')) {
       try {
-        await axios.delete(`/api/impact-analysis?id=${id}`);
+        await axios.delete(`/api/impact-analysis/${id}`);
         toast({
           title: 'Success',
           description: 'Impact analysis deleted successfully.',
