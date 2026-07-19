@@ -27,8 +27,9 @@ export function SignInForm() {
       } else {
         window.location.href = '/';
       }
-    } catch {
-      setError('Could not reach the authentication service.');
+    } catch (e) {
+      const message = e instanceof Error && e.message ? e.message : null;
+      setError(message ?? 'Could not reach the authentication service.');
       setPending(false);
     }
   };
