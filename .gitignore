@@ -135,3 +135,5 @@ next-env.d.ts
 # Local JSON data store (demo mode) at repo root only
 /data/
 
+.vercel
+.env*

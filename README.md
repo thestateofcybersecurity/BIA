@@ -29,14 +29,15 @@ Open http://localhost:3000. Without any configuration the app runs in single-wor
 | Variable | Effect |
 |---|---|
 | `DATABASE_URL` | Persist workspaces in Neon Postgres (table `workspaces`, one JSONB row per user) instead of local JSON files |
-| `NEXT_PUBLIC_STACK_PROJECT_ID`, `NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY`, `STACK_SECRET_SERVER_KEY` | Enable Neon Auth (Stack): sign-in required, one isolated workspace per user |
+| `NEON_AUTH_BASE_URL` | Neon Auth server URL, provisioned by the Neon integration on Vercel |
+| `NEON_AUTH_COOKIE_SECRET` | Cookie signing secret you generate (`openssl rand -base64 32`), 32+ characters |
 | `BIA_WORKSPACE_ID` | Workspace id used in demo mode, defaults to `default` |
 
-All four Neon variables are provisioned automatically by the Neon integration on Vercel. With none of them set, the app runs in single-workspace demo mode with local JSON storage; with them set, users sign in via Neon Auth (`/handler/sign-in`) and each user gets an isolated workspace. User records sync to the `neon_auth.users_sync` table in your database.
+`DATABASE_URL` and `NEON_AUTH_BASE_URL` come from the Neon integration; add `NEON_AUTH_COOKIE_SECRET` yourself. With both auth variables set, users sign in via `/auth/sign-in` (email and password through Neon Auth) and each user gets an isolated workspace; without them, the app runs in single-workspace demo mode.
 
 ## Stack
 
-Next.js 14 (App Router) · TypeScript · Tailwind CSS · Recharts · Neon Postgres + Neon Auth (Stack) · server actions with a pluggable JSON-file/Postgres store · Zod validation.
+Next.js 14 (App Router) · TypeScript · Tailwind CSS · Recharts · Neon Postgres + Neon Auth (`@neondatabase/auth`) · server actions with a pluggable JSON-file/Postgres store · Zod validation.
 
 ## Project layout
 

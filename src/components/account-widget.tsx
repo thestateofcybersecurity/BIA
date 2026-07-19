@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { authEnabled, getStackServerApp } from '@/lib/stack';
+import { authEnabled, getAuth } from '@/lib/neon-auth';
+import { SignOutButton } from '@/components/sign-out-button';
 
 /** Server component rendered into the sidebar footer. */
 export async function AccountWidget() {
@@ -11,11 +12,11 @@ export async function AccountWidget() {
     );
   }
 
-  const user = await getStackServerApp().getUser();
-  if (!user) {
+  const { data: session } = await getAuth().getSession();
+  if (!session?.user) {
     return (
       <Link
-        href="/handler/sign-in"
+        href="/auth/sign-in"
         className="font-mono text-[10px] uppercase tracking-wider text-accent hover:underline"
       >
         Sign in →
@@ -25,16 +26,11 @@ export async function AccountWidget() {
 
   return (
     <div className="min-w-0">
-      <p className="truncate text-xs text-ink-soft" title={user.primaryEmail ?? undefined}>
-        {user.displayName || user.primaryEmail}
+      <p className="truncate text-xs text-ink-soft" title={session.user.email ?? undefined}>
+        {session.user.name || session.user.email}
       </p>
-      <div className="mt-1 flex gap-3 font-mono text-[10px] uppercase tracking-wider">
-        <Link href="/handler/account-settings" className="text-ink-muted hover:text-accent">
-          Account
-        </Link>
-        <Link href="/handler/sign-out" className="text-ink-muted hover:text-accent">
-          Sign out
-        </Link>
+      <div className="mt-1">
+        <SignOutButton />
       </div>
     </div>
   );
