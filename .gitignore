@@ -128,3 +128,10 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Next.js generated types
+next-env.d.ts
+
+# Local JSON data store (demo mode) at repo root only
+/data/
+

@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-paper text-ink font-body antialiased;
+  font-feature-settings: 'tnum' 0;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle paper grain */
+.grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: radial-gradient(rgba(27, 36, 48, 0.028) 1px, transparent 1px);
+  background-size: 22px 22px;
+  z-index: 0;
+}
+
+input,
+select,
+textarea {
+  @apply bg-surface border border-line rounded-md px-3 py-2 text-sm text-ink outline-none transition-colors;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  @apply border-accent;
+  box-shadow: 0 0 0 3px rgba(188, 74, 27, 0.12);
+}
+
+label {
+  @apply text-xs font-medium uppercase tracking-wider text-ink-muted;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  .grain::before {
+    display: none;
+  }
+  .print-page {
+    break-inside: avoid;
+  }
+  .print-break {
+    break-before: page;
+  }
+}
