@@ -28,17 +28,15 @@ Open http://localhost:3000. Without any configuration the app runs in single-wor
 
 | Variable | Effect |
 |---|---|
-| `MONGODB_URI` | Persist workspaces in MongoDB (collection `workspaces`) instead of local JSON files |
-| `MONGODB_DB` | Database name, defaults to `bia` |
-| `BIA_WORKSPACE_ID` | Workspace id used in single-user mode, defaults to `default` |
+| `DATABASE_URL` | Persist workspaces in Neon Postgres (table `workspaces`, one JSONB row per user) instead of local JSON files |
+| `NEXT_PUBLIC_STACK_PROJECT_ID`, `NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY`, `STACK_SECRET_SERVER_KEY` | Enable Neon Auth (Stack): sign-in required, one isolated workspace per user |
+| `BIA_WORKSPACE_ID` | Workspace id used in demo mode, defaults to `default` |
 
-### Multi-user auth
-
-All data access is scoped by a user id returned from `src/lib/auth.ts`. To go multi-user, wire your identity provider (for example `@auth0/nextjs-auth0`) into `getUserId()` so it returns the session subject; every layer beneath it already isolates workspaces per id.
+All four Neon variables are provisioned automatically by the Neon integration on Vercel. With none of them set, the app runs in single-workspace demo mode with local JSON storage; with them set, users sign in via Neon Auth (`/handler/sign-in`) and each user gets an isolated workspace. User records sync to the `neon_auth.users_sync` table in your database.
 
 ## Stack
 
-Next.js 14 (App Router) · TypeScript · Tailwind CSS · Recharts · server actions with a pluggable JSON-file/MongoDB store · Zod validation.
+Next.js 14 (App Router) · TypeScript · Tailwind CSS · Recharts · Neon Postgres + Neon Auth (Stack) · server actions with a pluggable JSON-file/Postgres store · Zod validation.
 
 ## Project layout
 

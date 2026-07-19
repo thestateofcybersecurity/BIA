@@ -15,7 +15,7 @@ const STEPS = [
   { href: '/report', num: '08', label: 'BC plan report' },
 ];
 
-export function Nav() {
+export function Nav({ account }: { account?: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
@@ -56,7 +56,8 @@ export function Nav() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-line pt-4">
+      <div className="mt-auto flex flex-col gap-3 border-t border-line pt-4">
+        {account}
         <p className="font-mono text-[10px] leading-relaxed text-ink-faint">
           ISO 22317 · ISO 22301
           <br />

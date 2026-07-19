@@ -5,7 +5,7 @@ import type { Workspace } from '@/lib/domain/types';
 /**
  * Workspace persistence. Each user/tenant owns one workspace document.
  * Backend is selected by environment:
- *  - MONGODB_URI set: MongoDB, collection `workspaces`, _id = userId
+ *  - DATABASE_URL set: Neon Postgres, table `workspaces`, one JSONB row per user
  *  - otherwise: local JSON files under ./data (dev and demo mode)
  */
 
@@ -46,33 +46,51 @@ const fileStore: Store = {
   },
 };
 
-function mongoStore(uri: string): Store {
-  // Lazy client shared across invocations (survives hot reload via globalThis).
-  const getCollection = async () => {
-    const g = globalThis as { _biaMongo?: Promise<import('mongodb').MongoClient> };
-    if (!g._biaMongo) {
-      const { MongoClient } = await import('mongodb');
-      g._biaMongo = new MongoClient(uri).connect();
+function neonStore(url: string): Store {
+  // Shared across invocations and hot reloads; the table is ensured once
+  // per process before first use.
+  const g = globalThis as {
+    _biaSql?: ReturnType<typeof import('@neondatabase/serverless').neon>;
+    _biaTableReady?: Promise<unknown>;
+  };
+  const getSql = async () => {
+    if (!g._biaSql) {
+      const { neon } = await import('@neondatabase/serverless');
+      g._biaSql = neon(url);
     }
-    const client = await g._biaMongo;
-    return client.db(process.env.MONGODB_DB || 'bia').collection('workspaces');
+    if (!g._biaTableReady) {
+      g._biaTableReady = g._biaSql`
+        CREATE TABLE IF NOT EXISTS workspaces (
+          user_id text PRIMARY KEY,
+          data jsonb NOT NULL,
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )`;
+    }
+    await g._biaTableReady;
+    return g._biaSql;
   };
   return {
     async load(userId) {
-      const col = await getCollection();
-      const doc = await col.findOne({ _id: userId as never });
-      if (!doc) return emptyWorkspace();
-      const { _id, ...ws } = doc;
-      return { ...emptyWorkspace(), ...(ws as unknown as Workspace) };
+      const sql = await getSql();
+      const rows = (await sql`
+        SELECT data FROM workspaces WHERE user_id = ${userId}
+      `) as { data: Workspace }[];
+      if (rows.length === 0) return emptyWorkspace();
+      return { ...emptyWorkspace(), ...rows[0].data };
     },
     async save(userId, ws) {
-      const col = await getCollection();
-      await col.replaceOne({ _id: userId as never }, ws as never, { upsert: true });
+      const sql = await getSql();
+      await sql`
+        INSERT INTO workspaces (user_id, data, updated_at)
+        VALUES (${userId}, ${JSON.stringify(ws)}::jsonb, now())
+        ON CONFLICT (user_id)
+        DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+      `;
     },
   };
 }
 
 export function getStore(): Store {
-  const uri = process.env.MONGODB_URI;
-  return uri ? mongoStore(uri) : fileStore;
+  const url = process.env.DATABASE_URL;
+  return url ? neonStore(url) : fileStore;
 }
