@@ -237,6 +237,109 @@ export async function saveMaturityAnswers(
   });
 }
 
+// ---------------- CSV bulk import ----------------
+
+export interface ImportResult {
+  created: number;
+  updated: number;
+  assessments: number;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Bulk import processes (and optional impact assessments) from parsed CSV
+ * records. Upserts by process name (case-insensitive); upstream references
+ * are resolved by name after all rows are applied.
+ */
+export async function importCsv(
+  records: Record<string, string>[]
+): Promise<ImportResult> {
+  const { parseCsvRecord } = await import('@/lib/domain/csv');
+  const rows = records.map((r, i) => parseCsvRecord(r, i + 2));
+  const result: ImportResult = {
+    created: 0,
+    updated: 0,
+    assessments: 0,
+    errors: rows.flatMap((r) => r.errors),
+    warnings: rows.flatMap((r) => r.warnings),
+  };
+  const valid = rows.filter((r) => r.errors.length === 0);
+  if (valid.length === 0) return result;
+
+  const now = new Date().toISOString();
+  await withWorkspace((ws) => {
+    const byName = new Map(ws.processes.map((p) => [p.name.toLowerCase(), p]));
+
+    for (const row of valid) {
+      const existing = byName.get(row.name.toLowerCase());
+      const fields = {
+        name: row.name,
+        description: row.description,
+        owner: row.owner,
+        department: row.department,
+        usersServed: row.usersServed,
+        peakPeriods: row.peakPeriods,
+        dependencies: row.dependencies,
+      };
+      let processId: string;
+      if (existing) {
+        Object.assign(existing, fields, { updatedAt: now });
+        processId = existing.id;
+        result.updated++;
+      } else {
+        processId = nanoid(10);
+        const created = {
+          ...fields,
+          id: processId,
+          upstreamProcessIds: [],
+          createdAt: now,
+          updatedAt: now,
+        };
+        ws.processes.push(created);
+        byName.set(row.name.toLowerCase(), created);
+        result.created++;
+      }
+
+      if (row.hasAssessment) {
+        const assessment = ws.assessments.find((a) => a.processId === processId);
+        const payload = {
+          financialLoss: row.losses,
+          ratings: row.ratings,
+          mtpdOverride: null,
+          notes: '',
+          updatedAt: now,
+        };
+        if (assessment) {
+          Object.assign(assessment, payload);
+        } else {
+          ws.assessments.push({ id: nanoid(10), processId, ...payload });
+        }
+        result.assessments++;
+      }
+    }
+
+    // Resolve upstream references once every row exists.
+    for (const row of valid) {
+      const process = byName.get(row.name.toLowerCase())!;
+      const ids: string[] = [];
+      for (const upstreamName of row.upstreamNames) {
+        const target = byName.get(upstreamName.toLowerCase());
+        if (!target) {
+          result.warnings.push(
+            `"${row.name}": upstream process "${upstreamName}" not found; skipped`
+          );
+        } else if (target.id !== process.id) {
+          ids.push(target.id);
+        }
+      }
+      if (row.upstreamNames.length > 0) process.upstreamProcessIds = ids;
+    }
+  });
+
+  return result;
+}
+
 // ---------------- Workspace utilities ----------------
 
 export async function loadSampleData() {

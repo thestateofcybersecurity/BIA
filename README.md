@@ -7,7 +7,7 @@ Methodology grounding: ISO 22317, ISO 22301, NIST SP 800-34, and the BCI Good Pr
 ## The workflow
 
 1. **Organization profile**: revenue, headcount, and risk appetite calibrate the financial severity bands to your size.
-2. **Processes**: catalogue business processes with owners and dependencies across six classes (people, applications, equipment, facilities, suppliers, data) plus upstream process links.
+2. **Processes**: catalogue business processes with owners and dependencies across six classes (people, applications, equipment, facilities, suppliers, data) plus upstream process links. A CSV bulk import (with downloadable template) upserts processes by name and can populate impact assessments in the same pass.
 3. **Impact assessment**: rate the impact of disruption at 4 hours, 24 hours, 3 days, 1 week, and 1 month across five categories on an anchored 0-4 scale. MTPD, tier (1 Critical through 4 Deferrable), and priority are derived, never self-declared.
 4. **Objectives & gaps**: set target and achievable RTO/RPO/MBCO. RTO targets are validated against MTPD; shortfalls populate a gap register with owners and remediation status.
 5. **Recovery workflows**: ordered steps with teams and durations, checked against the RTO target.

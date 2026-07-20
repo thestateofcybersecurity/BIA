@@ -17,9 +17,14 @@ export default async function ProcessesPage() {
         title="Business processes"
         intro="Catalogue what the organization does and what each process depends on. Dependencies drive tabletop scenarios and recovery planning; tiers appear once impact assessments are complete."
         actions={
-          <Link href="/processes/new" className={btn.primary}>
-            Add process
-          </Link>
+          <>
+            <Link href="/processes/import" className={btn.secondary}>
+              Import CSV
+            </Link>
+            <Link href="/processes/new" className={btn.primary}>
+              Add process
+            </Link>
+          </>
         }
       />
 
