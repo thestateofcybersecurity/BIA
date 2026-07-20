@@ -134,9 +134,16 @@ The 37-question ISO 22301 self-assessment is retained for coverage but restructu
 - Domain score = mean of its questions. Overall score = weighted mean of domains (BIA and Strategies weighted 1.5x, others 1x, weights configurable in code).
 - Output: radar chart by domain, weakest-domain callouts, and a suggested roadmap (lowest domains first).
 
-## 8. Tabletop scenarios
+## 8. Tabletop exercises
 
-A curated library replaces the broken AI integration: ransomware, cloud or data center outage, critical supplier failure, facility loss or regional disaster, workforce disruption, and insider threat. Each scenario is generated from live assessment data: it names the organization's actual Tier 1 processes, injects real RTO gaps and dependency concentrations, and structures the exercise as phases (detection, assessment, response, recovery, post-incident) with discussion questions and evaluation criteria mapped to maturity domains, so exercise findings feed back into the maturity assessment.
+A curated library covers six scenario types: ransomware, cloud or data center outage, critical supplier failure, facility loss or regional disaster, workforce disruption, and insider threat. Each template is generated from live assessment data: it names the organization's actual Tier 1 processes, injects real RTO gaps and dependency concentrations, and structures the exercise as phases with discussion questions and evaluation criteria mapped to maturity domains.
+
+Any scenario can be run as a **live session**: the facilitator steps through the phases, records the room's answer to every discussion question, and captures observation notes. With Claude configured (`ANTHROPIC_API_KEY`), two AI capabilities layer on top:
+
+- **Tailored generation**: Claude designs a bespoke exercise from the full workspace (org profile, tiered processes with MTPD and RTO data, dependency inventories, gap register, maturity scores) plus an optional facilitator focus. There is no intake form; the assessment data is the intake. Injects are written to collide with documented recovery gaps, and discussion weight goes to the weakest maturity domains.
+- **After-action report**: on completion, Claude writes a structured report (executive summary, phase timeline, strengths, gaps, prioritized recommendations with owners, follow-ups, and maturity signals) judged against the organization's own BIA: responses that contradict documented MTPDs, objectives, or gaps are called out, and unanswered questions are treated as findings. Maturity signals map observations onto the eight assessment domains as evidence for the next self-assessment update.
+
+Structured outputs are schema-validated at the boundary; a refusal or malformed response is surfaced to the facilitator, never silently stored. Without an API key, the template library and live sessions work fully; only generation and the AI report are disabled.
 
 ## 9. Business continuity plan report
 

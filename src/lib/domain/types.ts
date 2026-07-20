@@ -113,6 +113,74 @@ export interface MaturityAssessment {
   updatedAt: string;
 }
 
+// ---------------- Tabletop exercises ----------------
+
+export interface ScenarioPhase {
+  title: string;
+  narrative: string;
+  injects: string[];
+  discussion: string[];
+  expectedActions: string[];
+}
+
+export interface GeneratedScenario {
+  id: string;
+  title: string;
+  category: string;
+  duration: string;
+  objective: string;
+  contextNotes: string[];
+  phases: ScenarioPhase[];
+  /** Maturity domain ids this exercise evaluates. */
+  evaluates: string[];
+}
+
+export interface AarRecommendation {
+  priority: 'high' | 'medium' | 'low';
+  item: string;
+  rationale: string;
+  suggestedOwner: string;
+}
+
+export interface AfterActionReport {
+  executiveSummary: string;
+  timeline: { phase: string; summary: string }[];
+  strengths: string[];
+  gaps: string[];
+  recommendations: AarRecommendation[];
+  followUps: { item: string; suggestedOwner: string; suggestedDue: string }[];
+  /** Observations mapped to maturity domain ids, feeding the self-assessment. */
+  maturitySignals: { domainId: string; observation: string }[];
+  generatedAt: string;
+}
+
+export interface ExerciseNote {
+  id: string;
+  text: string;
+  /** Phase index the note was taken during; null = general. */
+  phase: number | null;
+  at: string;
+}
+
+export interface ExerciseSession {
+  id: string;
+  /** Catalog scenario id this session started from. */
+  scenarioId: string;
+  /** library = deterministic template; ai = Claude-tailored. */
+  mode: 'library' | 'ai';
+  /** Optional focus the facilitator gave the AI generator. */
+  focus: string;
+  scenario: GeneratedScenario;
+  status: 'in_progress' | 'completed';
+  currentPhase: number;
+  /** Keyed `${phaseIndex}:${promptIndex}` -> participant response text. */
+  responses: Record<string, string>;
+  notes: ExerciseNote[];
+  report: AfterActionReport | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Everything for one user/tenant, persisted as a single document. */
 export interface Workspace {
   org: OrgProfile | null;
@@ -122,6 +190,7 @@ export interface Workspace {
   remediations: GapRemediation[];
   workflows: RecoveryWorkflow[];
   maturity: MaturityAssessment | null;
+  exercises: ExerciseSession[];
 }
 
 export type Tier = 1 | 2 | 3 | 4;

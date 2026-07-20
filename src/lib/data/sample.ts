@@ -301,6 +301,7 @@ export function sampleWorkspace(): Workspace {
         ],
       },
     ],
+    exercises: [],
     maturity: {
       updatedAt: ts,
       answers: {

@@ -1,4 +1,4 @@
-import type { Workspace } from './types';
+import type { Workspace, GeneratedScenario } from './types';
 import { deriveAll, computeGaps } from './scoring';
 import { MTPD_LABELS, TIER_SHORT } from './constants';
 
@@ -8,25 +8,7 @@ import { MTPD_LABELS, TIER_SHORT } from './constants';
  * concentrations, and recovery gaps. See docs/METHODOLOGY.md section 8.
  */
 
-export interface ScenarioPhase {
-  title: string;
-  narrative: string;
-  injects: string[];
-  discussion: string[];
-  expectedActions: string[];
-}
-
-export interface GeneratedScenario {
-  id: string;
-  title: string;
-  category: string;
-  duration: string;
-  objective: string;
-  contextNotes: string[];
-  phases: ScenarioPhase[];
-  /** Maturity domain ids this exercise evaluates. */
-  evaluates: string[];
-}
+export type { ScenarioPhase, GeneratedScenario } from './types';
 
 interface Ctx {
   orgName: string;

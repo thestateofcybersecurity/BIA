@@ -340,6 +340,136 @@ export async function importCsv(
   return result;
 }
 
+// ---------------- Tabletop exercise sessions ----------------
+
+export async function startLibraryExercise(scenarioId: string): Promise<{ id: string }> {
+  const { generateScenario } = await import('@/lib/domain/scenarios');
+  const ws = await loadWorkspace();
+  const scenario = generateScenario(ws, scenarioId);
+  if (!scenario) throw new Error('Unknown scenario');
+  const now = new Date().toISOString();
+  const id = nanoid(10);
+  await withWorkspace((w) => {
+    w.exercises.push({
+      id,
+      scenarioId,
+      mode: 'library',
+      focus: '',
+      scenario,
+      status: 'in_progress',
+      currentPhase: 0,
+      responses: {},
+      notes: [],
+      report: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+  return { id };
+}
+
+export async function startAiExercise(
+  scenarioId: string,
+  focus: string
+): Promise<{ id: string }> {
+  const { aiEnabled } = await import('@/lib/ai/client');
+  if (!aiEnabled()) throw new Error('AI generation requires ANTHROPIC_API_KEY to be configured.');
+  const { CATALOG } = await import('@/lib/domain/scenarios');
+  const { generateScenarioWithClaude } = await import('@/lib/ai/generate');
+
+  const base = CATALOG.find((s) => s.id === scenarioId);
+  if (!base) throw new Error('Unknown scenario');
+
+  const ws = await loadWorkspace();
+  const scenario = await generateScenarioWithClaude({
+    ws,
+    category: base.category,
+    baseTitle: base.title,
+    baseSummary: base.summary,
+    focus,
+  });
+
+  const now = new Date().toISOString();
+  const id = nanoid(10);
+  await withWorkspace((w) => {
+    w.exercises.push({
+      id,
+      scenarioId,
+      mode: 'ai',
+      focus,
+      scenario,
+      status: 'in_progress',
+      currentPhase: 0,
+      responses: {},
+      notes: [],
+      report: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+  return { id };
+}
+
+const progressSchema = z.object({
+  sessionId: z.string().min(1),
+  currentPhase: z.number().int().min(0),
+  responses: z.record(z.string(), z.string()),
+  notes: z.array(
+    z.object({
+      id: z.string(),
+      text: z.string(),
+      phase: z.number().int().nullable(),
+      at: z.string(),
+    })
+  ),
+});
+
+export async function saveExerciseProgress(input: z.infer<typeof progressSchema>) {
+  const parsed = progressSchema.parse(input);
+  await withWorkspace((ws) => {
+    const session = ws.exercises.find((e) => e.id === parsed.sessionId);
+    if (!session) throw new Error('Session not found');
+    session.currentPhase = parsed.currentPhase;
+    session.responses = parsed.responses;
+    session.notes = parsed.notes;
+    session.updatedAt = new Date().toISOString();
+  });
+}
+
+export async function completeExercise(sessionId: string) {
+  await withWorkspace((ws) => {
+    const session = ws.exercises.find((e) => e.id === sessionId);
+    if (!session) throw new Error('Session not found');
+    session.status = 'completed';
+    session.updatedAt = new Date().toISOString();
+  });
+}
+
+export async function generateExerciseReport(sessionId: string) {
+  const { aiEnabled } = await import('@/lib/ai/client');
+  if (!aiEnabled()) throw new Error('The after-action report requires ANTHROPIC_API_KEY to be configured.');
+  const { generateAarWithClaude } = await import('@/lib/ai/generate');
+
+  const ws = await loadWorkspace();
+  const session = ws.exercises.find((e) => e.id === sessionId);
+  if (!session) throw new Error('Session not found');
+  if (session.status !== 'completed') throw new Error('Complete the exercise before generating the report.');
+
+  const report = await generateAarWithClaude({ ws, session });
+  await withWorkspace((w) => {
+    const s = w.exercises.find((e) => e.id === sessionId);
+    if (!s) throw new Error('Session not found');
+    s.report = report;
+    s.updatedAt = new Date().toISOString();
+  });
+}
+
+export async function deleteExercise(sessionId: string) {
+  await withWorkspace((ws) => {
+    ws.exercises = ws.exercises.filter((e) => e.id !== sessionId);
+  });
+}
+
 // ---------------- Workspace utilities ----------------
 
 export async function loadSampleData() {

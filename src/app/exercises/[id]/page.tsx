@@ -2,10 +2,14 @@ import { notFound } from 'next/navigation';
 import { loadWorkspace } from '@/lib/actions';
 import { generateScenario } from '@/lib/domain/scenarios';
 import { MATURITY_DOMAINS } from '@/lib/domain/maturity';
+import { aiEnabled } from '@/lib/ai/client';
 import { PageHeader, Card } from '@/components/ui';
 import { PrintButton } from '@/components/print-button';
+import { ExerciseLauncher } from './launcher';
 
 export const dynamic = 'force-dynamic';
+// Claude generation can take a couple of minutes at high effort.
+export const maxDuration = 300;
 
 export default async function ExercisePage({
   params,
@@ -28,6 +32,10 @@ export default async function ExercisePage({
         intro={scenario.objective}
         actions={<PrintButton label="Print exercise pack" />}
       />
+
+      <div className="no-print">
+        <ExerciseLauncher scenarioId={id} aiEnabled={aiEnabled()} />
+      </div>
 
       {scenario.contextNotes.length > 0 && (
         <Card
