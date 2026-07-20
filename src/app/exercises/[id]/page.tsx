@@ -7,9 +7,14 @@ import { PrintButton } from '@/components/print-button';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ExercisePage({ params }: { params: { id: string } }) {
+export default async function ExercisePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   const ws = await loadWorkspace();
-  const scenario = generateScenario(ws, params.id);
+  const scenario = generateScenario(ws, id);
   if (!scenario) notFound();
 
   const domainName = (id: string) =>

@@ -1,6 +1,6 @@
 import { authEnabled, getAuth } from '@/lib/neon-auth';
 
-type Ctx = { params: { path: string[] } };
+type Ctx = { params: Promise<{ path: string[] }> };
 
 const handlers = authEnabled() ? getAuth().handler() : null;
 

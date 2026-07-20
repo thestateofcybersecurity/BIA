@@ -8,10 +8,11 @@ export const dynamic = 'force-dynamic';
 export default async function AssessmentPage({
   params,
 }: {
-  params: { processId: string };
+  params: Promise<{ processId: string }>;
 }) {
+  const { processId } = await params;
   const ws = await loadWorkspace();
-  const process = ws.processes.find((p) => p.id === params.processId);
+  const process = ws.processes.find((p) => p.id === processId);
   if (!process) notFound();
 
   const assessment = ws.assessments.find((a) => a.processId === process.id) ?? null;

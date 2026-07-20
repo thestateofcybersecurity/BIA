@@ -15,6 +15,6 @@ export async function getUserId(): Promise<string> {
     return session.user.id;
   }
   // cookies() keeps demo mode dynamic (never statically cached).
-  cookies();
+  await cookies();
   return process.env.BIA_WORKSPACE_ID || 'default';
 }
