@@ -100,6 +100,7 @@ export async function deleteProcess(id: string) {
     ws.objectives = ws.objectives.filter((o) => o.processId !== id);
     ws.remediations = ws.remediations.filter((r) => r.processId !== id);
     ws.workflows = ws.workflows.filter((w) => w.processId !== id);
+    ws.resourceProfiles = ws.resourceProfiles.filter((r) => r.processId !== id);
     for (const p of ws.processes) {
       p.upstreamProcessIds = p.upstreamProcessIds.filter((u) => u !== id);
     }
@@ -139,10 +140,34 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
   await withWorkspace((ws) => {
     const existing = ws.assessments.find((a) => a.processId === parsed.processId);
     if (existing) {
-      Object.assign(existing, { ...parsed, id: existing.id, updatedAt: now });
+      // Any edit invalidates the owner's sign-off; it must be re-approved.
+      Object.assign(existing, {
+        ...parsed,
+        id: existing.id,
+        updatedAt: now,
+        approvedBy: null,
+        approvedAt: null,
+      });
     } else {
-      ws.assessments.push({ ...parsed, id: nanoid(10), updatedAt: now } as ImpactAssessment);
+      ws.assessments.push({
+        ...parsed,
+        id: nanoid(10),
+        updatedAt: now,
+        approvedBy: null,
+        approvedAt: null,
+      } as ImpactAssessment);
     }
+  });
+}
+
+export async function approveAssessment(processId: string, approver: string) {
+  const name = approver.trim();
+  if (!name) throw new Error('Approver name is required.');
+  await withWorkspace((ws) => {
+    const a = ws.assessments.find((x) => x.processId === processId);
+    if (!a) throw new Error('Assessment not found');
+    a.approvedBy = name;
+    a.approvedAt = new Date().toISOString();
   });
 }
 
@@ -155,6 +180,7 @@ const objectivesSchema = z.object({
   mbcoPercent: z.number().min(0).max(100).nullable(),
   rtoAchievableHours: z.number().min(0).nullable(),
   rpoAchievableHours: z.number().min(0).nullable(),
+  wrtHours: z.number().min(0).nullable(),
   dataLossNotes: z.string(),
 });
 
@@ -190,6 +216,34 @@ export async function saveRemediation(input: z.infer<typeof remediationSchema>) 
       Object.assign(existing, { ...parsed, id: existing.id, updatedAt: now });
     } else {
       ws.remediations.push({ ...parsed, id: nanoid(10), updatedAt: now } as GapRemediation);
+    }
+  });
+}
+
+// ---------------- Recovery resource profiles ----------------
+
+const horizonNumbers = horizonRecord(z.number().min(0).nullable());
+
+const resourceProfileSchema = z.object({
+  processId: z.string().min(1),
+  staff: horizonNumbers,
+  workstations: horizonNumbers,
+  facilitySeats: horizonNumbers,
+  vitalRecords: z.array(z.string()),
+  notes: z.string(),
+});
+
+export async function saveResourceProfile(
+  input: z.infer<typeof resourceProfileSchema>
+) {
+  const parsed = resourceProfileSchema.parse(input);
+  const now = new Date().toISOString();
+  await withWorkspace((ws) => {
+    const existing = ws.resourceProfiles.find((r) => r.processId === parsed.processId);
+    if (existing) {
+      Object.assign(existing, { ...parsed, id: existing.id, updatedAt: now });
+    } else {
+      ws.resourceProfiles.push({ ...parsed, id: nanoid(10), updatedAt: now });
     }
   });
 }

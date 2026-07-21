@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveAssessment } from '@/lib/actions';
+import { saveAssessment, approveAssessment } from '@/lib/actions';
 import type {
   BusinessProcess,
   ImpactAssessment,
@@ -66,6 +66,8 @@ export function AssessmentForm({
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [override, setOverride] = useState(initial?.mtpdOverride ?? null);
   const [focusCat, setFocusCat] = useState<RatedCategory>('operational');
+  const [approver, setApprover] = useState(process.owner || '');
+  const [dirty, setDirty] = useState(false);
 
   const assessment: ImpactAssessment = useMemo(
     () => ({
@@ -87,11 +89,13 @@ export function AssessmentForm({
 
   const setRating = (cat: RatedCategory, h: Horizon, v: Severity) => {
     setSaved(false);
+    setDirty(true);
     setRatings((r) => ({ ...r, [cat]: enforceMonotonic(r[cat], h, v) }));
   };
 
   const setLoss = (h: Horizon, raw: string) => {
     setSaved(false);
+    setDirty(true);
     const v = raw === '' ? null : Math.max(0, Number(raw));
     setLosses((l) =>
       v == null ? { ...l, [h]: null } : enforceMonotonicLoss(l, h, v)
@@ -239,7 +243,7 @@ export function AssessmentForm({
           <textarea
             rows={3}
             value={notes}
-            onChange={(e) => { setNotes(e.target.value); setSaved(false); }}
+            onChange={(e) => { setNotes(e.target.value); setSaved(false); setDirty(true); }}
             placeholder="Assumptions, sources, workshop attendees, follow-ups"
             className="w-full"
           />
@@ -300,7 +304,7 @@ export function AssessmentForm({
                   id="ov-value"
                   value={override.value}
                   onChange={(e) => {
-                    setSaved(false);
+                    setSaved(false); setDirty(true);
                     setOverride({ ...override, value: e.target.value as MtpdValue });
                   }}
                 >
@@ -318,7 +322,7 @@ export function AssessmentForm({
                   rows={2}
                   value={override.justification}
                   onChange={(e) => {
-                    setSaved(false);
+                    setSaved(false); setDirty(true);
                     setOverride({ ...override, justification: e.target.value });
                   }}
                 />
@@ -326,7 +330,7 @@ export function AssessmentForm({
               <button
                 type="button"
                 className={btn.small}
-                onClick={() => { setSaved(false); setOverride(null); }}
+                onClick={() => { setSaved(false); setDirty(true); setOverride(null); }}
               >
                 Remove override
               </button>
@@ -336,12 +340,57 @@ export function AssessmentForm({
               type="button"
               className={btn.secondary}
               onClick={() => {
-                setSaved(false);
+                setSaved(false); setDirty(true);
                 setOverride({ value: derived.mtpdDerived ?? 'beyond', justification: '' });
               }}
             >
               Override derived MTPD
             </button>
+          )}
+        </Card>
+
+        <Card
+          title="Owner sign-off"
+          subtitle="Editing the assessment clears the sign-off; it must be re-approved"
+        >
+          {initial?.approvedBy && !dirty ? (
+            <p className="text-sm text-ink-soft">
+              Approved by <span className="font-medium text-ink">{initial.approvedBy}</span>
+              {initial.approvedAt && (
+                <span className="text-ink-muted">
+                  {' '}on {new Date(initial.approvedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-warn">
+                {dirty ? 'Unsaved changes; save before approving' : 'Not yet approved'}
+              </p>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 text-sm"
+                  value={approver}
+                  placeholder="Approver name"
+                  onChange={(e) => setApprover(e.target.value)}
+                />
+                <button
+                  className={btn.secondary}
+                  disabled={pending || dirty || !approver.trim() || !initial || !derived.assessmentComplete}
+                  onClick={() =>
+                    start(async () => {
+                      await approveAssessment(process.id, approver);
+                      router.refresh();
+                    })
+                  }
+                >
+                  Approve
+                </button>
+              </div>
+              {initial && !derived.assessmentComplete && (
+                <p className="text-xs text-ink-muted">Complete every cell before approving.</p>
+              )}
+            </div>
           )}
         </Card>
 
@@ -359,6 +408,7 @@ export function AssessmentForm({
                   notes,
                 });
                 setSaved(true);
+                setDirty(false);
                 router.refresh();
               })
             }

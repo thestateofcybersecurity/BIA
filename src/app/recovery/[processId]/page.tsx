@@ -3,6 +3,7 @@ import { loadWorkspace } from '@/lib/actions';
 import { PageHeader } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { WorkflowEditor } from './workflow-editor';
+import { ResourceProfileEditor } from './resource-profile';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,8 @@ export default async function WorkflowPage({
 
   const workflow = ws.workflows.find((w) => w.processId === process.id) ?? null;
   const objectives = ws.objectives.find((o) => o.processId === process.id) ?? null;
+  const resourceProfile =
+    ws.resourceProfiles.find((r) => r.processId === process.id) ?? null;
 
   return (
     <>
@@ -44,6 +47,7 @@ export default async function WorkflowPage({
           </li>
         </ul>
       </HelpBox>
+      <ResourceProfileEditor processId={process.id} initial={resourceProfile} />
       <WorkflowEditor
         processId={process.id}
         initial={workflow}

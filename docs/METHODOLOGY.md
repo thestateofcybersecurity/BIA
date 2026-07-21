@@ -114,18 +114,34 @@ The cumulative financial estimates per horizon form a downtime cost curve per pr
 
 Per process:
 
-- **RTO (target)**: how quickly the process must be restored. Validation: RTO must be less than MTPD; the app warns and suggests a buffer (RTO at most 80% of MTPD).
+- **RTO (target)**: how quickly the process must be restored.
+- **WRT (Work Recovery Time)**: how long backlog catch-up takes after systems are restored. Validation: RTO + WRT must fit inside the MTPD with a buffer (at most 80% of MTPD combined), because the MTPD bounds the return to normal service, not just restored systems.
 - **RPO (target)**: maximum tolerable data loss, guided by a data-loss tolerance question.
 - **MBCO**: minimum acceptable service level (% of normal output) during recovery.
 - **Achievable RTO / RPO**: what current capability can actually deliver.
 
 **Gap = achievable minus target.** Any positive gap creates an entry in the gap register with a severity, owner, remediation action, and status. RTO gap severity rates against MTPD headroom: high when achievable recovery lands beyond the MTPD, medium when it lands inside the 20% buffer zone, low otherwise. RPO gaps, and RTO gaps where no MTPD has been derived yet, rate on the size of the shortfall relative to the target: high at 3x the target or more, medium at 1x or more, low otherwise. The gap register is the primary output driving investment decisions.
 
-## 6. Recovery workflows
+### Governance
+
+Each completed assessment carries an owner sign-off (name and date); any edit to the assessment clears the sign-off and it must be re-approved. Assessments are due for review 12 months after their last approval or edit (ISO 22301 review cadence); overdue assessments are flagged in the app.
+
+## 6. Recovery workflows and resource requirements
 
 Ordered recovery steps per process, each with responsible team, dependencies (same six classes), alternate staff, and estimated duration. The sum of step durations is compared to the target RTO; if the critical path exceeds RTO the app flags it.
 
-## 7. Maturity assessment
+Each process also carries a **recovery resource profile** (ISO 22317 resource requirements at time of recovery): the minimum staff, workstations or equipment, and facility seats needed at each of the five horizons, plus the vital records and data sets the process cannot operate without. This is what alternate-site sizing and surge planning must actually provide.
+
+## 7. Dependency requirement roll-down
+
+The BIA handed down to IT and third-party management, fully derived (nothing entered separately):
+
+- Each **application** inherits the strictest (lowest) RTO and RPO targets of every process that depends on it, plus their highest criticality tier. An application supporting a Tier 1 process must itself be recoverable inside that process's targets.
+- Each **supplier** inherits the highest criticality of the processes it supports, and the roll-down shows concentration: a supplier appearing under many processes is a single point of failure.
+
+Dependencies are matched by name (case-insensitive), which is why consistent dependency naming in the process inventory matters.
+
+## 8. Maturity assessment
 
 The 37-question ISO 22301 self-assessment is retained for coverage but restructured:
 
@@ -134,7 +150,7 @@ The 37-question ISO 22301 self-assessment is retained for coverage but restructu
 - Domain score = mean of its questions. Overall score = weighted mean of domains (BIA and Strategies weighted 1.5x, others 1x, weights configurable in code).
 - Output: radar chart by domain, weakest-domain callouts, and a suggested roadmap (lowest domains first).
 
-## 8. Tabletop exercises
+## 9. Tabletop exercises
 
 A curated library covers six scenario types: ransomware, cloud or data center outage, critical supplier failure, facility loss or regional disaster, workforce disruption, and insider threat. Each template is generated from live assessment data: it names the organization's actual Tier 1 processes, injects real RTO gaps and dependency concentrations, and structures the exercise as phases with discussion questions and evaluation criteria mapped to maturity domains.
 
@@ -145,7 +161,7 @@ Any scenario can be run as a **live session**: the facilitator steps through the
 
 Structured outputs are schema-validated at the boundary; a refusal or malformed response is surfaced to the facilitator, never silently stored. Without an API key, the template library and live sessions work fully; only generation and the AI report are disabled.
 
-## 9. Business continuity plan report
+## 10. Business continuity plan report
 
 Generated fully from data, printable to PDF from the browser:
 
@@ -153,10 +169,11 @@ Generated fully from data, printable to PDF from the browser:
 2. Scope and organization profile
 3. Methodology summary
 4. Process inventory and dependency map
-5. BIA results: tiering table, impact heatmap, downtime cost curves
-6. Recovery objectives and gap register
-7. Recovery workflows
-8. Tabletop exercise program
-9. Maturity results and roadmap
+5. BIA results: tiering table with owner sign-off status, MTPD overrides with justifications
+6. Recovery objectives (including WRT) and gap register
+7. Recovery workflows and resource requirements
+8. Dependency recovery requirements (application and supplier roll-down)
+9. Tabletop exercise program
+10. Maturity results and roadmap
 
 Nothing in the report is boilerplate about a fictional company; every table and number traces to entered data.

@@ -62,6 +62,9 @@ export interface ImpactAssessment {
   mtpdOverride: { value: MtpdValue; justification: string } | null;
   notes: string;
   updatedAt: string;
+  /** Owner sign-off; cleared automatically whenever the assessment is edited. */
+  approvedBy?: string | null;
+  approvedAt?: string | null;
 }
 
 export interface RecoveryObjectives {
@@ -72,7 +75,28 @@ export interface RecoveryObjectives {
   mbcoPercent: number | null;
   rtoAchievableHours: number | null;
   rpoAchievableHours: number | null;
+  /** Work Recovery Time: backlog catch-up after restoration. RTO + WRT must fit inside the MTPD. */
+  wrtHours?: number | null;
   dataLossNotes: string;
+  updatedAt: string;
+}
+
+/**
+ * Minimum resources a process needs at each point after a disruption
+ * (ISO 22317 resource requirements at time of recovery).
+ */
+export interface RecoveryResourceProfile {
+  id: string;
+  processId: string;
+  /** Minimum staff able to operate the process at each horizon. */
+  staff: Record<Horizon, number | null>;
+  /** Workstations / laptops / specialist equipment needed. */
+  workstations: Record<Horizon, number | null>;
+  /** Physical seats (office, alternate site) needed. */
+  facilitySeats: Record<Horizon, number | null>;
+  /** Vital records and data sets the process cannot operate without. */
+  vitalRecords: string[];
+  notes: string;
   updatedAt: string;
 }
 
@@ -191,6 +215,7 @@ export interface Workspace {
   workflows: RecoveryWorkflow[];
   maturity: MaturityAssessment | null;
   exercises: ExerciseSession[];
+  resourceProfiles: RecoveryResourceProfile[];
 }
 
 export type Tier = 1 | 2 | 3 | 4;

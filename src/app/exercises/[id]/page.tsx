@@ -28,7 +28,7 @@ export default async function ExercisePage({
   return (
     <>
       <PageHeader
-        kicker={`Step 07 · ${scenario.category} · ${scenario.duration}`}
+        kicker={`Step 08 · ${scenario.category} · ${scenario.duration}`}
         title={scenario.title}
         intro={scenario.objective}
         actions={<PrintButton label="Print exercise pack" />}

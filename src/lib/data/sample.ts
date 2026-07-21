@@ -251,6 +251,9 @@ export function sampleWorkspace(): Workspace {
     mtpdOverride: null,
     notes: '',
     updatedAt: ts,
+    // Underwriting deliberately left unapproved to show the sign-off state.
+    approvedBy: d.id === 'underwriting' ? null : d.owner,
+    approvedAt: d.id === 'underwriting' ? null : ts,
   }));
 
   return {
@@ -267,12 +270,12 @@ export function sampleWorkspace(): Workspace {
     processes,
     assessments,
     objectives: [
-      { id: 'o1', processId: 'contact-center', rtoTargetHours: 4, rpoTargetHours: 1, mbcoPercent: 60, rtoAchievableHours: 4, rpoAchievableHours: 1, dataLossNotes: 'Telephony is cloud-hosted; CRM replicates continuously.', updatedAt: ts },
-      { id: 'o2', processId: 'claims', rtoTargetHours: 8, rpoTargetHours: 4, mbcoPercent: 50, rtoAchievableHours: 48, rpoAchievableHours: 4, dataLossNotes: 'Payment gateway cutover to backup processor is untested.', updatedAt: ts },
-      { id: 'o3', processId: 'policy-admin', rtoTargetHours: 24, rpoTargetHours: 8, mbcoPercent: 40, rtoAchievableHours: 36, rpoAchievableHours: 8, dataLossNotes: '', updatedAt: ts },
-      { id: 'o4', processId: 'billing', rtoTargetHours: 72, rpoTargetHours: 4, mbcoPercent: 50, rtoAchievableHours: 72, rpoAchievableHours: 24, dataLossNotes: 'Nightly batch only; intraday payments would need manual re-entry.', updatedAt: ts },
-      { id: 'o5', processId: 'agent-portal', rtoTargetHours: 24, rpoTargetHours: 8, mbcoPercent: 70, rtoAchievableHours: 12, rpoAchievableHours: 8, dataLossNotes: '', updatedAt: ts },
-      { id: 'o6', processId: 'payroll', rtoTargetHours: 96, rpoTargetHours: 24, mbcoPercent: 100, rtoAchievableHours: 48, rpoAchievableHours: 24, dataLossNotes: 'ADP holds primary records.', updatedAt: ts },
+      { id: 'o1', processId: 'contact-center', rtoTargetHours: 4, rpoTargetHours: 1, mbcoPercent: 60, rtoAchievableHours: 4, rpoAchievableHours: 1, wrtHours: 2, dataLossNotes: 'Telephony is cloud-hosted; CRM replicates continuously.', updatedAt: ts },
+      { id: 'o2', processId: 'claims', rtoTargetHours: 8, rpoTargetHours: 4, mbcoPercent: 50, rtoAchievableHours: 48, rpoAchievableHours: 4, wrtHours: 24, dataLossNotes: 'Payment gateway cutover to backup processor is untested.', updatedAt: ts },
+      { id: 'o3', processId: 'policy-admin', rtoTargetHours: 24, rpoTargetHours: 8, mbcoPercent: 40, rtoAchievableHours: 36, rpoAchievableHours: 8, wrtHours: 12, dataLossNotes: '', updatedAt: ts },
+      { id: 'o4', processId: 'billing', rtoTargetHours: 72, rpoTargetHours: 4, mbcoPercent: 50, rtoAchievableHours: 72, rpoAchievableHours: 24, wrtHours: null, dataLossNotes: 'Nightly batch only; intraday payments would need manual re-entry.', updatedAt: ts },
+      { id: 'o5', processId: 'agent-portal', rtoTargetHours: 24, rpoTargetHours: 8, mbcoPercent: 70, rtoAchievableHours: 12, rpoAchievableHours: 8, wrtHours: 4, dataLossNotes: '', updatedAt: ts },
+      { id: 'o6', processId: 'payroll', rtoTargetHours: 96, rpoTargetHours: 24, mbcoPercent: 100, rtoAchievableHours: 48, rpoAchievableHours: 24, wrtHours: 24, dataLossNotes: 'ADP holds primary records.', updatedAt: ts },
     ],
     remediations: [
       { id: 'r1', processId: 'claims', kind: 'rto', owner: 'Marcus Yee', action: 'Contract and test backup payment processor; document manual adjudication workaround for 72h operation.', status: 'in_progress', updatedAt: ts },
@@ -302,6 +305,28 @@ export function sampleWorkspace(): Workspace {
       },
     ],
     exercises: [],
+    resourceProfiles: [
+      {
+        id: 'rp-contact-center',
+        processId: 'contact-center',
+        staff: { h4: 8, h24: 15, d3: 25, w1: 35, m1: 42 },
+        workstations: { h4: 8, h24: 15, d3: 25, w1: 35, m1: 42 },
+        facilitySeats: { h4: 0, h24: 10, d3: 20, w1: 30, m1: 42 },
+        vitalRecords: ['Customer contact records', 'IVR scripts', 'Escalation matrix'],
+        notes: 'First 4 hours run fully remote on softphones; seats reflect gradual return to Rochester HQ or the alternate site.',
+        updatedAt: ts,
+      },
+      {
+        id: 'rp-claims',
+        processId: 'claims',
+        staff: { h4: 4, h24: 10, d3: 18, w1: 24, m1: 28 },
+        workstations: { h4: 4, h24: 10, d3: 18, w1: 24, m1: 28 },
+        facilitySeats: { h4: 0, h24: 6, d3: 12, w1: 20, m1: 28 },
+        vitalRecords: ['Open claims files', 'Payment authorization records', 'Adjuster licensing records'],
+        notes: 'Manual adjudication at 24h needs printed authority limits; surge via independent adjuster network beyond 1 week.',
+        updatedAt: ts,
+      },
+    ],
     maturity: {
       updatedAt: ts,
       answers: {

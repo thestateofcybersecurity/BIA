@@ -169,10 +169,14 @@ export interface RtoValidation {
   message: string;
 }
 
-/** RTO must be below MTPD, ideally with a buffer (RTO at most 80% of MTPD). */
+/**
+ * RTO plus WRT (backlog catch-up) must fit inside the MTPD, ideally with a
+ * buffer: normal service, not just restored systems, is what the MTPD bounds.
+ */
 export function validateRto(
   rtoTargetHours: number | null,
-  mtpd: MtpdValue | null
+  mtpd: MtpdValue | null,
+  wrtHours: number | null = null
 ): RtoValidation {
   if (rtoTargetHours == null) {
     return { status: 'unknown', message: 'Set an RTO target to validate it against the MTPD.' };
@@ -184,19 +188,37 @@ export function validateRto(
   if (mtpdHours === Infinity) {
     return { status: 'ok', message: 'MTPD is beyond the assessed window; any practical RTO is acceptable.' };
   }
-  if (rtoTargetHours > mtpdHours) {
+  const wrt = wrtHours ?? 0;
+  const effective = rtoTargetHours + wrt;
+  const label = wrt > 0 ? `RTO ${rtoTargetHours}h + WRT ${wrt}h = ${effective}h` : `RTO target (${rtoTargetHours}h)`;
+  if (effective > mtpdHours) {
     return {
       status: 'violation',
-      message: `RTO target (${rtoTargetHours}h) exceeds the MTPD (${mtpdHours}h). The process would be restored after the disruption became intolerable.`,
+      message: `${label} exceeds the MTPD (${mtpdHours}h). Normal service would resume after the disruption became intolerable.`,
     };
   }
-  if (rtoTargetHours > mtpdHours * RTO_BUFFER_FRACTION) {
+  if (effective > mtpdHours * RTO_BUFFER_FRACTION) {
     return {
       status: 'warn',
-      message: `RTO target leaves little headroom below the MTPD (${mtpdHours}h). Aim for at most ${Math.round(mtpdHours * RTO_BUFFER_FRACTION)}h.`,
+      message: `${label} leaves little headroom below the MTPD (${mtpdHours}h). Aim for at most ${Math.round(mtpdHours * RTO_BUFFER_FRACTION)}h combined.`,
     };
   }
-  return { status: 'ok', message: 'RTO target sits comfortably below the MTPD.' };
+  return {
+    status: 'ok',
+    message: wrt > 0
+      ? `RTO plus backlog recovery (${effective}h) sits comfortably below the MTPD.`
+      : 'RTO target sits comfortably below the MTPD.',
+  };
+}
+
+/** Assessments should be reviewed at least annually (ISO 22301). */
+export const REVIEW_INTERVAL_MONTHS = 12;
+
+export function isReviewDue(assessment: ImpactAssessment, now = new Date()): boolean {
+  const last = new Date(assessment.approvedAt ?? assessment.updatedAt);
+  const due = new Date(last);
+  due.setMonth(due.getMonth() + REVIEW_INTERVAL_MONTHS);
+  return now >= due;
 }
 
 export interface GapInfo {

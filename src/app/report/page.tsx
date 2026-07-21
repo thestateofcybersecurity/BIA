@@ -3,6 +3,7 @@ import { loadWorkspace } from '@/lib/actions';
 import { deriveAll, computeGaps } from '@/lib/domain/scoring';
 import { scoreMaturity, MATURITY_DOMAINS } from '@/lib/domain/maturity';
 import { CATALOG } from '@/lib/domain/scenarios';
+import { rollDownRequirements } from '@/lib/domain/rolldown';
 import {
   MTPD_LABELS,
   TIER_LABELS,
@@ -49,7 +50,7 @@ export default async function ReportPage() {
   if (!ws.org || ws.processes.length === 0) {
     return (
       <>
-        <PageHeader kicker="Step 08" title="Business continuity plan" />
+        <PageHeader kicker="Step 09" title="Business continuity plan" />
         <EmptyState
           title="Not enough data for a report"
           body="The report is generated entirely from your assessment data: organization profile, processes, impact assessments, recovery objectives, and maturity results. Nothing is boilerplate."
@@ -84,6 +85,7 @@ export default async function ReportPage() {
     .sort((a, b) => b.gapHours - a.gapHours);
 
   const nameOf = (id: string) => ws.processes.find((p) => p.id === id)?.name ?? id;
+  const rollDown = rollDownRequirements(ws);
   const remFor = (processId: string, kind: 'rto' | 'rpo') =>
     ws.remediations.find((r) => r.processId === processId && r.kind === kind);
 
@@ -91,7 +93,7 @@ export default async function ReportPage() {
     <>
       <div className="no-print">
         <PageHeader
-          kicker="Step 08"
+          kicker="Step 09"
           title="Business continuity plan"
           intro="Generated entirely from this workspace's data. Use your browser's print dialog to save as PDF; page breaks are handled."
           actions={<PrintButton label="Print / save PDF" />}
@@ -240,7 +242,7 @@ export default async function ReportPage() {
           <table className="w-full text-sm">
             <thead>
               <tr>
-                {['Process', 'MTPD', 'Tier', 'Priority', '24h cost', '1 week cost'].map((h) => (
+                {['Process', 'MTPD', 'Tier', 'Priority', '24h cost', '1 week cost', 'Sign-off'].map((h) => (
                   <th key={h} className={th}>{h}</th>
                 ))}
               </tr>
@@ -271,6 +273,18 @@ export default async function ReportPage() {
                         ? formatCurrency(a.financialLoss.w1, currency)
                         : '·'}
                     </td>
+                    <td className={`${td} text-xs`}>
+                      {a?.approvedBy ? (
+                        <span className="text-ink-soft">
+                          {a.approvedBy}
+                          {a.approvedAt ? `, ${formatDate(a.approvedAt)}` : ''}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[10px] uppercase text-warn">
+                          Not approved
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -297,7 +311,7 @@ export default async function ReportPage() {
           <table className="w-full text-sm">
             <thead>
               <tr>
-                {['Process', 'RTO target', 'RTO achievable', 'RPO target', 'RPO achievable', 'MBCO'].map((h) => (
+                {['Process', 'RTO target', 'RTO achievable', 'WRT', 'RPO target', 'RPO achievable', 'MBCO'].map((h) => (
                   <th key={h} className={th}>{h}</th>
                 ))}
               </tr>
@@ -308,6 +322,7 @@ export default async function ReportPage() {
                   <td className={td}>{nameOf(o.processId)}</td>
                   <td className={`${td} tnum font-mono text-xs`}>{o.rtoTargetHours != null ? formatHours(o.rtoTargetHours) : '·'}</td>
                   <td className={`${td} tnum font-mono text-xs`}>{o.rtoAchievableHours != null ? formatHours(o.rtoAchievableHours) : '·'}</td>
+                  <td className={`${td} tnum font-mono text-xs`}>{o.wrtHours != null ? formatHours(o.wrtHours) : '·'}</td>
                   <td className={`${td} tnum font-mono text-xs`}>{o.rpoTargetHours != null ? formatHours(o.rpoTargetHours) : '·'}</td>
                   <td className={`${td} tnum font-mono text-xs`}>{o.rpoAchievableHours != null ? formatHours(o.rpoAchievableHours) : '·'}</td>
                   <td className={`${td} tnum font-mono text-xs`}>{o.mbcoPercent != null ? `${o.mbcoPercent}%` : '·'}</td>
@@ -388,9 +403,103 @@ export default async function ReportPage() {
               );
             })
           )}
+
+          {ws.resourceProfiles.length > 0 && (
+            <>
+              <h3 className="mt-6 mb-2 font-display text-lg font-semibold">
+                Recovery resource requirements
+              </h3>
+              {ws.resourceProfiles.map((rp) => (
+                <div key={rp.id} className="mb-4 rounded-md border border-line/60 bg-paper/40 p-3">
+                  <p className="mb-2 text-sm font-medium">{nameOf(rp.processId)}</p>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <th className={th}>Needed by</th>
+                        {HORIZONS.map((h) => (
+                          <th key={h} className={th}>{HORIZON_LABELS[h]}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(
+                        [
+                          ['Minimum staff', rp.staff],
+                          ['Workstations / equipment', rp.workstations],
+                          ['Facility seats', rp.facilitySeats],
+                        ] as const
+                      ).map(([label, row]) => (
+                        <tr key={label}>
+                          <td className={td}>{label}</td>
+                          {HORIZONS.map((h) => (
+                            <td key={h} className={`${td} tnum font-mono`}>
+                              {row[h] ?? '·'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {rp.vitalRecords.length > 0 && (
+                    <p className="mt-2 text-xs text-ink-soft">
+                      <span className="font-mono uppercase tracking-wider text-ink-muted">
+                        Vital records:
+                      </span>{' '}
+                      {rp.vitalRecords.join(', ')}
+                    </p>
+                  )}
+                  {rp.notes && <p className="mt-1 text-xs text-ink-muted">{rp.notes}</p>}
+                </div>
+              ))}
+            </>
+          )}
         </Section>
 
-        <Section num="08" title="Exercise program">
+        <Section num="08" title="Dependency recovery requirements">
+          <p className="mb-3 text-sm leading-relaxed text-ink-soft">
+            The BIA handed down to IT and third-party management: each application inherits the
+            strictest recovery objectives of the processes that depend on it, and each supplier
+            inherits their highest criticality.
+          </p>
+          {(
+            [
+              ['Applications', rollDown.applications],
+              ['Suppliers', rollDown.suppliers],
+            ] as const
+          ).map(([label, rows]) =>
+            rows.length === 0 ? null : (
+              <div key={label} className="mb-5">
+                <h3 className="mb-2 font-display text-lg font-semibold">{label}</h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      {['Name', 'Criticality', 'Required RTO', 'Required RPO', 'Supports'].map((h) => (
+                        <th key={h} className={th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.name}>
+                        <td className={td}>{r.name}</td>
+                        <td className={td}><TierBadge tier={r.topTier} /></td>
+                        <td className={`${td} tnum font-mono text-xs`}>
+                          {r.strictestRtoHours != null ? `≤ ${formatHours(r.strictestRtoHours)}` : '·'}
+                        </td>
+                        <td className={`${td} tnum font-mono text-xs`}>
+                          {r.strictestRpoHours != null ? `≤ ${formatHours(r.strictestRpoHours)}` : '·'}
+                        </td>
+                        <td className={`${td} text-xs`}>{r.processes.map((p) => p.name).join(', ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+        </Section>
+
+        <Section num="09" title="Exercise program">
           <p className="mb-3 text-sm leading-relaxed text-ink-soft">
             The following tabletop scenarios are available, generated from this plan&apos;s data.
             Recommended cadence: two exercises per year minimum, rotating categories, with
@@ -406,7 +515,7 @@ export default async function ReportPage() {
           </ul>
         </Section>
 
-        <Section num="09" title="Maturity & roadmap">
+        <Section num="10" title="Maturity & roadmap">
           {maturity.overall == null ? (
             <p className="text-sm text-ink-muted">Maturity assessment not yet completed.</p>
           ) : (

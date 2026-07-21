@@ -17,7 +17,7 @@ export default async function ExercisesPage() {
   return (
     <>
       <PageHeader
-        kicker="Step 07"
+        kicker="Step 08"
         title="Tabletop exercises"
         intro={`Each scenario is generated from your assessment data: it names your actual critical processes, dependency concentrations, and known recovery gaps. Run one as a live session to record the room's responses and get a Claude-written after-action report. ${
           tier1 > 0

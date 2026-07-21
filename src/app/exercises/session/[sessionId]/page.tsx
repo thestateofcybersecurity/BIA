@@ -24,7 +24,7 @@ export default async function ExerciseSessionPage({
   return (
     <>
       <PageHeader
-        kicker={`Step 07 · Live session · ${session.mode === 'ai' ? 'Claude-tailored' : 'Template'}`}
+        kicker={`Step 08 · Live session · ${session.mode === 'ai' ? 'Claude-tailored' : 'Template'}`}
         title={session.scenario.title}
         intro={session.scenario.objective}
         actions={

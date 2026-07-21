@@ -19,6 +19,7 @@ export function emptyWorkspace(): Workspace {
     workflows: [],
     maturity: null,
     exercises: [],
+    resourceProfiles: [],
   };
 }
 

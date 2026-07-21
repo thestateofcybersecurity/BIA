@@ -41,16 +41,18 @@ function ObjectivesEditor({
     mbcoPercent: initial?.mbcoPercent ?? null,
     rtoAchievableHours: initial?.rtoAchievableHours ?? null,
     rpoAchievableHours: initial?.rpoAchievableHours ?? null,
+    wrtHours: initial?.wrtHours ?? null,
     dataLossNotes: initial?.dataLossNotes ?? '',
   });
 
-  const validation = validateRto(form.rtoTargetHours, process.mtpd);
+  const validation = validateRto(form.rtoTargetHours, process.mtpd, form.wrtHours);
   const tone =
     validation.status === 'ok' ? 'ok' : validation.status === 'warn' ? 'warn' : validation.status === 'violation' ? 'bad' : 'neutral';
 
   const fields: [string, keyof typeof form, string][] = [
     ['RTO target (h)', 'rtoTargetHours', 'How fast the business needs it back'],
     ['RTO achievable (h)', 'rtoAchievableHours', 'What current capability delivers'],
+    ['WRT (h)', 'wrtHours', 'Work Recovery Time: backlog catch-up after systems are restored'],
     ['RPO target (h)', 'rpoTargetHours', 'Tolerable data loss window'],
     ['RPO achievable (h)', 'rpoAchievableHours', 'Current backup/replication reality'],
     ['MBCO (%)', 'mbcoPercent', 'Minimum service level during recovery'],
@@ -58,7 +60,7 @@ function ObjectivesEditor({
 
   return (
     <div className="rounded-md border border-line bg-paper/60 p-4">
-      <div className="grid gap-3 sm:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {fields.map(([label, key, help]) => (
           <div key={key} className="flex flex-col gap-1">
             <label title={help}>{label}</label>
@@ -213,7 +215,7 @@ export function GapsClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line text-left">
-                {['Process', 'MTPD', 'RTO target', 'RTO achievable', 'RPO target', 'RPO achievable', 'MBCO', ''].map((h, i) => (
+                {['Process', 'MTPD', 'RTO target', 'RTO achievable', 'WRT', 'RPO target', 'RPO achievable', 'MBCO', ''].map((h, i) => (
                   <th key={i} className="pb-2 pr-3 font-mono text-[10px] font-normal uppercase tracking-wider text-ink-muted">
                     {h}
                   </th>
@@ -223,7 +225,7 @@ export function GapsClient({
             <tbody>
               {processes.map((p) => {
                 const o = objectiveFor(p.id);
-                const validation = validateRto(o?.rtoTargetHours ?? null, p.mtpd);
+                const validation = validateRto(o?.rtoTargetHours ?? null, p.mtpd, o?.wrtHours ?? null);
                 return (
                   <Fragment key={p.id}>
                     <tr className="border-b border-line/60">
@@ -245,6 +247,9 @@ export function GapsClient({
                         {o?.rtoAchievableHours != null ? formatHours(o.rtoAchievableHours) : '·'}
                       </td>
                       <td className="tnum py-3 pr-3 font-mono text-xs">
+                        {o?.wrtHours != null ? formatHours(o.wrtHours) : '·'}
+                      </td>
+                      <td className="tnum py-3 pr-3 font-mono text-xs">
                         {o?.rpoTargetHours != null ? formatHours(o.rpoTargetHours) : '·'}
                       </td>
                       <td className="tnum py-3 pr-3 font-mono text-xs">
@@ -264,7 +269,7 @@ export function GapsClient({
                     </tr>
                     {editing === p.id && (
                       <tr>
-                        <td colSpan={8} className="pb-4">
+                        <td colSpan={9} className="pb-4">
                           <ObjectivesEditor
                             process={p}
                             initial={o}

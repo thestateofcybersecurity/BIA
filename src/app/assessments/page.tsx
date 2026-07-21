@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { loadWorkspace } from '@/lib/actions';
-import { deriveAll } from '@/lib/domain/scoring';
+import { deriveAll, isReviewDue } from '@/lib/domain/scoring';
 import { MTPD_LABELS } from '@/lib/domain/constants';
 import { PageHeader, Card, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
@@ -71,7 +71,8 @@ export default async function AssessmentsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {ws.processes.map((p) => {
             const d = derived.get(p.id)!;
-            const started = ws.assessments.some((a) => a.processId === p.id);
+            const assessment = ws.assessments.find((a) => a.processId === p.id);
+            const started = assessment != null;
             return (
               <Link key={p.id} href={`/assessments/${p.id}`} className="group">
                 <Card className="h-full transition-colors group-hover:border-accent">
@@ -90,6 +91,14 @@ export default async function AssessmentsPage() {
                     {d.assessmentComplete ? (
                       <>
                         <StatusPill tone="ok">Assessed</StatusPill>
+                        {assessment?.approvedBy ? (
+                          <StatusPill tone="ok">Approved</StatusPill>
+                        ) : (
+                          <StatusPill tone="warn">Awaiting sign-off</StatusPill>
+                        )}
+                        {assessment && isReviewDue(assessment) && (
+                          <StatusPill tone="bad">Review due</StatusPill>
+                        )}
                         {d.mtpd && (
                           <span className="font-mono">MTPD {MTPD_LABELS[d.mtpd]}</span>
                         )}
