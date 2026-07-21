@@ -13,6 +13,7 @@ import {
 } from '@/lib/domain/constants';
 import type { Tier } from '@/lib/domain/types';
 import { PageHeader, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
+import { HelpBox } from '@/components/help';
 import { PrintButton } from '@/components/print-button';
 import { formatCurrency, formatCompactCurrency, formatHours, formatDate } from '@/lib/format';
 
@@ -96,6 +97,28 @@ export default async function ReportPage() {
           actions={<PrintButton label="Print / save PDF" />}
         />
       </div>
+
+      <HelpBox title="About this document">
+        <ul>
+          <li>
+            Every table and number below <strong>traces to entered data</strong>; there is no
+            boilerplate. Editing an assessment and reloading this page regenerates the plan.
+          </li>
+          <li>
+            Section 03 states the methodology in auditor-friendly terms, so the document explains
+            its own numbers; MTPD overrides are flagged with their justifications in section 05.
+          </li>
+          <li>
+            Use the print button to save a PDF; page breaks are handled and the navigation and
+            this help box are excluded from print.
+          </li>
+          <li>
+            A useful review cadence: regenerate after each assessment cycle and after each
+            tabletop exercise, and version the PDFs; the app always shows the current truth, the
+            PDFs show the history.
+          </li>
+        </ul>
+      </HelpBox>
 
       <article className="rounded-lg border border-line bg-surface p-8 shadow-card print:border-0 print:p-0 print:shadow-none">
         {/* Cover */}

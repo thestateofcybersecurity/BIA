@@ -4,6 +4,7 @@ import { generateScenario } from '@/lib/domain/scenarios';
 import { MATURITY_DOMAINS } from '@/lib/domain/maturity';
 import { aiEnabled } from '@/lib/ai/client';
 import { PageHeader, Card } from '@/components/ui';
+import { HelpBox } from '@/components/help';
 import { PrintButton } from '@/components/print-button';
 import { ExerciseLauncher } from './launcher';
 
@@ -32,6 +33,29 @@ export default async function ExercisePage({
         intro={scenario.objective}
         actions={<PrintButton label="Print exercise pack" />}
       />
+
+      <HelpBox title="Facilitating this exercise">
+        <ul>
+          <li>
+            Read each phase's <strong>narrative</strong> aloud, let discussion run, then drop the{' '}
+            <strong>injects</strong> when the room gets comfortable; their job is to break the
+            plan people are converging on.
+          </li>
+          <li>
+            The <strong>discussion questions</strong> are the record: in a live session each one
+            gets the room's actual answer written down, and an unanswered question is itself a
+            finding.
+          </li>
+          <li>
+            Keep the <strong>expected actions</strong> to yourself until the debrief; they
+            describe what a good response includes, not a script participants should see.
+          </li>
+          <li>
+            Aim for the stated duration with a hard stop; a tabletop that overruns loses the
+            executives whose decisions it exists to test.
+          </li>
+        </ul>
+      </HelpBox>
 
       <div className="no-print">
         <ExerciseLauncher scenarioId={id} aiEnabled={aiEnabled()} />

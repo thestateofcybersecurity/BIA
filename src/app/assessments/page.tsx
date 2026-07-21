@@ -3,6 +3,7 @@ import { loadWorkspace } from '@/lib/actions';
 import { deriveAll } from '@/lib/domain/scoring';
 import { MTPD_LABELS } from '@/lib/domain/constants';
 import { PageHeader, Card, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
+import { HelpBox } from '@/components/help';
 import { formatCompactCurrency } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,33 @@ export default async function AssessmentsPage() {
         title="Impact assessments"
         intro="Rate the impact of full disruption at five time horizons. The methodology derives MTPD (the point where disruption becomes intolerable), the criticality tier, and a priority ranking; none of them are self-declared."
       />
+
+      <HelpBox title="How the assessment derives its results">
+        <p>
+          The chain is: <strong>ratings → MTPD → tier → priority</strong>. You rate impact; the
+          methodology derives everything else, which removes the "everything is critical" problem
+          of self-declared ratings.
+        </p>
+        <ul>
+          <li>
+            Each process is rated at five horizons (4h, 24h, 3 days, 1 week, 1 month) across five
+            categories on an anchored 0-4 scale. Financial impact is entered as a cumulative
+            currency estimate and converted through your organization's revenue-scaled bands.
+          </li>
+          <li>
+            <strong>MTPD</strong> is the earliest horizon where any category hits severity 4
+            (intolerable). The tier follows mechanically from the MTPD.
+          </li>
+          <li>
+            The <strong>priority score</strong> (0-100) ranks processes for recovery sequencing:
+            60% time criticality from the MTPD, 40% impact magnitude. It never assigns tiers.
+          </li>
+          <li>
+            Run these as short workshops with the process owner; the anchor descriptions under
+            the rating grid keep different owners calibrated to the same scale.
+          </li>
+        </ul>
+      </HelpBox>
 
       {!ws.org && (
         <div className="mb-6 rounded-md border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-ink-soft">

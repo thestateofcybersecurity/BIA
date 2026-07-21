@@ -119,7 +119,7 @@ Per process:
 - **MBCO**: minimum acceptable service level (% of normal output) during recovery.
 - **Achievable RTO / RPO**: what current capability can actually deliver.
 
-**Gap = achievable minus target.** Any positive gap creates an entry in the gap register with severity (gap relative to MTPD headroom), owner, remediation action, and status. The gap register is the primary output driving investment decisions.
+**Gap = achievable minus target.** Any positive gap creates an entry in the gap register with a severity, owner, remediation action, and status. RTO gap severity rates against MTPD headroom: high when achievable recovery lands beyond the MTPD, medium when it lands inside the 20% buffer zone, low otherwise. RPO gaps, and RTO gaps where no MTPD has been derived yet, rate on the size of the shortfall relative to the target: high at 3x the target or more, medium at 1x or more, low otherwise. The gap register is the primary output driving investment decisions.
 
 ## 6. Recovery workflows
 

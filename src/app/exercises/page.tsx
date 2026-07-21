@@ -3,6 +3,7 @@ import { loadWorkspace } from '@/lib/actions';
 import { CATALOG } from '@/lib/domain/scenarios';
 import { deriveAll } from '@/lib/domain/scoring';
 import { PageHeader, Card, StatusPill } from '@/components/ui';
+import { HelpBox } from '@/components/help';
 import { formatDate } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,32 @@ export default async function ExercisesPage() {
             : 'Complete impact assessments first to get fully tailored exercises.'
         }`}
       />
+
+      <HelpBox title="Exercises, sessions, and reports">
+        <ul>
+          <li>
+            The six <strong>scenario templates</strong> below are always available and already
+            populated with your data. Open one to read it, print a facilitator pack, or start a
+            session.
+          </li>
+          <li>
+            A <strong>live session</strong> walks the room through the phases while you record
+            the answer to every discussion question plus your own observation notes. Two per year,
+            rotating categories, is a sound cadence.
+          </li>
+          <li>
+            With Claude configured, <strong>tailored generation</strong> designs a bespoke
+            exercise from your assessment: injects are written to collide with your documented
+            recovery gaps, and questions target your weakest maturity domains.
+          </li>
+          <li>
+            Completing a session unlocks the <strong>after-action report</strong>: strengths,
+            gaps, prioritized recommendations with owners, and maturity signals to feed back into
+            the self-assessment. Exercise → findings → remediation → re-assessment is the loop
+            that makes the program improve.
+          </li>
+        </ul>
+      </HelpBox>
 
       {sessions.length > 0 && (
         <Card title="Sessions" subtitle="Live runs of your exercises" className="mb-6">

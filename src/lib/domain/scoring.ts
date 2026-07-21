@@ -174,8 +174,11 @@ export function validateRto(
   rtoTargetHours: number | null,
   mtpd: MtpdValue | null
 ): RtoValidation {
-  if (rtoTargetHours == null || mtpd == null) {
-    return { status: 'unknown', message: 'Set an RTO target and complete the impact assessment.' };
+  if (rtoTargetHours == null) {
+    return { status: 'unknown', message: 'Set an RTO target to validate it against the MTPD.' };
+  }
+  if (mtpd == null) {
+    return { status: 'unknown', message: 'Complete the impact assessment to derive the MTPD this target must sit below.' };
   }
   const mtpdHours = mtpdToHours(mtpd);
   if (mtpdHours === Infinity) {
@@ -223,10 +226,15 @@ export function computeGaps(
     if (gap <= 0) return;
     let severity: GapInfo['severity'] = 'low';
     if (kind === 'rto' && mtpdHours !== Infinity) {
+      // RTO gaps rate against MTPD headroom: recovery past the point where
+      // disruption becomes intolerable is high severity by definition.
       if (achievable > mtpdHours) severity = 'high';
       else if (achievable > mtpdHours * RTO_BUFFER_FRACTION) severity = 'medium';
-    } else if (gap >= target) {
-      severity = 'medium';
+    } else {
+      // RPO gaps, and RTO gaps without a derived MTPD, rate on the size of
+      // the shortfall relative to the target.
+      if (gap >= target * 3) severity = 'high';
+      else if (gap >= target) severity = 'medium';
     }
     gaps.push({
       processId: objectives.processId,

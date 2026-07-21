@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { loadWorkspace } from '@/lib/actions';
 import { PageHeader, btn } from '@/components/ui';
+import { HelpBox } from '@/components/help';
 import { ProcessForm } from '../process-form';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,23 @@ export default async function EditProcessPage({
           </Link>
         }
       />
+      <HelpBox title="Editing safely">
+        <ul>
+          <li>
+            Renaming or re-owning a process leaves its assessment, objectives, and workflows
+            attached; they key on the process, not its name.
+          </li>
+          <li>
+            Deleting removes the process <strong>and everything attached to it</strong>
+            (assessment, objectives, gaps, workflow) and unlinks it from other processes'
+            upstream lists.
+          </li>
+          <li>
+            Keep dependency names consistent with other processes so concentration analysis
+            (which supplier or system appears everywhere) stays accurate.
+          </li>
+        </ul>
+      </HelpBox>
       <ProcessForm
         initial={process}
         allProcesses={ws.processes.map((p) => ({ id: p.id, name: p.name }))}

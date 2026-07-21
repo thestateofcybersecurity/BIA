@@ -20,6 +20,7 @@ import {
   btn,
 } from '@/components/ui';
 import { LoadSampleButton } from '@/components/workspace-buttons';
+import { HelpBox } from '@/components/help';
 import { CostBarChart } from '@/components/charts';
 import { formatCompactCurrency, formatHours } from '@/lib/format';
 
@@ -64,10 +65,12 @@ export default async function DashboardPage() {
     );
   }
 
-  const assessed = [...derived.values()].filter((d) => d.assessmentComplete);
-  const tier1 = assessed.filter((d) => d.tier === 1).length;
-  const tier2 = assessed.filter((d) => d.tier === 2).length;
-  const cost24 = assessed.reduce((s, d) => s + (d.cost24h ?? 0), 0);
+  const allDerived = [...derived.values()];
+  const assessed = allDerived.filter((d) => d.assessmentComplete);
+  const tier1 = allDerived.filter((d) => d.tier === 1).length;
+  const tier2 = allDerived.filter((d) => d.tier === 2).length;
+  // Same rule as the BC plan report: every process with a 24h loss estimate.
+  const cost24 = allDerived.reduce((s, d) => s + (d.cost24h ?? 0), 0);
 
   const allGaps = ws.objectives.flatMap((o) =>
     computeGaps(o, derived.get(o.processId)?.mtpd ?? null)
@@ -115,6 +118,35 @@ export default async function DashboardPage() {
         }
       />
 
+      <HelpBox title="Reading this dashboard">
+        <p>
+          Every number here is <strong>derived live</strong> from your assessments; nothing is
+          entered on this page.
+        </p>
+        <ul>
+          <li>
+            <strong>Heatmap cells</strong> show the worst severity (0 negligible to 4 severe)
+            across all five impact categories at each time horizon. Reading a row left to right
+            shows how the damage of an outage grows over time.
+          </li>
+          <li>
+            <strong>MTPD</strong> (Maximum Tolerable Period of Disruption) is the first horizon
+            where any category reaches severity 4. The criticality tier follows from it: Tier 1
+            Critical within 24 hours, Tier 2 Essential within 3 days, Tier 3 Important within a
+            month, Tier 4 Deferrable beyond.
+          </li>
+          <li>
+            <strong>24h downtime exposure</strong> sums the entered 24-hour loss estimates across
+            processes. It is a portfolio-wide worst case (everything down at once), useful for
+            sizing the problem, not a prediction.
+          </li>
+          <li>
+            <strong>Open recovery gaps</strong> counts processes whose achievable recovery falls
+            short of its target and has no resolved or accepted remediation yet.
+          </li>
+        </ul>
+      </HelpBox>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatTile
           label="Processes"
@@ -130,7 +162,7 @@ export default async function DashboardPage() {
         <StatTile
           label="24h downtime exposure"
           value={formatCompactCurrency(cost24, currency)}
-          detail="Sum across assessed processes"
+          detail="Sum of entered 24h loss estimates"
           tone="accent"
         />
         <StatTile

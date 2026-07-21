@@ -3,6 +3,7 @@ import { loadWorkspace } from '@/lib/actions';
 import { deriveAll } from '@/lib/domain/scoring';
 import { DEPENDENCY_CLASSES } from '@/lib/domain/constants';
 import { PageHeader, Card, TierBadge, EmptyState, btn, StatusPill } from '@/components/ui';
+import { HelpBox } from '@/components/help';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,30 @@ export default async function ProcessesPage() {
           </>
         }
       />
+
+      <HelpBox title="Building a good process inventory">
+        <ul>
+          <li>
+            Catalogue <strong>business processes, not systems</strong>: "Claims processing", not
+            "the claims server". Most organizations land on 8 to 20 processes; going finer than
+            that makes the assessment workshops drag without sharpening the results.
+          </li>
+          <li>
+            <strong>Dependencies are the connective tissue</strong> of the whole methodology: they
+            power the concentration analysis in tabletop exercises ("which supplier appears in the
+            most processes?") and pre-fill recovery planning. Name them consistently; "Fiserv" and
+            "Fiserv payment gateway" count as two different suppliers.
+          </li>
+          <li>
+            <strong>Upstream links</strong> record that a process cannot run without another one,
+            so a disruption in one place propagates realistically in exercises.
+          </li>
+          <li>
+            Tiers appear in the last column once each process has a completed impact assessment;
+            they are derived from MTPD, never assigned by hand.
+          </li>
+        </ul>
+      </HelpBox>
 
       {ws.processes.length === 0 ? (
         <EmptyState

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { loadWorkspace } from '@/lib/actions';
 import { deriveAll, workflowVsRto } from '@/lib/domain/scoring';
 import { PageHeader, Card, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
+import { HelpBox } from '@/components/help';
 import { formatHours } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,28 @@ export default async function RecoveryPage() {
         title="Recovery workflows"
         intro="Ordered recovery steps per process, with teams, durations, and dependencies. The total step time is checked against the RTO target: a plan that takes longer than the RTO is a gap, not a plan."
       />
+      <HelpBox title="Writing workflows that survive contact with reality">
+        <ul>
+          <li>
+            Steps are assumed to run <strong>in sequence</strong>, so the total duration is the
+            critical path. If that total exceeds the RTO target the card is flagged: a plan that
+            takes longer than the RTO is a gap wearing a plan's clothes.
+          </li>
+          <li>
+            Start workflows with your <strong>Tier 1 processes</strong> (they are sorted to the
+            top); a Deferrable process may not need one at all.
+          </li>
+          <li>
+            Name an <strong>alternate</strong> for every step that depends on a specific person;
+            incidents have a habit of happening during vacations, as the tabletop exercises will
+            demonstrate.
+          </li>
+          <li>
+            Per-step dependencies use the same six classes as the process inventory, so recovery
+            needs and normal-operations needs stay comparable.
+          </li>
+        </ul>
+      </HelpBox>
       {ws.processes.length === 0 ? (
         <EmptyState
           title="No processes yet"
