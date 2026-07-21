@@ -95,8 +95,15 @@ export default async function ReportPage() {
         <PageHeader
           kicker="Step 09"
           title="Business continuity plan"
-          intro="Generated entirely from this workspace's data. Use your browser's print dialog to save as PDF; page breaks are handled."
-          actions={<PrintButton label="Print / save PDF" />}
+          intro="Preview below; the download produces the official PDF document with cover page, document control, approvals, and page numbering."
+          actions={
+            <>
+              <a href="/api/report/pdf" className={btn.primary} download>
+                Download official PDF
+              </a>
+              <PrintButton label="Browser print" />
+            </>
+          }
         />
       </div>
 
@@ -111,8 +118,10 @@ export default async function ReportPage() {
             its own numbers; MTPD overrides are flagged with their justifications in section 05.
           </li>
           <li>
-            Use the print button to save a PDF; page breaks are handled and the navigation and
-            this help box are excluded from print.
+            <strong>Download official PDF</strong> produces the formal document: cover page,
+            document control and approvals tables, running headers with page numbers, and a
+            confidentiality classification. Browser print remains available for a quick copy of
+            this on-screen preview.
           </li>
           <li>
             A useful review cadence: regenerate after each assessment cycle and after each
