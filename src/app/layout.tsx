@@ -3,6 +3,7 @@ import { Fraunces, Archivo, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Nav } from '@/components/nav';
 import { AccountWidget } from '@/components/account-widget';
+import { Analytics } from '@vercel/analytics/next';
 
 const display = Fraunces({
   subsets: ['latin'],
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </footer>
           </main>
         </div>
+        <Analytics />
       </body>
     </html>
   );
