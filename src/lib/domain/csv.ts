@@ -168,27 +168,29 @@ export function parseCsvRecord(record: Record<string, string>, rowNum: number): 
   };
 }
 
+/** Example row used by both the CSV and Excel templates. */
+export const TEMPLATE_EXAMPLE: string[] = [
+  'Order fulfillment',
+  'Pick pack and ship customer orders',
+  'Jane Smith',
+  'Operations',
+  'All customers',
+  'Holiday season',
+  'Warehouse team (12 FTE);Shift supervisor',
+  'WMS;ERP',
+  'Forklifts;Barcode scanners',
+  'Main warehouse',
+  'Freight carrier;Packaging supplier',
+  'Order records',
+  'Order intake',
+  '2000', '25000', '120000', '400000', '1500000',
+  '1', '2', '3', '4', '4',
+  '0', '1', '2', '3', '4',
+  '0', '0', '1', '2', '2',
+  '0', '0', '0', '0', '0',
+];
+
 export function csvTemplate(): string {
   const header = CSV_COLUMNS.map((c) => c.name).join(',');
-  const example = [
-    'Order fulfillment',
-    'Pick pack and ship customer orders',
-    'Jane Smith',
-    'Operations',
-    'All customers',
-    'Holiday season',
-    'Warehouse team (12 FTE);Shift supervisor',
-    'WMS;ERP',
-    'Forklifts;Barcode scanners',
-    'Main warehouse',
-    'Freight carrier;Packaging supplier',
-    'Order records',
-    'Order intake',
-    '2000', '25000', '120000', '400000', '1500000',
-    '1', '2', '3', '4', '4',
-    '0', '1', '2', '3', '4',
-    '0', '0', '1', '2', '2',
-    '0', '0', '0', '0', '0',
-  ];
-  return `${header}\n${example.map((v) => (v.includes(',') || v.includes(';') ? `"${v}"` : v)).join(',')}\n`;
+  return `${header}\n${TEMPLATE_EXAMPLE.map((v) => (v.includes(',') || v.includes(';') ? `"${v}"` : v)).join(',')}\n`;
 }

@@ -15,6 +15,7 @@
     "@neondatabase/auth": "^0.4.2-beta",
     "@neondatabase/serverless": "^1.1.0",
     "@react-pdf/renderer": "^4.5.1",
+    "exceljs": "^4.4.0",
     "nanoid": "^5.0.7",
     "next": "^16.2.10",
     "papaparse": "^5.4.1",
@@ -40,6 +41,8 @@
   },
   "overrides": {
     "better-auth": "^1.6.23",
-    "postcss": "^8.5.20"
+    "postcss": "^8.5.20",
+    "sharp": "^0.35.0",
+    "uuid": "^11.1.1"
   }
 }

@@ -17,9 +17,30 @@ export function ImportClient() {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
 
-  const handleFile = (file: File) => {
+  const applyRecords = (name: string, data: Record<string, string>[]) => {
+    setFileName(name);
+    setRecords(data);
+    setPreview(data.map((r, i) => parseCsvRecord(r, i + 2)));
+  };
+
+  const handleFile = async (file: File) => {
     setResult(null);
     setParseError(null);
+    const isExcel = /\.xlsx?$/i.test(file.name);
+    if (isExcel) {
+      try {
+        const { parseXlsxToRecords } = await import('@/lib/xlsx');
+        const data = await parseXlsxToRecords(await file.arrayBuffer());
+        if (data.length === 0) {
+          setParseError('No data rows found below the header row.');
+          return;
+        }
+        applyRecords(file.name, data);
+      } catch (e) {
+        setParseError(e instanceof Error ? e.message : 'Could not read the workbook.');
+      }
+      return;
+    }
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
@@ -29,22 +50,34 @@ export function ImportClient() {
           setParseError(`Could not parse the file: ${errors[0].message}`);
           return;
         }
-        setFileName(file.name);
-        setRecords(data);
-        setPreview(data.map((r, i) => parseCsvRecord(r, i + 2)));
+        applyRecords(file.name, data);
       },
       error: (err) => setParseError(`Could not read the file: ${err.message}`),
     });
   };
 
-  const downloadTemplate = () => {
-    const blob = new Blob([csvTemplate()], { type: 'text/csv' });
+  const download = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'bia-import-template.csv';
+    a.download = name;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadExcelTemplate = async () => {
+    const { buildTemplateWorkbook } = await import('@/lib/xlsx');
+    const buffer = await buildTemplateWorkbook();
+    download(
+      new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+      'bia-import-template.xlsx'
+    );
+  };
+
+  const downloadCsvTemplate = () => {
+    download(new Blob([csvTemplate()], { type: 'text/csv' }), 'bia-import-template.csv');
   };
 
   const errorCount = preview.filter((r) => r.errors.length > 0).length;
@@ -52,10 +85,16 @@ export function ImportClient() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card title="1 · Get the template" subtitle="A header row plus one example process">
+      <Card
+        title="1 · Get the template"
+        subtitle="The Excel workbook includes a Column reference sheet; hand it to process owners to fill in"
+      >
         <div className="flex flex-wrap items-center gap-3">
-          <button className={btn.secondary} onClick={downloadTemplate}>
-            Download template CSV
+          <button className={btn.primary} onClick={downloadExcelTemplate}>
+            Download Excel template
+          </button>
+          <button className={btn.secondary} onClick={downloadCsvTemplate}>
+            CSV template
           </button>
           <p className="text-xs text-ink-muted">
             {CSV_COLUMNS.filter((c) => c.required).length} required column,{' '}
@@ -68,7 +107,7 @@ export function ImportClient() {
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -78,7 +117,7 @@ export function ImportClient() {
         />
         <div className="flex flex-wrap items-center gap-3">
           <button className={btn.primary} onClick={() => inputRef.current?.click()}>
-            Choose CSV file
+            Choose Excel or CSV file
           </button>
           {fileName && (
             <span className="font-mono text-xs text-ink-soft">

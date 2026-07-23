@@ -9,11 +9,17 @@ export default function ImportPage() {
     <>
       <PageHeader
         kicker="Step 02 · Bulk import"
-        title="Import processes from CSV"
+        title="Import processes from Excel or CSV"
         intro="One row per process. Existing processes are matched by name and updated, so you can re-import a corrected file safely. Dependency and upstream cells take semicolon-separated lists; the optional loss and severity columns create the impact assessment in the same pass."
       />
-      <HelpBox title="CSV rules worth knowing">
+      <HelpBox title="Import rules worth knowing">
         <ul>
+          <li>
+            <strong>Excel or CSV, same rules.</strong> The Excel template has a Column reference
+            sheet explaining every field, which makes it the better artifact to send to process
+            owners; data is read from the "Processes" sheet (or the first sheet). Delete the
+            italic example row before importing real data.
+          </li>
           <li>
             <strong>Only "name" is required.</strong> Everything else is optional; you can import
             bare process names first and enrich later, because re-importing updates by name
