@@ -32,7 +32,7 @@ export default async function MaturityPage() {
             lists the weakest domains first as the suggested improvement order.
           </li>
           <li>
-            After each tabletop exercise, revisit this page: the after-action report's maturity
+            After each tabletop exercise, revisit this page: the after-action report&apos;s maturity
             signals are written as evidence for exactly these questions.
           </li>
         </ul>

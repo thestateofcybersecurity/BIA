@@ -43,7 +43,7 @@ export default async function ExerciseSessionPage({
           <ul>
             <li>
               Work phase by phase: read the narrative, drop injects, and{' '}
-              <strong>record the room's answer to every discussion question</strong> before
+              <strong>record the room&apos;s answer to every discussion question</strong> before
               advancing. Progress saves whenever you move between phases or hit Save.
             </li>
             <li>

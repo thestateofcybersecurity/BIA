@@ -13,7 +13,7 @@ export function aiEnabled(): boolean {
 export const AI_MODEL = 'claude-opus-4-8';
 
 declare global {
-  // eslint-disable-next-line no-var
+
   var _biaAnthropic: Anthropic | undefined;
 }
 

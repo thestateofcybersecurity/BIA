@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { connection } from 'next/server';
 import { authEnabled, getAuth } from '@/lib/neon-auth';
 import { SignOutButton } from '@/components/sign-out-button';
 
@@ -12,6 +13,10 @@ export async function AccountWidget() {
     );
   }
 
+  // Bail out of static prerendering (the /_not-found build pass) before
+  // getSession reads cookies, which would throw inside Neon Auth and spam
+  // the build log with a cookie validation error.
+  await connection();
   const { data: session } = await getAuth().getSession();
   if (!session?.user) {
     return (

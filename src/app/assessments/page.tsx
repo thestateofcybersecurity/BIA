@@ -24,14 +24,14 @@ export default async function AssessmentsPage() {
       <HelpBox title="How the assessment derives its results">
         <p>
           The chain is: <strong>ratings → MTPD → tier → priority</strong>. You rate impact; the
-          methodology derives everything else, which removes the "everything is critical" problem
+          methodology derives everything else, which removes the &quot;everything is critical&quot; problem
           of self-declared ratings.
         </p>
         <ul>
           <li>
             Each process is rated at five horizons (4h, 24h, 3 days, 1 week, 1 month) across five
             categories on an anchored 0-4 scale. Financial impact is entered as a cumulative
-            currency estimate and converted through your organization's revenue-scaled bands.
+            currency estimate and converted through your organization&apos;s revenue-scaled bands.
           </li>
           <li>
             <strong>MTPD</strong> is the earliest horizon where any category hits severity 4

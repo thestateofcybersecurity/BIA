@@ -18,7 +18,7 @@ export const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || 'https://bia.cybersecurityalphabetsoup.com';
 
 declare global {
-  // eslint-disable-next-line no-var
+
   var _biaResend: Resend | undefined;
 }
 

@@ -32,7 +32,7 @@ export default async function WorkflowPage({
       <HelpBox title="Estimating step durations">
         <ul>
           <li>
-            Estimate each step as the time from "go" to "verifiably done", including waiting on
+            Estimate each step as the time from &quot;go&quot; to &quot;verifiably done&quot;, including waiting on
             vendors and approvals; optimistic estimates are how a plan passes on paper and fails
             in an exercise.
           </li>

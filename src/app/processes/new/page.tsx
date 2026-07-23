@@ -18,14 +18,14 @@ export default async function NewProcessPage() {
           </li>
           <li>
             The owner should be the person you would drag into an impact assessment workshop, and
-            who can answer "how long can this be down?".
+            who can answer &quot;how long can this be down?&quot;.
           </li>
           <li>
             Dependency spelling matters: the app counts how often each item appears across
             processes to find concentrations, so reuse exact names (press Enter after each item).
           </li>
           <li>
-            Peak periods sharpen tabletop exercises; "renewal season" turns a generic outage into
+            Peak periods sharpen tabletop exercises; &quot;renewal season&quot; turns a generic outage into
             a worst-moment outage.
           </li>
         </ul>

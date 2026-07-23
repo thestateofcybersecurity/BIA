@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint src --ext .ts,.tsx",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -31,14 +31,14 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.0",
+    "eslint": "^9.39.0",
     "eslint-config-next": "^16.2.10",
     "postcss": "^8.5.20",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.4"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "22.x"
   },
   "overrides": {
     "better-auth": "^1.6.23",

@@ -17,11 +17,11 @@ export default function ImportPage() {
           <li>
             <strong>Excel or CSV, same rules.</strong> The Excel template has a Column reference
             sheet explaining every field, which makes it the better artifact to send to process
-            owners; data is read from the "Processes" sheet (or the first sheet). Delete the
+            owners; data is read from the &quot;Processes&quot; sheet (or the first sheet). Delete the
             italic example row before importing real data.
           </li>
           <li>
-            <strong>Only "name" is required.</strong> Everything else is optional; you can import
+            <strong>Only &quot;name&quot; is required.</strong> Everything else is optional; you can import
             bare process names first and enrich later, because re-importing updates by name
             instead of duplicating.
           </li>

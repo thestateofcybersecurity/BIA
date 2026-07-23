@@ -68,7 +68,7 @@ export default async function RequirementsPage() {
           <li>
             <strong>For IT and disaster recovery:</strong> the applications table is the recovery
             requirements sheet. An application supporting a Tier 1 process must itself be
-            recoverable within that process's RTO, and its backups must meet the strictest RPO
+            recoverable within that process&apos;s RTO, and its backups must meet the strictest RPO
             shown, or the process targets are fiction.
           </li>
           <li>
@@ -81,8 +81,8 @@ export default async function RequirementsPage() {
             means no dependent process has a target yet.
           </li>
           <li>
-            Spelling matters: dependencies are matched by name (case-insensitive), so "Fiserv"
-            and "Fiserv gateway" roll up separately.
+            Spelling matters: dependencies are matched by name (case-insensitive), so &quot;Fiserv&quot;
+            and &quot;Fiserv gateway&quot; roll up separately.
           </li>
         </ul>
       </HelpBox>

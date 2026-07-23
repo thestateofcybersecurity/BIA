@@ -37,13 +37,13 @@ export default async function ExercisePage({
       <HelpBox title="Facilitating this exercise">
         <ul>
           <li>
-            Read each phase's <strong>narrative</strong> aloud, let discussion run, then drop the{' '}
+            Read each phase&apos;s <strong>narrative</strong> aloud, let discussion run, then drop the{' '}
             <strong>injects</strong> when the room gets comfortable; their job is to break the
             plan people are converging on.
           </li>
           <li>
             The <strong>discussion questions</strong> are the record: in a live session each one
-            gets the room's actual answer written down, and an unanswered question is itself a
+            gets the room&apos;s actual answer written down, and an unanswered question is itself a
             finding.
           </li>
           <li>

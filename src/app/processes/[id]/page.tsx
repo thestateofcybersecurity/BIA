@@ -36,7 +36,7 @@ export default async function EditProcessPage({
           </li>
           <li>
             Deleting removes the process <strong>and everything attached to it</strong>
-            (assessment, objectives, gaps, workflow) and unlinks it from other processes'
+            (assessment, objectives, gaps, workflow) and unlinks it from other processes&apos;
             upstream lists.
           </li>
           <li>

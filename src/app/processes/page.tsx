@@ -32,15 +32,15 @@ export default async function ProcessesPage() {
       <HelpBox title="Building a good process inventory">
         <ul>
           <li>
-            Catalogue <strong>business processes, not systems</strong>: "Claims processing", not
-            "the claims server". Most organizations land on 8 to 20 processes; going finer than
+            Catalogue <strong>business processes, not systems</strong>: &quot;Claims processing&quot;, not
+            &quot;the claims server&quot;. Most organizations land on 8 to 20 processes; going finer than
             that makes the assessment workshops drag without sharpening the results.
           </li>
           <li>
             <strong>Dependencies are the connective tissue</strong> of the whole methodology: they
-            power the concentration analysis in tabletop exercises ("which supplier appears in the
-            most processes?") and pre-fill recovery planning. Name them consistently; "Fiserv" and
-            "Fiserv payment gateway" count as two different suppliers.
+            power the concentration analysis in tabletop exercises (&quot;which supplier appears in the
+            most processes?&quot;) and pre-fill recovery planning. Name them consistently; &quot;Fiserv&quot; and
+            &quot;Fiserv payment gateway&quot; count as two different suppliers.
           </li>
           <li>
             <strong>Upstream links</strong> record that a process cannot run without another one,

@@ -14,7 +14,7 @@ export function authEnabled(): boolean {
 type NeonAuth = ReturnType<typeof createNeonAuth>;
 
 declare global {
-  // eslint-disable-next-line no-var
+
   var _biaNeonAuth: NeonAuth | undefined;
 }
 

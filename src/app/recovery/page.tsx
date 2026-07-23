@@ -28,7 +28,7 @@ export default async function RecoveryPage() {
           <li>
             Steps are assumed to run <strong>in sequence</strong>, so the total duration is the
             critical path. If that total exceeds the RTO target the card is flagged: a plan that
-            takes longer than the RTO is a gap wearing a plan's clothes.
+            takes longer than the RTO is a gap wearing a plan&apos;s clothes.
           </li>
           <li>
             Start workflows with your <strong>Tier 1 processes</strong> (they are sorted to the

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Papa from 'papaparse';
 import { importCsv, type ImportResult } from '@/lib/actions';
@@ -230,9 +231,9 @@ export function ImportClient() {
                   ))}
                 </ul>
               )}
-              <a href="/processes" className="mt-3 inline-block text-xs text-accent hover:underline">
+              <Link href="/processes" className="mt-3 inline-block text-xs text-accent hover:underline">
                 Go to processes →
-              </a>
+              </Link>
             </div>
           )}
         </Card>

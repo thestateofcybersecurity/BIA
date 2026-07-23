@@ -13,7 +13,7 @@ export interface UserContact {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
+
   var _biaContactQuery: number | undefined;
 }
 

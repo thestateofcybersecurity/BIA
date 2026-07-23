@@ -28,14 +28,14 @@ export default async function AssessmentPage({
       <HelpBox title="Rating tips">
         <ul>
           <li>
-            <strong>Think cumulatively:</strong> the 1 week cell means "the process has been fully
-            down for a week", so its financial figure includes everything already lost at 24 hours
+            <strong>Think cumulatively:</strong> the 1 week cell means &quot;the process has been fully
+            down for a week&quot;, so its financial figure includes everything already lost at 24 hours
             and 3 days. The form auto-adjusts neighboring cells to keep values non-decreasing.
           </li>
           <li>
             <strong>Rate by the anchors, not the number.</strong> Click a category name to see its
             level descriptions; pick the described condition that matches, and reserve 4 for
-            genuinely intolerable ("threatens viability, safety, or license to operate"), because
+            genuinely intolerable (&quot;threatens viability, safety, or license to operate&quot;), because
             severity 4 is what sets the MTPD.
           </li>
           <li>

@@ -38,7 +38,7 @@ export default async function GapsPage() {
             buffer zone. RPO gaps rate on shortfall size: high at 3x the target or more.
           </li>
           <li>
-            Give every gap an owner and a remediation action; "risk accepted" is a legitimate
+            Give every gap an owner and a remediation action; &quot;risk accepted&quot; is a legitimate
             status, but it should be a decision, not a default. Closing a gap means improving the
             achievable value, then re-entering it here.
           </li>
