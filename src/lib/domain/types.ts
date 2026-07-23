@@ -216,6 +216,12 @@ export interface Workspace {
   maturity: MaturityAssessment | null;
   exercises: ExerciseSession[];
   resourceProfiles: RecoveryResourceProfile[];
+  /** Email notification toggles; a missing key means enabled. */
+  notifications?: {
+    signOffRequests?: boolean;
+    aarReady?: boolean;
+    reviewReminders?: boolean;
+  };
 }
 
 export type Tier = 1 | 2 | 3 | 4;

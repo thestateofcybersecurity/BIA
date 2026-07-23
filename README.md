@@ -32,7 +32,13 @@ Open http://localhost:3000. Without any configuration the app runs in single-wor
 | `NEON_AUTH_BASE_URL` | Neon Auth server URL, provisioned by the Neon integration on Vercel |
 | `NEON_AUTH_COOKIE_SECRET` | Cookie signing secret you generate (`openssl rand -base64 32`), 32+ characters |
 | `ANTHROPIC_API_KEY` | Enables Claude-tailored tabletop exercises and AI after-action reports (model: `claude-opus-4-8`); without it those features are hidden |
+| `RESEND_API_KEY` | Enables email notifications via Resend: sign-off requests when an assessment becomes complete, after-action report announcements, and weekly review reminders; without it no emails are sent |
+| `EMAIL_FROM` | Sender for notification emails, defaults to `BIA <bia@cybersecurityalphabetsoup.com>` (the domain must be verified in Resend) |
+| `CRON_SECRET` | Bearer token guarding `/api/cron/review-reminders`; Vercel Cron sends it automatically once set. The weekly reminder job (Mondays 13:00 UTC, see `vercel.json`) refuses to run without it |
+| `NEXT_PUBLIC_APP_URL` | Base URL used for links inside emails, defaults to `https://bia.cybersecurityalphabetsoup.com` |
 | `BIA_WORKSPACE_ID` | Workspace id used in demo mode, defaults to `default` |
+
+Notification emails go to each user's Neon Auth account email and respect the per-workspace preferences on the Organization page. In demo mode (no auth) there is no recipient, so nothing is sent.
 
 `DATABASE_URL` and `NEON_AUTH_BASE_URL` come from the Neon integration; add `NEON_AUTH_COOKIE_SECRET` yourself. With both auth variables set, users sign in via `/auth/sign-in` (email and password through Neon Auth) and each user gets an isolated workspace; without them, the app runs in single-workspace demo mode.
 

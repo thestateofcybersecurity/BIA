@@ -26,6 +26,8 @@ export function emptyWorkspace(): Workspace {
 interface Store {
   load(userId: string): Promise<Workspace>;
   save(userId: string, ws: Workspace): Promise<void>;
+  /** All user ids with a stored workspace (used by scheduled notifications). */
+  listUserIds(): Promise<string[]>;
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -45,6 +47,14 @@ const fileStore: Store = {
     const tmp = `${file}.tmp`;
     await fs.writeFile(tmp, JSON.stringify(ws, null, 2), 'utf8');
     await fs.rename(tmp, file);
+  },
+  async listUserIds() {
+    try {
+      const files = await fs.readdir(DATA_DIR);
+      return files.filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5));
+    } catch {
+      return [];
+    }
   },
 };
 
@@ -88,6 +98,11 @@ function neonStore(url: string): Store {
         ON CONFLICT (user_id)
         DO UPDATE SET data = EXCLUDED.data, updated_at = now()
       `;
+    },
+    async listUserIds() {
+      const sql = await getSql();
+      const rows = (await sql`SELECT user_id FROM workspaces`) as { user_id: string }[];
+      return rows.map((r) => r.user_id);
     },
   };
 }

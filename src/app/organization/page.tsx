@@ -1,7 +1,9 @@
 import { loadWorkspace } from '@/lib/actions';
+import { emailEnabled } from '@/lib/email/client';
 import { PageHeader, Card } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { OrgForm } from './org-form';
+import { NotificationSettings } from './notification-settings';
 import {
   LoadSampleButton,
   ResetButton,
@@ -52,6 +54,10 @@ export default async function OrganizationPage() {
         </div>
 
         <div className="flex flex-col gap-6">
+          <NotificationSettings
+            initial={ws.notifications}
+            emailEnabled={emailEnabled()}
+          />
           <Card
             title="Workspace data"
             subtitle="Everything lives in one workspace document"

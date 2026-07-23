@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getStore, emptyWorkspace } from '@/lib/data/store';
+import { isAssessmentComplete } from '@/lib/domain/scoring';
 import { getUserId } from '@/lib/auth';
 import { sampleWorkspace } from '@/lib/data/sample';
 import type {
@@ -137,8 +138,14 @@ const assessmentSchema = z.object({
 export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
   const parsed = assessmentSchema.parse(input);
   const now = new Date().toISOString();
+  let becameAwaitingSignOff = false;
+  let processName = '';
+  let processOwner = '';
+  let snapshot: Workspace | null = null;
   await withWorkspace((ws) => {
     const existing = ws.assessments.find((a) => a.processId === parsed.processId);
+    const wasCompleteAndUnapproved =
+      existing != null && isAssessmentComplete(existing) && !existing.approvedBy;
     if (existing) {
       // Any edit invalidates the owner's sign-off; it must be re-approved.
       Object.assign(existing, {
@@ -157,7 +164,26 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
         approvedAt: null,
       } as ImpactAssessment);
     }
+    const after = ws.assessments.find((a) => a.processId === parsed.processId)!;
+    const process = ws.processes.find((p) => p.id === parsed.processId);
+    processName = process?.name ?? 'a process';
+    processOwner = process?.owner ?? '';
+    // Notify on the transition into "complete, needs sign-off"; repeated
+    // edits while already awaiting sign-off stay quiet.
+    becameAwaitingSignOff = isAssessmentComplete(after) && !wasCompleteAndUnapproved;
+    snapshot = ws;
   });
+
+  if (becameAwaitingSignOff && snapshot) {
+    const { notifyWorkspaceUser } = await import('@/lib/email/send');
+    const { signOffRequestEmail } = await import('@/lib/email/templates');
+    await notifyWorkspaceUser(
+      snapshot,
+      await getUserId(),
+      'signOffRequests',
+      signOffRequestEmail({ processName, owner: processOwner })
+    );
+  }
 }
 
 export async function approveAssessment(processId: string, approver: string) {
@@ -516,11 +542,42 @@ export async function generateExerciseReport(sessionId: string) {
     s.report = report;
     s.updatedAt = new Date().toISOString();
   });
+
+  const { notifyWorkspaceUser } = await import('@/lib/email/send');
+  const { aarReadyEmail } = await import('@/lib/email/templates');
+  await notifyWorkspaceUser(
+    ws,
+    await getUserId(),
+    'aarReady',
+    aarReadyEmail({
+      exerciseTitle: session.scenario.title,
+      sessionId,
+      recommendationCount: report.recommendations.length,
+      highPriorityCount: report.recommendations.filter((r) => r.priority === 'high').length,
+    })
+  );
 }
 
 export async function deleteExercise(sessionId: string) {
   await withWorkspace((ws) => {
     ws.exercises = ws.exercises.filter((e) => e.id !== sessionId);
+  });
+}
+
+// ---------------- Notification preferences ----------------
+
+const notificationPrefsSchema = z.object({
+  signOffRequests: z.boolean(),
+  aarReady: z.boolean(),
+  reviewReminders: z.boolean(),
+});
+
+export async function saveNotificationPrefs(
+  input: z.infer<typeof notificationPrefsSchema>
+) {
+  const parsed = notificationPrefsSchema.parse(input);
+  await withWorkspace((ws) => {
+    ws.notifications = parsed;
   });
 }
 
