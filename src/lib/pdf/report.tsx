@@ -37,13 +37,14 @@ import {
   TREATMENT_LABELS,
 } from '@/lib/domain/constants';
 import { deriveRisks, riskConcentration } from '@/lib/domain/risk';
+import { overclaims } from '@/lib/domain/maturity-evidence';
 import { formatCurrency, formatCompactCurrency, formatHours, formatDate } from '@/lib/format';
 
 /**
  * The official BC plan document, generated server-side as a real PDF.
  * Layout mirrors the on-screen report (docs/METHODOLOGY.md section 10)
  * with document-control formalities: cover, control and approvals page,
- * running header/footer, and page numbering.
+ * and a running header/footer.
  */
 
 const INK = '#1b2430';
@@ -103,6 +104,13 @@ const s = StyleSheet.create({
   headerText: { fontSize: 7, color: MUTED, letterSpacing: 1 },
   footer: {
     position: 'absolute',
+    // An explicit height is load-bearing, not cosmetic. Without it this
+    // absolutely positioned fixed element resolves to invalid geometry once
+    // the document grows past a handful of pages, and the whole render dies
+    // with "unsupported number: -1.75e+22" from the border clipper. It must
+    // also clear paddingTop plus a line of 7pt text, or the height clips the
+    // footer text and leaves a bare rule.
+    height: 26,
     bottom: 24,
     left: 54,
     right: 54,
@@ -217,11 +225,10 @@ function PageChrome({ org, generated }: { org: string; generated: string }) {
         <Text style={s.headerText}>{generated}</Text>
       </View>
       <View style={s.footer} fixed>
+        {/* No page numbers: @react-pdf 4.5.1 silently drops `render`
+            callbacks on multi-page documents, so a page counter here would
+            print nothing at all rather than the wrong number. */}
         <Text style={s.footerText}>CONFIDENTIAL · INTERNAL USE ONLY</Text>
-        <Text
-          style={s.footerText}
-          render={({ pageNumber, totalPages }) => `PAGE ${pageNumber} OF ${totalPages}`}
-        />
       </View>
     </>
   );
@@ -254,6 +261,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
   const plan = ws.plan;
   const risks = deriveRisks(ws);
   const riskConcentrations = riskConcentration(ws);
+  const evidenceGaps = overclaims(ws, ws.maturity);
   const contactDirectory = ws.processes
     .map((p) => ({ p, tier: derived.get(p.id)?.tier ?? null }))
     .filter(({ p }) => p.owner.trim().length > 0)
@@ -524,7 +532,9 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
           Worst severity across all five categories per process and horizon (0 negligible to 4
           severe). The MTPD is the first horizon where any category reaches 4.
         </Text>
-        <View style={[s.table, { marginBottom: 10 }]} wrap={false}>
+        {/* Grows with the inventory, so it has to be allowed to split: a
+            large enough catalogue makes this taller than a page. */}
+        <View style={[s.table, { marginBottom: 10 }]}>
           <View style={s.thRow}>
             <Th width="30%">Process</Th>
             {HORIZONS.map((h) => (
@@ -1129,6 +1139,38 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
                 Improvement priority (weakest first):{' '}
                 {maturity.roadmap.map((d) => d.name).join(', ')}.
               </Text>
+            )}
+            {evidenceGaps.length > 0 && (
+              <>
+                <Text style={s.subTitle}>Ratings ahead of the evidence</Text>
+                <Text style={s.body}>
+                  These self-assessed levels sit two or more above what the assessment data
+                  demonstrates. Evidence held outside this workspace may well support them; the
+                  point is to be able to name it.
+                </Text>
+                <View style={s.table}>
+                  <View style={s.thRow}>
+                    <Th width="24%">Practice</Th>
+                    <Th width="18%">Domain</Th>
+                    <Th width="9%">Rated</Th>
+                    <Th width="11%">Evidenced</Th>
+                    <Th width="38%">What the data shows</Th>
+                  </View>
+                  {evidenceGaps.map((e, i) => (
+                    <View
+                      key={e.questionId}
+                      style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}
+                      wrap={false}
+                    >
+                      <Td width="24%" strong>{e.label}</Td>
+                      <Td width="18%">{e.domainName}</Td>
+                      <Td width="9%" color={WARN}>{String(e.answered)}</Td>
+                      <Td width="11%">{String(e.supported)}</Td>
+                      <Td width="38%">{e.detail}</Td>
+                    </View>
+                  ))}
+                </View>
+              </>
             )}
           </>
         )}

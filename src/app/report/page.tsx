@@ -21,6 +21,7 @@ import {
   TREATMENT_LABELS,
 } from '@/lib/domain/constants';
 import { deriveRisks, riskConcentration } from '@/lib/domain/risk';
+import { overclaims } from '@/lib/domain/maturity-evidence';
 import type { Tier } from '@/lib/domain/types';
 import { PageHeader, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
@@ -100,6 +101,7 @@ export default async function ReportPage() {
   const plan = ws.plan;
   const risks = deriveRisks(ws);
   const riskConcentrations = riskConcentration(ws);
+  const evidenceGaps = overclaims(ws, ws.maturity);
   const contactDirectory = ws.processes
     .map((p) => ({ p, tier: derived.get(p.id)?.tier ?? null }))
     .filter(({ p }) => p.owner.trim().length > 0)
@@ -120,7 +122,7 @@ export default async function ReportPage() {
         <PageHeader
           kicker="Step 11"
           title="Business continuity plan"
-          intro="Preview below; the download produces the official PDF document with cover page, document control, approvals, and page numbering."
+          intro="Preview below; the download produces the official PDF document with cover page, document control, approvals, and running headers."
           actions={
             <>
               <a href="/api/report/pdf" className={btn.primary} download>
@@ -144,8 +146,8 @@ export default async function ReportPage() {
           </li>
           <li>
             <strong>Download official PDF</strong> produces the formal document: cover page,
-            document control and approvals tables, running headers with page numbers, and a
-            confidentiality classification. Browser print remains available for a quick copy of
+            document control and approvals tables, running headers, and a
+            confidentiality classification on every page. Browser print remains available for a quick copy of
             this on-screen preview.
           </li>
           <li>
@@ -889,6 +891,40 @@ export default async function ReportPage() {
                   Improvement priority (weakest first):{' '}
                   {maturity.roadmap.map((d) => d.name).join(', ')}.
                 </p>
+              )}
+              {evidenceGaps.length > 0 && (
+                <>
+                  <h3 className="mt-6 mb-2 font-display text-lg font-semibold">
+                    Ratings ahead of the evidence
+                  </h3>
+                  <p className="mb-2 text-sm leading-relaxed text-ink-soft">
+                    These self-assessed levels sit two or more above what the assessment data
+                    demonstrates. Evidence held outside this workspace may well support them; the
+                    point is to be able to name it.
+                  </p>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        {['Practice', 'Domain', 'Rated', 'Evidenced', 'What the data shows'].map(
+                          (h) => (
+                            <th key={h} className={th}>{h}</th>
+                          )
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {evidenceGaps.map((e) => (
+                        <tr key={e.questionId}>
+                          <td className={td}>{e.label}</td>
+                          <td className={`${td} text-xs`}>{e.domainName}</td>
+                          <td className={`${td} tnum font-mono text-xs`}>{e.answered}</td>
+                          <td className={`${td} tnum font-mono text-xs`}>{e.supported}</td>
+                          <td className={`${td} text-xs`}>{e.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               )}
             </>
           )}

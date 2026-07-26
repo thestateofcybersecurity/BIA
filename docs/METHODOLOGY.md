@@ -207,12 +207,26 @@ All of it is printed into the BC plan report, which is what makes the generated 
 
 ## 10. Maturity assessment
 
-The 37-question ISO 22301 self-assessment is retained for coverage but restructured:
+A 46-question ISO 22301 self-assessment:
 
 - **8 domains** mapped to ISO 22301 clauses: Context and Scope (cl. 4), Leadership and Policy (cl. 5), Risk Assessment (cl. 6/8.2), Business Impact Analysis (cl. 8.2), Continuity Strategies and Plans (cl. 8.3/8.4), Crisis Management and Communications (cl. 8.4), Exercising and Testing (cl. 8.5), Documentation and Improvement (cl. 7/10)
 - **Anchored 0-5 capability scale** (CMMI style): 0 Not performed, 1 Initial (ad hoc), 2 Repeatable (inconsistent), 3 Defined (documented and communicated), 4 Managed (measured and reviewed), 5 Optimized (continuously improved). Every question shows the anchor text.
-- Domain score = mean of its questions. Overall score = weighted mean of domains (BIA and Strategies weighted 1.5x, others 1x, weights configurable in code).
+- Domain score = mean of its answered questions. Overall score = weighted mean of domains (Business Impact Analysis, Risk Assessment, and Continuity Strategies weighted 1.5x, others 1x, weights configurable in code). The first two are the two halves of clause 8.2 and carry equal weight for that reason.
 - Output: radar chart by domain, weakest-domain callouts, and a suggested roadmap (lowest domains first).
+
+The question set covers the practices the app itself supports, so the assessment and the work stay aligned: risk register coverage, treatment ownership and correlated exposure under Risk Assessment; owner sign-off under BIA; strategy selection, the investment case, and the requirement roll-down under Strategies; activation criteria, the response roster, and audience communications under Crisis Management.
+
+### Evidence
+
+A self-assessment is only as honest as the person filling it in, and the usual failure is a program rating itself Defined on practices it has never performed. Where the workspace holds data bearing on a practice, the app derives the level that data demonstrates and shows it beside the question: how many processes carry a complete assessment, how many risks have a treatment and an owner, whether all three activation levels have observable criteria, whether every response role has a deputy, when an exercise was last completed, and so on.
+
+Three rules keep this honest:
+
+- **Evidence is a floor, not a verdict.** The app cannot see training records, board minutes, or documents kept elsewhere, so a rating above the evidenced level may be entirely legitimate.
+- **Level 5 is never evidenced from data.** Continuous improvement is a judgement about how an organization behaves over time, not a database query.
+- **A rating two or more levels above the evidence is flagged**, in the app and in the report, with the underlying data stated. The point is not to overrule the assessor; it is to make sure the evidence can be named before an auditor asks for it.
+
+Unanswered questions can be seeded from the evidence in one action, which is a starting point for the conversation rather than a substitute for it.
 
 ## 11. Tabletop exercises
 

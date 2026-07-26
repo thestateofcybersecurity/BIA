@@ -14,7 +14,7 @@ Methodology grounding: ISO 22317, ISO 22301, NIST SP 800-34, and the BCI Good Pr
 6. **Recovery workflows**: ordered steps with teams and durations, checked against the RTO target.
 7. **Inherited requirements**: applications, suppliers, and upstream processes each inherit the strictest objectives of everything downstream of them, with conflicts and circular dependencies reported.
 8. **Activation & communications**: declaration criteria, response team roster with contacts and deputies, and a communications plan by audience, so the generated document is usable during an incident.
-9. **Maturity**: a 37-question ISO 22301 self-assessment across eight weighted domains on an anchored 0-5 capability scale, with a radar view and improvement roadmap.
+9. **Maturity**: a 46-question ISO 22301 self-assessment across eight weighted domains on an anchored 0-5 capability scale, with a radar view and improvement roadmap. Where the workspace holds evidence for a practice, the level your data demonstrates is shown beside the question, and ratings sitting two or more levels above it are flagged in the app and the report.
 10. **Tabletop exercises**: six scenario templates generated from your live data, runnable as live sessions that record the room's responses. With Claude configured, exercises can be AI-tailored to your exact gaps and completed sessions get a structured after-action report (timeline, strengths, gaps, prioritized recommendations, maturity signals).
 11. **BC plan report**: a printable plan generated entirely from your data. No boilerplate.
 
