@@ -156,6 +156,40 @@ export interface MaturityAssessment {
   updatedAt: string;
 }
 
+// ---------------- Risk register ----------------
+
+/**
+ * The companion to the BIA (ISO 22301 cl. 8.2 pairs them): the BIA says how
+ * bad a disruption would be, the risk assessment says what could cause one
+ * and how likely it is. Impact is never re-entered here; it is derived from
+ * the assessments of the processes a threat would disrupt.
+ */
+
+export type Likelihood = 0 | 1 | 2 | 3 | 4;
+export type RiskTreatment = 'avoid' | 'reduce' | 'transfer' | 'accept';
+export type RiskStatus = 'open' | 'treating' | 'treated' | 'accepted';
+export type RiskBand = 'low' | 'medium' | 'high' | 'critical';
+
+export interface RiskEntry {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  /** Processes this threat would disrupt; their BIA results supply the impact. */
+  processIds: string[];
+  /** Named dependencies the threat attacks, matched against the inventory. */
+  dependencies: string[];
+  likelihood: Likelihood;
+  likelihoodRationale: string;
+  existingControls: string;
+  treatment: RiskTreatment | null;
+  treatmentAction: string;
+  owner: string;
+  targetDate: string | null;
+  status: RiskStatus;
+  updatedAt: string;
+}
+
 // ---------------- Delegated data collection ----------------
 
 export type CollectionStatus = 'sent' | 'submitted' | 'revoked';
@@ -313,6 +347,7 @@ export interface Workspace {
   resourceProfiles: RecoveryResourceProfile[];
   plan: ContinuityPlan | null;
   collectionRequests: CollectionRequest[];
+  risks: RiskEntry[];
   /** Email notification toggles; a missing key means enabled. */
   notifications?: {
     signOffRequests?: boolean;

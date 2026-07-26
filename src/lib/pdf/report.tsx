@@ -33,7 +33,10 @@ import {
   SEVERITY_LABELS,
   ACTIVATION_LABELS,
   STRATEGY_LABELS,
+  RISK_BAND_LABELS,
+  TREATMENT_LABELS,
 } from '@/lib/domain/constants';
+import { deriveRisks, riskConcentration } from '@/lib/domain/risk';
 import { formatCurrency, formatCompactCurrency, formatHours, formatDate } from '@/lib/format';
 
 /**
@@ -249,6 +252,8 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
 
   const nameOf = (id: string) => ws.processes.find((p) => p.id === id)?.name ?? id;
   const plan = ws.plan;
+  const risks = deriveRisks(ws);
+  const riskConcentrations = riskConcentration(ws);
   const contactDirectory = ws.processes
     .map((p) => ({ p, tier: derived.get(p.id)?.tier ?? null }))
     .filter(({ p }) => p.owner.trim().length > 0)
@@ -602,8 +607,71 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
           </>
         )}
 
-        {/* 06 Objectives & gaps */}
-        <SectionTitle num="06" title="Recovery objectives & gap register" />
+        {/* 06 Risk register */}
+        <SectionTitle num="06" title="Risk register" />
+        {risks.length === 0 ? (
+          <Text style={s.body}>
+            No risks registered. The impact assessment establishes what a disruption would cost;
+            the risk assessment identifies what could cause one. ISO 22301 clause 8.2 expects both.
+          </Text>
+        ) : (
+          <>
+            <Text style={s.body}>
+              Likelihood is rated on an anchored 0-4 frequency scale. Impact is not re-entered:
+              each threat inherits the criticality tier of the most critical process it would disrupt,
+              from section 05 (Tier 1 gives impact 4, down to Tier 4 giving 1). Score is likelihood
+              multiplied by impact, banded Low (0-3), Medium (4-7), High (8-11), Critical (12+).
+            </Text>
+            <View style={s.table}>
+              <View style={s.thRow}>
+                <Th width="24%">Threat</Th>
+                <Th width="13%">Category</Th>
+                <Th width="8%">L x I</Th>
+                <Th width="12%">Rating</Th>
+                <Th width="21%">Processes affected</Th>
+                <Th width="22%">Treatment</Th>
+              </View>
+              {risks.map((r, i) => (
+                // Long cells here, so keep a row whole rather than orphaning
+                // its title on the previous page.
+                <View key={r.risk.id} style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]} wrap={false}>
+                  <Td width="24%" strong>{r.risk.title}</Td>
+                  <Td width="13%">{r.risk.category}</Td>
+                  <Td width="8%">{`${r.risk.likelihood} x ${r.impact ?? '·'}`}</Td>
+                  <Td
+                    width="12%"
+                    strong
+                    color={
+                      r.band === 'critical' || r.band === 'high'
+                        ? BAD
+                        : r.band === 'medium'
+                          ? WARN
+                          : MUTED
+                    }
+                  >
+                    {r.band ? `${RISK_BAND_LABELS[r.band]} ${r.score}` : 'Not scorable'}
+                  </Td>
+                  <Td width="21%">
+                    {r.affected.map((a) => a.name).join(', ') || 'None linked'}
+                  </Td>
+                  <Td width="22%">
+                    {`${r.risk.treatment ? TREATMENT_LABELS[r.risk.treatment] : 'Not decided'}${r.risk.treatmentAction ? `: ${r.risk.treatmentAction}` : ''}${r.risk.owner ? ` (${r.risk.owner})` : ''}`}
+                  </Td>
+                </View>
+              ))}
+            </View>
+            {riskConcentrations.length > 0 && (
+              <Text style={s.body}>
+                {`Correlated exposure: ${riskConcentrations
+                  .map((c) => `${c.name} (${c.risks.length} risks)`)
+                  .join(', ')}. These threats share a dependency, so they are not independent events.`}
+              </Text>
+            )}
+          </>
+        )}
+
+        {/* 07 Objectives & gaps */}
+        <SectionTitle num="07" title="Recovery objectives & gap register" />
         <View style={s.table}>
           <View style={s.thRow}>
             <Th width="28%">Process</Th>
@@ -646,7 +714,11 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
                 const sevColor = g.severity === 'high' ? BAD : g.severity === 'medium' ? WARN : MUTED;
                 const exposure = exposureFor(g);
                 return (
-                  <View key={`${g.processId}-${g.kind}`} style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}>
+                  <View
+                    key={`${g.processId}-${g.kind}`}
+                    style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}
+                    wrap={false}
+                  >
                     <Td width="18%" strong>{nameOf(g.processId)}</Td>
                     <Td width="7%">{g.kind.toUpperCase()}</Td>
                     <Td width="13%">
@@ -681,7 +753,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
         )}
 
         {/* 07 Activation */}
-        <SectionTitle num="07" title="Plan activation & response team" />
+        <SectionTitle num="08" title="Plan activation & response team" />
         {!plan ? (
           <Text style={s.body}>
             No activation plan recorded yet. Without declaration criteria, a response roster, and a
@@ -805,7 +877,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
         )}
 
         {/* 08 Workflows + resources */}
-        <SectionTitle num="08" title="Recovery workflows & resource requirements" />
+        <SectionTitle num="09" title="Recovery workflows & resource requirements" />
         {ws.workflows.length === 0 ? (
           <Text style={s.body}>No recovery workflows documented yet.</Text>
         ) : (
@@ -885,7 +957,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
         )}
 
         {/* 08 Roll-down */}
-        <SectionTitle num="09" title="Dependency recovery requirements" />
+        <SectionTitle num="10" title="Dependency recovery requirements" />
         <Text style={s.body}>
           The BIA handed down to IT and third-party management: each application inherits the
           strictest recovery objectives of the processes that depend on it, and each supplier
@@ -968,7 +1040,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
         )}
 
         {/* 09 Exercise program */}
-        <SectionTitle num="10" title="Exercise program" />
+        <SectionTitle num="11" title="Exercise program" />
         <Text style={s.body}>
           Recommended cadence: two tabletop exercises per year minimum, rotating categories, with
           results feeding the maturity assessment and the gap register.
@@ -1014,7 +1086,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
         )}
 
         {/* 10 Maturity */}
-        <SectionTitle num="11" title="Maturity & roadmap" />
+        <SectionTitle num="12" title="Maturity & roadmap" />
         {maturity.overall == null ? (
           <Text style={s.body}>Maturity assessment not yet completed.</Text>
         ) : (

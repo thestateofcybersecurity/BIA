@@ -22,6 +22,7 @@ export function emptyWorkspace(): Workspace {
     resourceProfiles: [],
     plan: null,
     collectionRequests: [],
+    risks: [],
   };
 }
 

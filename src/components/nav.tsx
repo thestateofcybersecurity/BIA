@@ -8,13 +8,14 @@ const STEPS = [
   { href: '/organization', num: '01', label: 'Organization' },
   { href: '/processes', num: '02', label: 'Processes' },
   { href: '/assessments', num: '03', label: 'Impact assessment' },
-  { href: '/gaps', num: '04', label: 'Objectives & gaps' },
-  { href: '/recovery', num: '05', label: 'Recovery workflows' },
-  { href: '/requirements', num: '06', label: 'Requirements' },
-  { href: '/activation', num: '07', label: 'Activation & comms' },
-  { href: '/maturity', num: '08', label: 'Maturity' },
-  { href: '/exercises', num: '09', label: 'Tabletop exercises' },
-  { href: '/report', num: '10', label: 'BC plan report' },
+  { href: '/risks', num: '04', label: 'Risk register' },
+  { href: '/gaps', num: '05', label: 'Objectives & gaps' },
+  { href: '/recovery', num: '06', label: 'Recovery workflows' },
+  { href: '/requirements', num: '07', label: 'Requirements' },
+  { href: '/activation', num: '08', label: 'Activation & comms' },
+  { href: '/maturity', num: '09', label: 'Maturity' },
+  { href: '/exercises', num: '10', label: 'Tabletop exercises' },
+  { href: '/report', num: '11', label: 'BC plan report' },
 ];
 
 export function Nav({ account }: { account?: React.ReactNode }) {

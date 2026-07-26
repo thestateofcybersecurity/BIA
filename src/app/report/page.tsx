@@ -17,7 +17,10 @@ import {
   HORIZON_LABELS,
   ACTIVATION_LABELS,
   STRATEGY_LABELS,
+  RISK_BAND_LABELS,
+  TREATMENT_LABELS,
 } from '@/lib/domain/constants';
+import { deriveRisks, riskConcentration } from '@/lib/domain/risk';
 import type { Tier } from '@/lib/domain/types';
 import { PageHeader, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
@@ -56,7 +59,7 @@ export default async function ReportPage() {
   if (!ws.org || ws.processes.length === 0) {
     return (
       <>
-        <PageHeader kicker="Step 10" title="Business continuity plan" />
+        <PageHeader kicker="Step 11" title="Business continuity plan" />
         <EmptyState
           title="Not enough data for a report"
           body="The report is generated entirely from your assessment data: organization profile, processes, impact assessments, recovery objectives, and maturity results. Nothing is boilerplate."
@@ -95,6 +98,8 @@ export default async function ReportPage() {
   const chain = processChainRequirements(ws);
   const cycles = detectDependencyCycles(ws);
   const plan = ws.plan;
+  const risks = deriveRisks(ws);
+  const riskConcentrations = riskConcentration(ws);
   const contactDirectory = ws.processes
     .map((p) => ({ p, tier: derived.get(p.id)?.tier ?? null }))
     .filter(({ p }) => p.owner.trim().length > 0)
@@ -113,7 +118,7 @@ export default async function ReportPage() {
     <>
       <div className="no-print">
         <PageHeader
-          kicker="Step 10"
+          kicker="Step 11"
           title="Business continuity plan"
           intro="Preview below; the download produces the official PDF document with cover page, document control, approvals, and page numbering."
           actions={
@@ -339,7 +344,79 @@ export default async function ReportPage() {
           )}
         </Section>
 
-        <Section num="06" title="Recovery objectives & gap register">
+        <Section num="06" title="Risk register">
+          {risks.length === 0 ? (
+            <p className="text-sm text-ink-muted">
+              No risks registered. The impact assessment establishes what a disruption would cost;
+              the risk assessment identifies what could cause one. ISO 22301 clause 8.2 expects
+              both.
+            </p>
+          ) : (
+            <>
+              <p className="mb-3 text-sm leading-relaxed text-ink-soft">
+                Likelihood is rated on an anchored 0-4 frequency scale. Impact is not re-entered:
+                each threat inherits the criticality tier of the most critical process it would
+                disrupt, from section 05 (Tier 1 gives impact 4, down to Tier 4 giving 1). Score is
+                likelihood multiplied by impact, banded Low (0-3), Medium (4-7), High (8-11),
+                Critical (12+).
+              </p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    {['Threat', 'Category', 'L × I', 'Rating', 'Processes affected', 'Treatment', 'Owner'].map(
+                      (h) => (
+                        <th key={h} className={th}>{h}</th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {risks.map((r) => (
+                    <tr key={r.risk.id}>
+                      <td className={td}>{r.risk.title}</td>
+                      <td className={`${td} text-xs`}>{r.risk.category}</td>
+                      <td className={`${td} tnum font-mono text-xs`}>
+                        {r.risk.likelihood} × {r.impact ?? '·'}
+                      </td>
+                      <td className={td}>
+                        <StatusPill
+                          tone={
+                            r.band === 'critical' || r.band === 'high'
+                              ? 'bad'
+                              : r.band === 'medium'
+                                ? 'warn'
+                                : 'neutral'
+                          }
+                        >
+                          {r.band ? `${RISK_BAND_LABELS[r.band]} ${r.score}` : 'Not scorable'}
+                        </StatusPill>
+                      </td>
+                      <td className={`${td} text-xs`}>
+                        {r.affected.map((a) => a.name).join(', ') || 'None linked'}
+                      </td>
+                      <td className={`${td} text-xs`}>
+                        {r.risk.treatment ? TREATMENT_LABELS[r.risk.treatment] : 'Not decided'}
+                        {r.risk.treatmentAction ? `: ${r.risk.treatmentAction}` : ''}
+                      </td>
+                      <td className={`${td} text-xs`}>{r.risk.owner || 'Unassigned'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {riskConcentrations.length > 0 && (
+                <p className="mt-3 text-sm text-ink-soft">
+                  <strong>Correlated exposure:</strong>{' '}
+                  {riskConcentrations
+                    .map((c) => `${c.name} (${c.risks.length} risks)`)
+                    .join(', ')}
+                  . These threats share a dependency, so they are not independent events.
+                </p>
+              )}
+            </>
+          )}
+        </Section>
+
+        <Section num="07" title="Recovery objectives & gap register">
           <table className="w-full text-sm">
             <thead>
               <tr>
@@ -427,7 +504,7 @@ export default async function ReportPage() {
           )}
         </Section>
 
-        <Section num="07" title="Plan activation & response team">
+        <Section num="08" title="Plan activation & response team">
           {!plan ? (
             <p className="text-sm text-ink-muted">
               No activation plan recorded yet. Without declaration criteria, a response roster, and
@@ -568,7 +645,7 @@ export default async function ReportPage() {
           )}
         </Section>
 
-        <Section num="08" title="Recovery workflows">
+        <Section num="09" title="Recovery workflows">
           {ws.workflows.length === 0 ? (
             <p className="text-sm text-ink-muted">No recovery workflows documented yet.</p>
           ) : (
@@ -657,7 +734,7 @@ export default async function ReportPage() {
           )}
         </Section>
 
-        <Section num="09" title="Dependency recovery requirements">
+        <Section num="10" title="Dependency recovery requirements">
           <p className="mb-3 text-sm leading-relaxed text-ink-soft">
             The BIA handed down to IT and third-party management: each application inherits the
             strictest recovery objectives of the processes that depend on it, and each supplier
@@ -755,7 +832,7 @@ export default async function ReportPage() {
           )}
         </Section>
 
-        <Section num="10" title="Exercise program">
+        <Section num="11" title="Exercise program">
           <p className="mb-3 text-sm leading-relaxed text-ink-soft">
             The following tabletop scenarios are available, generated from this plan&apos;s data.
             Recommended cadence: two exercises per year minimum, rotating categories, with
@@ -771,7 +848,7 @@ export default async function ReportPage() {
           </ul>
         </Section>
 
-        <Section num="11" title="Maturity & roadmap">
+        <Section num="12" title="Maturity & roadmap">
           {maturity.overall == null ? (
             <p className="text-sm text-ink-muted">Maturity assessment not yet completed.</p>
           ) : (

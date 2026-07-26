@@ -14,7 +14,7 @@ export default async function GapsPage() {
   return (
     <>
       <PageHeader
-        kicker="Step 04"
+        kicker="Step 05"
         title="Recovery objectives & gaps"
         intro="Set what the business needs (target RTO, RPO, minimum service level) and what current capability can deliver. Every shortfall lands in the gap register with an owner and remediation status; the register is what drives investment decisions."
       />

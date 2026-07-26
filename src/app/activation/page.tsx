@@ -28,7 +28,7 @@ export default async function ActivationPage() {
   return (
     <>
       <PageHeader
-        kicker="Step 07"
+        kicker="Step 08"
         title="Activation & communications"
         intro="The operational half of the plan. Everything before this step says how bad a disruption would be; this step says who declares one, who runs the response, and who gets told what. Without it the analysis cannot be executed at 2am."
       />

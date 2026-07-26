@@ -110,7 +110,40 @@ Used only to rank processes within and across tiers, never to assign tiers:
 
 The cumulative financial estimates per horizon form a downtime cost curve per process, aggregated on the dashboard and in the report.
 
-## 5. Recovery objectives and gap analysis
+## 5. Risk assessment
+
+ISO 22301 clause 8.2 pairs business impact analysis with risk assessment, and they answer different questions. The BIA says how bad a disruption would be and how long it can be tolerated. The risk assessment says what could cause one and how likely that is. Both are needed to choose strategies: impact alone cannot rank spending, and likelihood alone ignores what is actually at stake.
+
+**Impact is never entered twice.** Each registered threat records the processes it would disrupt and inherits its impact from their assessments, taken from the criticality tier of the most critical process affected:
+
+| Top tier affected | Impact |
+|---|---|
+| Tier 1 Critical | 4 |
+| Tier 2 Essential | 3 |
+| Tier 3 Important | 2 |
+| Tier 4 Deferrable | 1 |
+
+Tier is the right source because it derives from MTPD, which measures how quickly a disruption becomes intolerable, and that is exactly the discriminating question once a threat lands. Peak severity is the wrong source and was rejected during implementation: impact grows with outage length, so almost every process peaks at severity 4 by the one month horizon, every threat would inherit impact 4, and the matrix would collapse into a single column.
+
+The consequence is that a threat taking out a Tier 1 process cannot be rated minor, and re-tiering a process automatically re-rates every threat against it without anyone editing the register. This is what keeps the two halves of clause 8.2 from drifting apart. A threat whose affected processes have no completed assessment is reported as not scorable rather than being given a default.
+
+**Likelihood** is the one judgement the assessor supplies, on an anchored 0-4 scale tied to expected frequency:
+
+| Level | Label | Anchor |
+|---|---|---|
+| 0 | Rare | Not expected within ten years; no known occurrence in the sector |
+| 1 | Unlikely | Plausible within five to ten years; has happened to comparable organizations |
+| 2 | Possible | Expected within two to five years; has happened in the sector recently |
+| 3 | Likely | Expected within one to two years; near misses already seen here |
+| 4 | Almost certain | Expected within the year, or already occurred here in the last twelve months |
+
+**Risk score = likelihood x impact**, giving 0 to 16, banded Low (0-3), Medium (4-7), High (8-11), Critical (12 and above). Nothing is annualised. The BIA deliberately measures a single occurrence, and multiplying by an invented frequency would launder a guess into a figure that looks like arithmetic.
+
+**Treatment** follows ISO 31000: avoid, reduce, transfer, or accept, each with an owner, action, and target date. Transfer deserves its own note in a continuity context: insurance moves the financial consequence but does not keep the process running, so a transferred risk still needs the recovery capability tracked in the gap register.
+
+Two cross-checks fall out of the register automatically. A **dependency named by more than one risk** turns separate threats into one correlated event, which is what single-risk thinking misses. A **Tier 1 process with no registered threat** usually means the register is incomplete rather than the process being safe, and is flagged as a coverage gap. The register also feeds the tabletop exercise generator, so AI-designed scenarios exercise the threats actually on the register.
+
+## 6. Recovery objectives and gap analysis
 
 Per process:
 
@@ -142,13 +175,13 @@ The contributor sees the rating grid but not the governance controls: MTPD overr
 
 Each completed assessment carries an owner sign-off (name and date); any edit to the assessment clears the sign-off and it must be re-approved. Assessments are due for review 12 months after their last approval or edit (ISO 22301 review cadence); overdue assessments are flagged in the app.
 
-## 6. Recovery workflows and resource requirements
+## 7. Recovery workflows and resource requirements
 
 Ordered recovery steps per process, each with responsible team, dependencies (same six classes), alternate staff, and estimated duration. The sum of step durations is compared to the target RTO; if the critical path exceeds RTO the app flags it.
 
 Each process also carries a **recovery resource profile** (ISO 22317 resource requirements at time of recovery): the minimum staff, workstations or equipment, and facility seats needed at each of the five horizons, plus the vital records and data sets the process cannot operate without. This is what alternate-site sizing and surge planning must actually provide.
 
-## 7. Dependency requirement roll-down
+## 8. Dependency requirement roll-down
 
 The BIA handed down to IT and third-party management, fully derived (nothing entered separately):
 
@@ -160,7 +193,7 @@ Circular process dependencies are detected and reported: if A cannot run without
 
 Application and supplier dependencies are matched by name (case-insensitive), which is why consistent dependency naming in the process inventory matters; process links are matched by id, so they are exact.
 
-## 8. Plan activation and communications
+## 9. Plan activation and communications
 
 Everything above establishes how bad a disruption would be and how fast recovery must happen. This section is the operational half of the plan (NIST SP 800-34 notification and activation phase), without which the analysis cannot be executed during an incident:
 
@@ -172,7 +205,7 @@ Everything above establishes how bad a disruption would be and how fast recovery
 
 All of it is printed into the BC plan report, which is what makes the generated document usable at 2am rather than only at audit time.
 
-## 9. Maturity assessment
+## 10. Maturity assessment
 
 The 37-question ISO 22301 self-assessment is retained for coverage but restructured:
 
@@ -181,7 +214,7 @@ The 37-question ISO 22301 self-assessment is retained for coverage but restructu
 - Domain score = mean of its questions. Overall score = weighted mean of domains (BIA and Strategies weighted 1.5x, others 1x, weights configurable in code).
 - Output: radar chart by domain, weakest-domain callouts, and a suggested roadmap (lowest domains first).
 
-## 10. Tabletop exercises
+## 11. Tabletop exercises
 
 A curated library covers six scenario types: ransomware, cloud or data center outage, critical supplier failure, facility loss or regional disaster, workforce disruption, and insider threat. Each template is generated from live assessment data: it names the organization's actual Tier 1 processes, injects real RTO gaps and dependency concentrations, and structures the exercise as phases with discussion questions and evaluation criteria mapped to maturity domains.
 
@@ -192,7 +225,7 @@ Any scenario can be run as a **live session**: the facilitator steps through the
 
 Structured outputs are schema-validated at the boundary; a refusal or malformed response is surfaced to the facilitator, never silently stored. Without an API key, the template library and live sessions work fully; only generation and the AI report are disabled.
 
-## 11. Business continuity plan report
+## 12. Business continuity plan report
 
 Generated fully from data, printable to PDF from the browser:
 
@@ -201,11 +234,12 @@ Generated fully from data, printable to PDF from the browser:
 3. Methodology summary
 4. Process inventory and dependency map
 5. BIA results: tiering table with owner sign-off status, MTPD overrides with justifications
-6. Recovery objectives (including WRT) and gap register
-7. Plan activation, response team roster, communications, and the process owner directory
-8. Recovery workflows and resource requirements
-9. Dependency recovery requirements (application, supplier, and process-chain roll-down)
-10. Tabletop exercise program
-11. Maturity results and roadmap
+6. Risk register with derived impact, ratings, treatments, and correlated exposure
+7. Recovery objectives (including WRT) and gap register
+8. Plan activation, response team roster, communications, and the process owner directory
+9. Recovery workflows and resource requirements
+10. Dependency recovery requirements (application, supplier, and process-chain roll-down)
+11. Tabletop exercise program
+12. Maturity results and roadmap
 
 Nothing in the report is boilerplate about a fictional company; every table and number traces to entered data.

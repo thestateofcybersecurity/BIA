@@ -9,13 +9,14 @@ Methodology grounding: ISO 22317, ISO 22301, NIST SP 800-34, and the BCI Good Pr
 1. **Organization profile**: revenue, headcount, and risk appetite calibrate the financial severity bands to your size.
 2. **Processes**: catalogue business processes with owners and dependencies across six classes (people, applications, equipment, facilities, suppliers, data) plus upstream process links. A bulk import accepts Excel workbooks or CSV (with downloadable templates; the Excel one includes a column-reference sheet for process owners), upserts processes by name, and can populate impact assessments in the same pass.
 3. **Impact assessment**: rate the impact of disruption at 4 hours, 24 hours, 3 days, 1 week, and 1 month across five categories on an anchored 0-4 scale. MTPD, tier (1 Critical through 4 Deferrable), and priority are derived, never self-declared. Assessments can be delegated: a signed, expiring, revocable link lets the named process owner complete their own process without an account, and a complete submission records their sign-off.
-4. **Objectives & gaps**: set target and achievable RTO/RPO/MBCO. RTO targets are validated against MTPD; shortfalls populate a gap register with owners, chosen continuity strategy, cost, and due date, priced against the exposure the shortfall carries.
-5. **Recovery workflows**: ordered steps with teams and durations, checked against the RTO target.
-6. **Inherited requirements**: applications, suppliers, and upstream processes each inherit the strictest objectives of everything downstream of them, with conflicts and circular dependencies reported.
-7. **Activation & communications**: declaration criteria, response team roster with contacts and deputies, and a communications plan by audience, so the generated document is usable during an incident.
-8. **Maturity**: a 37-question ISO 22301 self-assessment across eight weighted domains on an anchored 0-5 capability scale, with a radar view and improvement roadmap.
-9. **Tabletop exercises**: six scenario templates generated from your live data, runnable as live sessions that record the room's responses. With Claude configured, exercises can be AI-tailored to your exact gaps and completed sessions get a structured after-action report (timeline, strengths, gaps, prioritized recommendations, maturity signals).
-10. **BC plan report**: a printable plan generated entirely from your data. No boilerplate.
+4. **Risk register**: the companion to the BIA (ISO 22301 cl. 8.2). Register threats with an anchored likelihood; impact is inherited from the criticality tier of the processes each threat would disrupt, never entered twice. Scores band into a matrix, treatments follow ISO 31000, and shared dependencies are flagged as correlated exposure.
+5. **Objectives & gaps**: set target and achievable RTO/RPO/MBCO. RTO targets are validated against MTPD; shortfalls populate a gap register with owners, chosen continuity strategy, cost, and due date, priced against the exposure the shortfall carries.
+6. **Recovery workflows**: ordered steps with teams and durations, checked against the RTO target.
+7. **Inherited requirements**: applications, suppliers, and upstream processes each inherit the strictest objectives of everything downstream of them, with conflicts and circular dependencies reported.
+8. **Activation & communications**: declaration criteria, response team roster with contacts and deputies, and a communications plan by audience, so the generated document is usable during an incident.
+9. **Maturity**: a 37-question ISO 22301 self-assessment across eight weighted domains on an anchored 0-5 capability scale, with a radar view and improvement roadmap.
+10. **Tabletop exercises**: six scenario templates generated from your live data, runnable as live sessions that record the room's responses. With Claude configured, exercises can be AI-tailored to your exact gaps and completed sessions get a structured after-action report (timeline, strengths, gaps, prioritized recommendations, maturity signals).
+11. **BC plan report**: a printable plan generated entirely from your data. No boilerplate.
 
 ## Running it
 
@@ -60,6 +61,7 @@ src/lib/contribution/      Signed links for delegated assessment collection
 src/lib/email/             Resend notification layer and templates
 src/lib/pdf/               The official BC plan PDF document
 src/app/                   Pages: dashboard, organization, processes, assessments,
-                           gaps, recovery, requirements, activation, maturity,
-                           exercises, report, and the public /contribute route
+                           risks, gaps, recovery, requirements, activation,
+                           maturity, exercises, report, and the public
+                           /contribute route
 ```

@@ -19,7 +19,7 @@ export default async function RecoveryPage() {
   return (
     <>
       <PageHeader
-        kicker="Step 05"
+        kicker="Step 06"
         title="Recovery workflows"
         intro="Ordered recovery steps per process, with teams, durations, and dependencies. The total step time is checked against the RTO target: a plan that takes longer than the RTO is a gap, not a plan."
       />

@@ -1,6 +1,7 @@
 import type { Workspace } from '@/lib/domain/types';
 import { deriveAll, computeGaps } from '@/lib/domain/scoring';
 import { scoreMaturity } from '@/lib/domain/maturity';
+import { deriveRisks, riskConcentration } from '@/lib/domain/risk';
 import {
   MTPD_LABELS,
   TIER_SHORT,
@@ -60,6 +61,29 @@ export function workspaceBrief(ws: Workspace): string {
       const name = ws.processes.find((p) => p.id === g.processId)?.name ?? g.processId;
       lines.push(
         `- ${name}: ${g.kind.toUpperCase()} target ${formatHours(g.targetHours)}, achievable ${formatHours(g.achievableHours)} (${g.severity} severity gap)`
+      );
+    }
+  }
+
+  const risks = deriveRisks(ws).slice(0, 8);
+  if (risks.length > 0) {
+    lines.push('', '## Risk register (highest rated first)');
+    for (const r of risks) {
+      const rating =
+        r.band && r.score != null ? `${r.band} (${r.score})` : 'not yet scorable';
+      const affected = r.affected.map((a) => a.name).join(', ') || 'no processes linked';
+      lines.push(
+        `- ${r.risk.title} [${r.risk.category}]: likelihood ${r.risk.likelihood}/4, impact ${r.impact ?? '?'}/4, ${rating}. Affects: ${affected}.` +
+          (r.risk.treatment ? ` Treatment: ${r.risk.treatment}.` : ' No treatment decided.') +
+          (r.risk.existingControls ? ` Existing controls: ${r.risk.existingControls}` : '')
+      );
+    }
+    const shared = riskConcentration(ws);
+    if (shared.length > 0) {
+      lines.push(
+        `Correlated exposure (one dependency behind several risks): ${shared
+          .map((c) => `${c.name} appears in ${c.risks.length} risks`)
+          .join('; ')}`
       );
     }
   }

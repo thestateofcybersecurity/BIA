@@ -580,6 +580,48 @@ export async function deleteExercise(sessionId: string) {
   });
 }
 
+// ---------------- Risk register ----------------
+
+const riskSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().trim().min(1),
+  category: z.string(),
+  description: z.string(),
+  processIds: z.array(z.string()),
+  dependencies: z.array(z.string()),
+  likelihood: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  likelihoodRationale: z.string(),
+  existingControls: z.string(),
+  treatment: z.enum(['avoid', 'reduce', 'transfer', 'accept']).nullable(),
+  treatmentAction: z.string(),
+  owner: z.string(),
+  targetDate: z.string().nullable(),
+  status: z.enum(['open', 'treating', 'treated', 'accepted']),
+});
+
+export async function saveRisk(input: z.infer<typeof riskSchema>) {
+  const parsed = riskSchema.parse(input);
+  const now = new Date().toISOString();
+  let id = parsed.id;
+  await withWorkspace((ws) => {
+    if (id) {
+      const existing = ws.risks.find((r) => r.id === id);
+      if (!existing) throw new Error('Risk not found');
+      Object.assign(existing, { ...parsed, id, updatedAt: now });
+    } else {
+      id = nanoid(10);
+      ws.risks.push({ ...parsed, id, updatedAt: now });
+    }
+  });
+  return { id: id! };
+}
+
+export async function deleteRisk(id: string) {
+  await withWorkspace((ws) => {
+    ws.risks = ws.risks.filter((r) => r.id !== id);
+  });
+}
+
 // ---------------- Delegated data collection ----------------
 
 /**

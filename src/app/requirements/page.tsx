@@ -152,7 +152,7 @@ export default async function RequirementsPage() {
   return (
     <>
       <PageHeader
-        kicker="Step 06"
+        kicker="Step 07"
         title="Inherited requirements"
         intro="The BIA handed down: applications, suppliers, and upstream processes each inherit the strictest recovery objectives of everything that depends on them. Nothing here is entered separately; it is derived live from the process inventory and recovery objectives."
       />

@@ -348,6 +348,131 @@ export function sampleWorkspace(): Workspace {
       },
     ],
     collectionRequests: [],
+    risks: [
+      {
+        id: 'risk-ransomware',
+        title: 'Ransomware detonation across the claims and policy estate',
+        category: 'Cyber attack',
+        description:
+          'Initial access through a phishing lure or an unpatched edge device, followed by lateral movement to the file and database servers behind claims and policy administration.',
+        processIds: ['claims', 'policy-admin', 'contact-center'],
+        dependencies: ['ClaimsFlow', 'PolicyCore', 'Document management (OnBase)'],
+        likelihood: 3,
+        likelihoodRationale:
+          'Two regional carriers in the state were hit in the last eighteen months; our own phishing simulation click rate is 9%.',
+        existingControls:
+          'EDR on all servers, offline backup copies tested quarterly, MFA on remote access. Network segmentation between claims and policy remains incomplete.',
+        treatment: 'reduce',
+        treatmentAction:
+          'Finish segmentation between the claims and policy estates, and rehearse a full restore of ClaimsFlow from the offline copy.',
+        owner: 'Elena Sorensen',
+        targetDate: '2027-01-31',
+        status: 'treating',
+        updatedAt: ts,
+      },
+      {
+        id: 'risk-fiserv',
+        title: 'Payment processor outage at Fiserv',
+        category: 'Supplier or third-party failure',
+        description:
+          'Extended unavailability of the payment gateway stops claim payments going out and premium payments coming in.',
+        processIds: ['claims', 'billing'],
+        dependencies: ['Fiserv', 'Payment gateway (Fiserv)'],
+        likelihood: 2,
+        likelihoodRationale:
+          'Two brief outages in the past three years, neither beyond four hours; the contract carries no continuity commitment.',
+        existingControls:
+          'Manual payment authority up to $25k. The backup processor is contracted but the cutover has never been tested.',
+        treatment: 'reduce',
+        treatmentAction:
+          'Test the backup processor cutover end to end and add a continuity clause at contract renewal.',
+        owner: 'Marcus Yee',
+        targetDate: '2026-11-30',
+        status: 'treating',
+        updatedAt: ts,
+      },
+      {
+        id: 'risk-hq',
+        title: 'Loss of Rochester HQ (fire, flood, or extended utility failure)',
+        category: 'Facility loss',
+        description:
+          'The building housing contact center, claims, and policy operations becomes unusable for more than a week.',
+        processIds: ['contact-center', 'claims', 'policy-admin'],
+        dependencies: ['Rochester HQ, floor 2', 'Rochester HQ, floor 3'],
+        likelihood: 1,
+        likelihoodRationale:
+          'No incident in the building in twenty years; the site sits outside the flood plain but on a single utility feed.',
+        existingControls:
+          'Contact center staff can work remotely on softphones. Claims adjudication needs printed authority limits that are only held on site.',
+        treatment: 'reduce',
+        treatmentAction:
+          'Hold current authority-limit documentation off site and confirm alternate seating at the Buffalo branch.',
+        owner: 'Priya Raman',
+        targetDate: '2027-06-30',
+        status: 'open',
+        updatedAt: ts,
+      },
+      {
+        id: 'risk-aws',
+        title: 'Extended AWS us-east-1 disruption',
+        category: 'Technology failure',
+        description:
+          'The agent portal is single-region; a prolonged regional impairment removes agent self-service and new business quoting.',
+        processIds: ['agent-portal', 'underwriting'],
+        dependencies: ['AWS (us-east-1)', 'Agent portal (AWS-hosted)'],
+        likelihood: 2,
+        likelihoodRationale:
+          'Region-wide impairments have occurred roughly every two years, typically measured in hours rather than days.',
+        existingControls: 'Daily snapshots to a second region; no standby environment running.',
+        treatment: 'accept',
+        treatmentAction:
+          'Accepted for now: agents can transact by phone through the contact center, and the portal is Tier 3.',
+        owner: 'Priya Raman',
+        targetDate: null,
+        status: 'accepted',
+        updatedAt: ts,
+      },
+      {
+        id: 'risk-winter',
+        title: 'Severe winter storm closing the Rochester site',
+        category: 'Natural hazard',
+        description:
+          'Lake-effect snow and a driving ban keep staff away from the Rochester site for two to three days during renewal season.',
+        processIds: ['contact-center', 'claims', 'policy-admin'],
+        dependencies: ['Rochester HQ, floor 2', 'Rochester HQ, floor 3'],
+        likelihood: 4,
+        likelihoodRationale:
+          'Driving bans have been declared in three of the last five winters; this is a question of when, not if.',
+        existingControls:
+          'Contact center runs remotely on softphones. Policy services staff have laptops but no VPN capacity test above 60 concurrent users.',
+        treatment: 'reduce',
+        treatmentAction:
+          'Load-test remote access at full headcount before November and publish the severe weather working procedure.',
+        owner: 'Dana Whitfield',
+        targetDate: '2026-10-31',
+        status: 'treating',
+        updatedAt: ts,
+      },
+      {
+        id: 'risk-keyperson',
+        title: 'Loss of the payroll specialist team',
+        category: 'Workforce disruption',
+        description:
+          'Both payroll specialists are unavailable across a pay run, with no cross-trained cover.',
+        processIds: ['payroll'],
+        dependencies: ['ADP Workforce Now'],
+        likelihood: 2,
+        likelihoodRationale:
+          'A two-person team with overlapping leave patterns; one departure in the last two years took four months to backfill.',
+        existingControls: 'ADP support can run an emergency repeat of the previous cycle.',
+        treatment: 'reduce',
+        treatmentAction: 'Cross-train two HR generalists and document the pay run end to end.',
+        owner: 'Elena Sorensen',
+        targetDate: '2027-02-28',
+        status: 'open',
+        updatedAt: ts,
+      },
+    ],
     plan: {
       declarationAuthority:
         'Chief Operating Officer; in their absence the Incident Commander, confirmed to the CEO within 1 hour.',

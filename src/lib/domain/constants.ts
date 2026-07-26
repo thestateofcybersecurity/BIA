@@ -9,6 +9,9 @@ import type {
   DependencyClass,
   ActivationLevel,
   RecoveryStrategy,
+  Likelihood,
+  RiskTreatment,
+  RiskBand,
 } from './types';
 
 export const HORIZONS: Horizon[] = ['h4', 'h24', 'd3', 'w1', 'm1'];
@@ -163,6 +166,76 @@ export const DEPENDENCY_LABELS: Record<DependencyClass, string> = {
 
 /** RTO should leave headroom below MTPD. */
 export const RTO_BUFFER_FRACTION = 0.8;
+
+export const LIKELIHOODS: Likelihood[] = [0, 1, 2, 3, 4];
+
+export const LIKELIHOOD_LABELS: Record<Likelihood, string> = {
+  0: 'Rare',
+  1: 'Unlikely',
+  2: 'Possible',
+  3: 'Likely',
+  4: 'Almost certain',
+};
+
+/** Anchored to expected frequency so different assessors rate alike. */
+export const LIKELIHOOD_ANCHORS: Record<Likelihood, string> = {
+  0: 'Not expected within ten years; no known occurrence in the sector.',
+  1: 'Plausible within five to ten years; has happened to comparable organizations.',
+  2: 'Expected within two to five years; has happened in the sector recently.',
+  3: 'Expected within one to two years; near misses or partial occurrences already seen here.',
+  4: 'Expected within the year, or it has already occurred here in the last twelve months.',
+};
+
+export const RISK_CATEGORIES = [
+  'Cyber attack',
+  'Technology failure',
+  'Supplier or third-party failure',
+  'Facility loss',
+  'Natural hazard',
+  'Workforce disruption',
+  'Utility or infrastructure',
+  'Regulatory or legal',
+];
+
+export const RISK_TREATMENTS: RiskTreatment[] = ['avoid', 'reduce', 'transfer', 'accept'];
+
+export const TREATMENT_LABELS: Record<RiskTreatment, string> = {
+  avoid: 'Avoid',
+  reduce: 'Reduce',
+  transfer: 'Transfer',
+  accept: 'Accept',
+};
+
+export const TREATMENT_DESCRIPTIONS: Record<RiskTreatment, string> = {
+  avoid: 'Stop doing the thing that creates the exposure, or remove the dependency entirely.',
+  reduce: 'Lower the likelihood with controls, or the impact with continuity capability.',
+  transfer: 'Move the financial consequence elsewhere through insurance or contract terms. The disruption still happens.',
+  accept: 'A documented decision to carry the risk as it stands, made with the rating visible.',
+};
+
+/** Impact axis of the risk matrix: derived from the tier it came from. */
+export const RISK_IMPACT_LABELS: Record<0 | 1 | 2 | 3 | 4, string> = {
+  0: 'None',
+  1: 'T4 Deferrable',
+  2: 'T3 Important',
+  3: 'T2 Essential',
+  4: 'T1 Critical',
+};
+
+export const RISK_BAND_LABELS: Record<RiskBand, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  critical: 'Critical',
+};
+
+/** Score = likelihood x impact on the shared 0-4 scales, so 0 to 16. */
+export const RISK_BAND_THRESHOLDS: { band: RiskBand; min: number }[] = [
+  { band: 'critical', min: 12 },
+  { band: 'high', min: 8 },
+  { band: 'medium', min: 4 },
+  { band: 'low', min: 0 },
+];
 
 export const RECOVERY_STRATEGIES: RecoveryStrategy[] = [
   'workaround',
