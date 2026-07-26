@@ -120,7 +120,15 @@ Per process:
 - **MBCO**: minimum acceptable service level (% of normal output) during recovery.
 - **Achievable RTO / RPO**: what current capability can actually deliver.
 
-**Gap = achievable minus target.** Any positive gap creates an entry in the gap register with a severity, owner, remediation action, and status. RTO gap severity rates against MTPD headroom: high when achievable recovery lands beyond the MTPD, medium when it lands inside the 20% buffer zone, low otherwise. RPO gaps, and RTO gaps where no MTPD has been derived yet, rate on the size of the shortfall relative to the target: high at 3x the target or more, medium at 1x or more, low otherwise. The gap register is the primary output driving investment decisions.
+**Gap = achievable minus target.** Any positive gap creates an entry in the gap register with a severity, owner, remediation action, chosen continuity strategy, estimated cost, target close date, and status. RTO gap severity rates against MTPD headroom: high when achievable recovery lands beyond the MTPD, medium when it lands inside the 20% buffer zone, low otherwise. RPO gaps, and RTO gaps where no MTPD has been derived yet, rate on the size of the shortfall relative to the target: high at 3x the target or more, medium at 1x or more, low otherwise. The gap register is the primary output driving investment decisions.
+
+### Continuity strategy and the investment case (ISO 22301 cl. 8.3)
+
+Identifying a gap is not the same as deciding how to close it. Each gap records the **strategy** that closes it, chosen from the standard options: manual workaround, alternate site or workspace, standby system or replication, third-party or outsourced service, additional capacity, improved data protection, or an explicit decision to accept the risk.
+
+Each gap is also priced from data the assessment already holds. **Exposure** is the additional loss from restoring at the achievable time instead of the target: the downtime cost curve is read at both times and the difference taken. Between assessed horizons the curve is interpolated linearly; before the first horizon it runs from zero; beyond the last assessed horizon it is held flat rather than extrapolated, since nothing in the assessment supports a claim about that region. RPO gaps are data loss rather than downtime, so the curve cannot price them and they are reported as not costed instead of guessed.
+
+Placing the remediation cost beside the exposure makes the investment case explicit: spending less than a single occurrence costs is straightforward to defend, and spending more requires an argument about event frequency or about the non-financial impacts (safety, licence to operate) that the financial curve does not capture. The comparison is per occurrence, not annualised, because the BIA deliberately does not estimate likelihood; that is the risk assessment's job.
 
 ### Governance
 

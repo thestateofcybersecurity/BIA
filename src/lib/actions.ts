@@ -231,6 +231,20 @@ const remediationSchema = z.object({
   owner: z.string(),
   action: z.string(),
   status: z.enum(['open', 'in_progress', 'resolved', 'accepted']),
+  strategy: z
+    .enum([
+      'workaround',
+      'alternate_site',
+      'standby',
+      'third_party',
+      'capacity',
+      'data_protection',
+      'accept',
+    ])
+    .nullable()
+    .optional(),
+  estimatedCost: z.number().min(0).nullable().optional(),
+  targetDate: z.string().nullable().optional(),
 });
 
 export async function saveRemediation(input: z.infer<typeof remediationSchema>) {

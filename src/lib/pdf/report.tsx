@@ -7,7 +7,13 @@ import {
   StyleSheet,
 } from '@react-pdf/renderer';
 import type { Workspace, Tier, Severity, Horizon } from '@/lib/domain/types';
-import { deriveAll, computeGaps, REVIEW_INTERVAL_MONTHS } from '@/lib/domain/scoring';
+import {
+  deriveAll,
+  computeGaps,
+  gapExposure,
+  REVIEW_INTERVAL_MONTHS,
+  type GapInfo,
+} from '@/lib/domain/scoring';
 import { scoreMaturity, MATURITY_DOMAINS } from '@/lib/domain/maturity';
 import {
   rollDownRequirements,
@@ -26,6 +32,7 @@ import {
   RATED_CATEGORIES,
   SEVERITY_LABELS,
   ACTIVATION_LABELS,
+  STRATEGY_LABELS,
 } from '@/lib/domain/constants';
 import { formatCurrency, formatCompactCurrency, formatHours, formatDate } from '@/lib/format';
 
@@ -248,6 +255,8 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
     .sort((a, b) => (a.tier ?? 9) - (b.tier ?? 9) || a.p.name.localeCompare(b.p.name));
   const remFor = (processId: string, kind: 'rto' | 'rpo') =>
     ws.remediations.find((r) => r.processId === processId && r.kind === kind);
+  const exposureFor = (gap: GapInfo) =>
+    gapExposure(ws.assessments.find((a) => a.processId === gap.processId), gap);
 
   const approvals = ranked.filter(({ a }) => a?.approvedBy);
   const completedSessions = ws.exercises.filter((e) => e.status === 'completed');
@@ -623,30 +632,47 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
             <Text style={s.subTitle}>Gap register</Text>
             <View style={s.table}>
               <View style={s.thRow}>
-                <Th width="22%">Process</Th>
-                <Th width="8%">Gap</Th>
-                <Th width="16%">Target / achievable</Th>
+                <Th width="18%">Process</Th>
+                <Th width="7%">Gap</Th>
+                <Th width="13%">Target / achiev.</Th>
                 <Th width="10%">Severity</Th>
-                <Th width="14%">Owner</Th>
-                <Th width="20%">Remediation</Th>
-                <Th width="10%">Status</Th>
+                <Th width="10%">Exposure</Th>
+                <Th width="12%">Owner</Th>
+                <Th width="20%">Remediation & strategy</Th>
+                <Th width="10%">Cost / due</Th>
               </View>
               {gaps.map((g, i) => {
                 const rem = remFor(g.processId, g.kind);
                 const sevColor = g.severity === 'high' ? BAD : g.severity === 'medium' ? WARN : MUTED;
+                const exposure = exposureFor(g);
                 return (
                   <View key={`${g.processId}-${g.kind}`} style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}>
-                    <Td width="22%" strong>{nameOf(g.processId)}</Td>
-                    <Td width="8%">{g.kind.toUpperCase()}</Td>
-                    <Td width="16%">
+                    <Td width="18%" strong>{nameOf(g.processId)}</Td>
+                    <Td width="7%">{g.kind.toUpperCase()}</Td>
+                    <Td width="13%">
                       {formatHours(g.targetHours)} / {formatHours(g.achievableHours)}
                     </Td>
                     <Td width="10%" color={sevColor} strong>
                       +{formatHours(g.gapHours)} {g.severity}
                     </Td>
-                    <Td width="14%">{rem?.owner || 'Unassigned'}</Td>
-                    <Td width="20%">{rem?.action || 'Not defined'}</Td>
-                    <Td width="10%">{(rem?.status ?? 'open').replace('_', ' ')}</Td>
+                    <Td width="10%">
+                      {exposure != null ? formatCompactCurrency(exposure, currency) : '·'}
+                    </Td>
+                    <Td width="12%">{rem?.owner || 'Unassigned'}</Td>
+                    <Td width="20%">
+                      {`${rem?.action || 'Not defined'}${rem?.strategy ? ` (${STRATEGY_LABELS[rem.strategy]})` : ''}`}
+                    </Td>
+                    <Td width="10%">
+                      {[
+                        rem?.estimatedCost != null
+                          ? formatCompactCurrency(rem.estimatedCost, currency)
+                          : null,
+                        rem?.targetDate ? formatDate(rem.targetDate) : null,
+                        (rem?.status ?? 'open').replace('_', ' '),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Td>
                   </View>
                 );
               })}

@@ -106,6 +106,16 @@ export interface RecoveryResourceProfile {
 export type GapKind = 'rto' | 'rpo';
 export type GapStatus = 'open' | 'in_progress' | 'resolved' | 'accepted';
 
+/** Continuity strategy options (ISO 22301 cl. 8.3) chosen to close a gap. */
+export type RecoveryStrategy =
+  | 'workaround'
+  | 'alternate_site'
+  | 'standby'
+  | 'third_party'
+  | 'capacity'
+  | 'data_protection'
+  | 'accept';
+
 export interface GapRemediation {
   id: string;
   processId: string;
@@ -113,6 +123,12 @@ export interface GapRemediation {
   owner: string;
   action: string;
   status: GapStatus;
+  /** Which continuity strategy the action implements. */
+  strategy?: RecoveryStrategy | null;
+  /** One-off plus first-year cost of the strategy, in org currency. */
+  estimatedCost?: number | null;
+  /** ISO date (yyyy-mm-dd) the gap is due to be closed. */
+  targetDate?: string | null;
   updatedAt: string;
 }
 

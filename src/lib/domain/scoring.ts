@@ -273,6 +273,51 @@ export function computeGaps(
   return gaps;
 }
 
+/**
+ * Cumulative downtime loss at an arbitrary number of hours, read off the
+ * assessed cost curve. Between assessed horizons the curve is interpolated
+ * linearly; before the first horizon it runs from zero; beyond the last
+ * assessed horizon it is held flat rather than extrapolated, because nothing
+ * in the assessment supports a claim about that region.
+ */
+export function cumulativeLossAt(
+  assessment: ImpactAssessment,
+  hours: number
+): number | null {
+  const points: [number, number][] = [];
+  for (const h of HORIZONS) {
+    const value = assessment.financialLoss[h];
+    if (value != null) points.push([HORIZON_HOURS[h], value]);
+  }
+  if (points.length === 0) return null;
+  if (hours <= 0) return 0;
+  const [firstHours, firstLoss] = points[0];
+  if (hours <= firstHours) return (firstLoss * hours) / firstHours;
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x0, y0] = points[i];
+    const [x1, y1] = points[i + 1];
+    if (hours <= x1) return y0 + ((y1 - y0) * (hours - x0)) / (x1 - x0);
+  }
+  return points[points.length - 1][1];
+}
+
+/**
+ * What the shortfall actually costs: the extra loss incurred by restoring at
+ * the achievable time instead of the target. RPO gaps are data loss rather
+ * than downtime, so the downtime curve cannot price them and this returns
+ * null instead of guessing.
+ */
+export function gapExposure(
+  assessment: ImpactAssessment | undefined,
+  gap: GapInfo
+): number | null {
+  if (!assessment || gap.kind !== 'rto') return null;
+  const late = cumulativeLossAt(assessment, gap.achievableHours);
+  const onTime = cumulativeLossAt(assessment, gap.targetHours);
+  if (late == null || onTime == null) return null;
+  return Math.max(0, Math.round(late - onTime));
+}
+
 /** Sum of recovery step durations vs the RTO target. */
 export function workflowVsRto(
   totalStepHours: number,

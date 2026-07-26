@@ -298,8 +298,8 @@ export function sampleWorkspace(): Workspace {
       { id: 'o6', processId: 'payroll', rtoTargetHours: 96, rpoTargetHours: 24, mbcoPercent: 100, rtoAchievableHours: 48, rpoAchievableHours: 24, wrtHours: 24, dataLossNotes: 'ADP holds primary records.', updatedAt: ts },
     ],
     remediations: [
-      { id: 'r1', processId: 'claims', kind: 'rto', owner: 'Marcus Yee', action: 'Contract and test backup payment processor; document manual adjudication workaround for 72h operation.', status: 'in_progress', updatedAt: ts },
-      { id: 'r2', processId: 'billing', kind: 'rpo', owner: 'Tom Okafor', action: 'Enable intraday replication for payment transactions.', status: 'open', updatedAt: ts },
+      { id: 'r1', processId: 'claims', kind: 'rto', owner: 'Marcus Yee', action: 'Contract and test backup payment processor; document manual adjudication workaround for 72h operation.', status: 'in_progress', strategy: 'third_party', estimatedCost: 85_000, targetDate: '2026-11-30', updatedAt: ts },
+      { id: 'r2', processId: 'billing', kind: 'rpo', owner: 'Tom Okafor', action: 'Enable intraday replication for payment transactions.', status: 'open', strategy: 'data_protection', estimatedCost: 40_000, targetDate: '2027-03-31', updatedAt: ts },
     ],
     workflows: [
       {

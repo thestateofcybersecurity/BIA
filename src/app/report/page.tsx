@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { loadWorkspace } from '@/lib/actions';
-import { deriveAll, computeGaps } from '@/lib/domain/scoring';
+import { deriveAll, computeGaps, gapExposure, type GapInfo } from '@/lib/domain/scoring';
 import { scoreMaturity, MATURITY_DOMAINS } from '@/lib/domain/maturity';
 import { CATALOG } from '@/lib/domain/scenarios';
 import {
@@ -16,6 +16,7 @@ import {
   HORIZONS,
   HORIZON_LABELS,
   ACTIVATION_LABELS,
+  STRATEGY_LABELS,
 } from '@/lib/domain/constants';
 import type { Tier } from '@/lib/domain/types';
 import { PageHeader, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
@@ -100,6 +101,13 @@ export default async function ReportPage() {
     .sort((a, b) => (a.tier ?? 9) - (b.tier ?? 9) || a.p.name.localeCompare(b.p.name));
   const remFor = (processId: string, kind: 'rto' | 'rpo') =>
     ws.remediations.find((r) => r.processId === processId && r.kind === kind);
+  const exposureFor = (gap: GapInfo) =>
+    gapExposure(ws.assessments.find((a) => a.processId === gap.processId), gap);
+  const totalExposure = gaps.reduce((sum, g) => sum + (exposureFor(g) ?? 0), 0);
+  const totalRemediationCost = ws.remediations.reduce(
+    (sum, r) => sum + (r.estimatedCost ?? 0),
+    0
+  );
 
   return (
     <>
@@ -178,8 +186,11 @@ export default async function ReportPage() {
             estimated {formatCurrency(cost24, currency)} in cumulative losses, rising to{' '}
             {formatCurrency(cost1w, currency)} at one week. {gaps.length} recovery gap
             {gaps.length === 1 ? '' : 's'} {gaps.length === 1 ? 'is' : 'are'} currently on
-            the register{gaps.length > 0 ? ', detailed in section 06' : ''}. Overall program
-            maturity is{' '}
+            the register{gaps.length > 0 ? ', detailed in section 06' : ''}
+            {totalExposure > 0
+              ? `, carrying ${formatCurrency(totalExposure, currency)} of additional loss exposure per occurrence against ${formatCurrency(totalRemediationCost, currency)} of costed remediation`
+              : ''}
+            . Overall program maturity is{' '}
             {maturity.overall != null ? `${maturity.overall.toFixed(1)} of 5` : 'not yet assessed'}
             .
           </p>
@@ -358,7 +369,16 @@ export default async function ReportPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr>
-                    {['Process', 'Gap', 'Shortfall', 'Owner', 'Remediation', 'Status'].map((h) => (
+                    {[
+                      'Process',
+                      'Gap',
+                      'Shortfall',
+                      'Exposure',
+                      'Owner',
+                      'Remediation & strategy',
+                      'Cost / due',
+                      'Status',
+                    ].map((h) => (
                       <th key={h} className={th}>{h}</th>
                     ))}
                   </tr>
@@ -375,8 +395,28 @@ export default async function ReportPage() {
                             +{formatHours(g.gapHours)}
                           </StatusPill>
                         </td>
+                        <td className={`${td} tnum font-mono text-xs`}>
+                          {exposureFor(g) != null
+                            ? formatCompactCurrency(exposureFor(g)!, currency)
+                            : '·'}
+                        </td>
                         <td className={td}>{rem?.owner || 'Unassigned'}</td>
-                        <td className={`${td} max-w-xs text-xs`}>{rem?.action || 'Not defined'}</td>
+                        <td className={`${td} max-w-xs text-xs`}>
+                          {rem?.action || 'Not defined'}
+                          {rem?.strategy ? (
+                            <span className="block text-ink-muted">
+                              {STRATEGY_LABELS[rem.strategy]}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className={`${td} tnum font-mono text-xs`}>
+                          {rem?.estimatedCost != null
+                            ? formatCompactCurrency(rem.estimatedCost, currency)
+                            : '·'}
+                          {rem?.targetDate ? (
+                            <span className="block">{formatDate(rem.targetDate)}</span>
+                          ) : null}
+                        </td>
                         <td className={`${td} font-mono text-xs uppercase`}>{rem?.status.replace('_', ' ') ?? 'open'}</td>
                       </tr>
                     );

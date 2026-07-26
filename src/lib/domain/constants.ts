@@ -8,6 +8,7 @@ import type {
   Tier,
   DependencyClass,
   ActivationLevel,
+  RecoveryStrategy,
 } from './types';
 
 export const HORIZONS: Horizon[] = ['h4', 'h24', 'd3', 'w1', 'm1'];
@@ -162,6 +163,43 @@ export const DEPENDENCY_LABELS: Record<DependencyClass, string> = {
 
 /** RTO should leave headroom below MTPD. */
 export const RTO_BUFFER_FRACTION = 0.8;
+
+export const RECOVERY_STRATEGIES: RecoveryStrategy[] = [
+  'workaround',
+  'alternate_site',
+  'standby',
+  'third_party',
+  'capacity',
+  'data_protection',
+  'accept',
+];
+
+export const STRATEGY_LABELS: Record<RecoveryStrategy, string> = {
+  workaround: 'Manual workaround',
+  alternate_site: 'Alternate site or workspace',
+  standby: 'Standby system or replication',
+  third_party: 'Third-party or outsourced service',
+  capacity: 'Additional capacity (people or equipment)',
+  data_protection: 'Improved backup or data protection',
+  accept: 'Accept the risk',
+};
+
+export const STRATEGY_DESCRIPTIONS: Record<RecoveryStrategy, string> = {
+  workaround:
+    'Documented manual or degraded-mode procedure that keeps the process running without the failed resource. Cheapest option; needs rehearsal to be real.',
+  alternate_site:
+    'Relocation to another workspace, whether a company site, a reciprocal arrangement, or remote working at scale.',
+  standby:
+    'Warm or hot standby, clustering, or replication so the technical service fails over inside the RTO.',
+  third_party:
+    'A contracted provider takes the load, with continuity obligations written into the contract.',
+  capacity:
+    'Cross-trained staff, spare equipment, or surge arrangements that restore throughput rather than systems.',
+  data_protection:
+    'More frequent backups, replication, or journalling; the usual answer to an RPO gap rather than an RTO gap.',
+  accept:
+    'A documented decision to tolerate the shortfall, signed off with the exposure understood.',
+};
 
 export const ACTIVATION_LEVELS: ActivationLevel[] = ['monitor', 'partial', 'full'];
 

@@ -9,17 +9,25 @@ import type {
   MtpdValue,
   Tier,
   GapStatus,
+  RecoveryStrategy,
 } from '@/lib/domain/types';
-import { MTPD_LABELS } from '@/lib/domain/constants';
+import {
+  MTPD_LABELS,
+  RECOVERY_STRATEGIES,
+  STRATEGY_LABELS,
+  STRATEGY_DESCRIPTIONS,
+} from '@/lib/domain/constants';
 import { validateRto, computeGaps, type GapInfo } from '@/lib/domain/scoring';
 import { Card, btn, StatusPill, TierBadge } from '@/components/ui';
-import { formatHours } from '@/lib/format';
+import { formatHours, formatCompactCurrency, formatCurrency } from '@/lib/format';
 
 interface ProcessRow {
   id: string;
   name: string;
   mtpd: MtpdValue | null;
   tier: Tier | null;
+  /** Extra loss from restoring at the achievable time instead of the target. */
+  exposure: Record<'rto' | 'rpo', number | null>;
 }
 
 const num = (v: string): number | null => (v === '' ? null : Math.max(0, Number(v)));
@@ -113,10 +121,14 @@ function RemediationEditor({
   gap,
   processName,
   initial,
+  exposure,
+  currency,
 }: {
   gap: GapInfo;
   processName: string;
   initial: GapRemediation | null;
+  exposure: number | null;
+  currency: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -124,8 +136,18 @@ function RemediationEditor({
     owner: initial?.owner ?? '',
     action: initial?.action ?? '',
     status: (initial?.status ?? 'open') as GapStatus,
+    strategy: (initial?.strategy ?? null) as RecoveryStrategy | null,
+    estimatedCost: initial?.estimatedCost ?? null,
+    targetDate: initial?.targetDate ?? '',
   });
   const [dirty, setDirty] = useState(false);
+  const change = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
+    setDirty(true);
+    setForm((f) => ({ ...f, [k]: v }));
+  };
+
+  const cost = form.estimatedCost;
+  const worthIt = cost != null && exposure != null && exposure > 0 ? cost < exposure : null;
 
   return (
     <tr className="border-b border-line/60 align-top last:border-0">
@@ -140,28 +162,85 @@ function RemediationEditor({
         <StatusPill tone={gap.severity === 'high' ? 'bad' : gap.severity === 'medium' ? 'warn' : 'neutral'}>
           +{formatHours(gap.gapHours)} {gap.severity}
         </StatusPill>
+        <p className="tnum mt-1 whitespace-nowrap font-mono text-[10px] text-ink-muted">
+          {exposure != null ? `${formatCompactCurrency(exposure, currency)} exposure` : 'not costed'}
+        </p>
       </td>
       <td className="py-3 pr-3">
         <input
           className="!py-1 text-xs"
           value={form.owner}
           placeholder="Owner"
-          onChange={(e) => { setDirty(true); setForm((f) => ({ ...f, owner: e.target.value })); }}
+          onChange={(e) => change('owner', e.target.value)}
         />
       </td>
-      <td className="w-2/5 py-3 pr-3">
-        <input
-          className="w-full !py-1 text-xs"
-          value={form.action}
-          placeholder="Remediation action"
-          onChange={(e) => { setDirty(true); setForm((f) => ({ ...f, action: e.target.value })); }}
-        />
+      <td className="w-1/3 py-3 pr-3">
+        <div className="flex flex-col gap-1.5">
+          <input
+            className="w-full !py-1 text-xs"
+            value={form.action}
+            placeholder="Remediation action"
+            onChange={(e) => change('action', e.target.value)}
+          />
+          <select
+            className="!py-1 text-xs"
+            aria-label="Continuity strategy"
+            value={form.strategy ?? ''}
+            onChange={(e) =>
+              change('strategy', e.target.value === '' ? null : (e.target.value as RecoveryStrategy))
+            }
+          >
+            <option value="">Strategy not chosen</option>
+            {RECOVERY_STRATEGIES.map((s) => (
+              <option key={s} value={s}>
+                {STRATEGY_LABELS[s]}
+              </option>
+            ))}
+          </select>
+          {form.strategy && (
+            <p className="text-[10px] leading-snug text-ink-muted">
+              {STRATEGY_DESCRIPTIONS[form.strategy]}
+            </p>
+          )}
+        </div>
+      </td>
+      <td className="py-3 pr-3">
+        <div className="flex flex-col gap-1.5">
+          <input
+            className="!py-1 text-xs"
+            type="number"
+            min={0}
+            aria-label="Estimated cost"
+            value={form.estimatedCost ?? ''}
+            placeholder="Cost"
+            onChange={(e) =>
+              change('estimatedCost', e.target.value === '' ? null : Math.max(0, Number(e.target.value)))
+            }
+          />
+          <input
+            className="!py-1 text-xs"
+            type="date"
+            aria-label="Target close date"
+            value={form.targetDate ?? ''}
+            onChange={(e) => change('targetDate', e.target.value)}
+          />
+          {worthIt !== null && (
+            <p
+              className={`text-[10px] leading-snug ${worthIt ? 'text-ok' : 'text-warn'}`}
+              title={`Cost ${formatCurrency(cost!, currency)} vs exposure ${formatCurrency(exposure!, currency)}`}
+            >
+              {worthIt
+                ? 'Costs less than a single occurrence of the gap.'
+                : 'Costs more than one occurrence; justify on frequency or non-financial impact.'}
+            </p>
+          )}
+        </div>
       </td>
       <td className="py-3 pr-3">
         <select
           className="!py-1 text-xs"
           value={form.status}
-          onChange={(e) => { setDirty(true); setForm((f) => ({ ...f, status: e.target.value as GapStatus })); }}
+          onChange={(e) => change('status', e.target.value as GapStatus)}
         >
           <option value="open">Open</option>
           <option value="in_progress">In progress</option>
@@ -175,7 +254,12 @@ function RemediationEditor({
           disabled={pending || !dirty}
           onClick={() =>
             start(async () => {
-              await saveRemediation({ processId: gap.processId, kind: gap.kind, ...form });
+              await saveRemediation({
+                processId: gap.processId,
+                kind: gap.kind,
+                ...form,
+                targetDate: form.targetDate === '' ? null : form.targetDate,
+              });
               setDirty(false);
               router.refresh();
             })
@@ -192,10 +276,12 @@ export function GapsClient({
   processes,
   objectives,
   remediations,
+  currency,
 }: {
   processes: ProcessRow[];
   objectives: RecoveryObjectives[];
   remediations: GapRemediation[];
+  currency: string;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -204,6 +290,15 @@ export function GapsClient({
     const o = objectiveFor(p.id);
     return o ? computeGaps(o, p.mtpd) : [];
   });
+
+  const totalExposure = gaps.reduce((sum, g) => {
+    const p = processes.find((x) => x.id === g.processId);
+    return sum + (p?.exposure[g.kind] ?? 0);
+  }, 0);
+  const totalCost = gaps.reduce((sum, g) => {
+    const r = remediations.find((x) => x.processId === g.processId && x.kind === g.kind);
+    return sum + (r?.estimatedCost ?? 0);
+  }, 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -288,7 +383,11 @@ export function GapsClient({
 
       <Card
         title="Gap register"
-        subtitle="Every process whose achievable recovery falls short of its target"
+        subtitle={
+          totalExposure > 0
+            ? `${formatCompactCurrency(totalExposure, currency)} of exposure on the register, ${formatCompactCurrency(totalCost, currency)} of remediation costed`
+            : 'Every process whose achievable recovery falls short of its target'
+        }
       >
         {gaps.length === 0 ? (
           <p className="text-sm text-ink-muted">
@@ -300,7 +399,16 @@ export function GapsClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line text-left">
-                  {['Process', 'Target → achievable', 'Gap', 'Owner', 'Remediation', 'Status', ''].map((h, i) => (
+                  {[
+                    'Process',
+                    'Target → achievable',
+                    'Gap & exposure',
+                    'Owner',
+                    'Remediation & strategy',
+                    'Cost & due date',
+                    'Status',
+                    '',
+                  ].map((h, i) => (
                     <th key={i} className="pb-2 pr-3 font-mono text-[10px] font-normal uppercase tracking-wider text-ink-muted">
                       {h}
                     </th>
@@ -318,6 +426,10 @@ export function GapsClient({
                         (r) => r.processId === g.processId && r.kind === g.kind
                       ) ?? null
                     }
+                    exposure={
+                      processes.find((p) => p.id === g.processId)?.exposure[g.kind] ?? null
+                    }
+                    currency={currency}
                   />
                 ))}
               </tbody>

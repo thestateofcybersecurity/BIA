@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { loadWorkspace } from '@/lib/actions';
-import { deriveAll } from '@/lib/domain/scoring';
+import { deriveAll, computeGaps, gapExposure } from '@/lib/domain/scoring';
 import { PageHeader, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { GapsClient } from './gaps-client';
@@ -42,6 +42,20 @@ export default async function GapsPage() {
             status, but it should be a decision, not a default. Closing a gap means improving the
             achievable value, then re-entering it here.
           </li>
+          <li>
+            <strong>Exposure</strong> is the extra loss from restoring at the achievable time
+            rather than the target, read off the downtime cost curve you already entered. Put the
+            remediation cost beside it and the investment case writes itself: spending less than a
+            single occurrence costs is easy to defend, spending more needs an argument about
+            frequency or about the non-financial impacts (safety, licence to operate) that money
+            does not capture. RPO gaps are data loss rather than downtime, so the curve cannot
+            price them and they show as not costed.
+          </li>
+          <li>
+            <strong>Strategy</strong> records how the gap gets closed (workaround, alternate site,
+            standby, third party, capacity, data protection, or accept). It is the ISO 22301
+            clause 8.3 decision that sits between identifying a gap and funding the fix.
+          </li>
         </ul>
       </HelpBox>
       {ws.processes.length === 0 ? (
@@ -55,14 +69,26 @@ export default async function GapsPage() {
         </EmptyState>
       ) : (
         <GapsClient
-          processes={ws.processes.map((p) => ({
-            id: p.id,
-            name: p.name,
-            mtpd: derived.get(p.id)?.mtpd ?? null,
-            tier: derived.get(p.id)?.tier ?? null,
-          }))}
+          processes={ws.processes.map((p) => {
+            const assessment = ws.assessments.find((a) => a.processId === p.id);
+            const objectives = ws.objectives.find((o) => o.processId === p.id);
+            const mtpd = derived.get(p.id)?.mtpd ?? null;
+            const gaps = objectives ? computeGaps(objectives, mtpd) : [];
+            const exposureFor = (kind: 'rto' | 'rpo') => {
+              const gap = gaps.find((g) => g.kind === kind);
+              return gap ? gapExposure(assessment, gap) : null;
+            };
+            return {
+              id: p.id,
+              name: p.name,
+              mtpd,
+              tier: derived.get(p.id)?.tier ?? null,
+              exposure: { rto: exposureFor('rto'), rpo: exposureFor('rpo') },
+            };
+          })}
           objectives={ws.objectives}
           remediations={ws.remediations}
+          currency={ws.org?.currency ?? 'USD'}
         />
       )}
     </>
