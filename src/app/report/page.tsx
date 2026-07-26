@@ -15,6 +15,7 @@ import {
   DEPENDENCY_LABELS,
   HORIZONS,
   HORIZON_LABELS,
+  ACTIVATION_LABELS,
 } from '@/lib/domain/constants';
 import type { Tier } from '@/lib/domain/types';
 import { PageHeader, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
@@ -54,7 +55,7 @@ export default async function ReportPage() {
   if (!ws.org || ws.processes.length === 0) {
     return (
       <>
-        <PageHeader kicker="Step 09" title="Business continuity plan" />
+        <PageHeader kicker="Step 10" title="Business continuity plan" />
         <EmptyState
           title="Not enough data for a report"
           body="The report is generated entirely from your assessment data: organization profile, processes, impact assessments, recovery objectives, and maturity results. Nothing is boilerplate."
@@ -92,6 +93,11 @@ export default async function ReportPage() {
   const rollDown = rollDownRequirements(ws);
   const chain = processChainRequirements(ws);
   const cycles = detectDependencyCycles(ws);
+  const plan = ws.plan;
+  const contactDirectory = ws.processes
+    .map((p) => ({ p, tier: derived.get(p.id)?.tier ?? null }))
+    .filter(({ p }) => p.owner.trim().length > 0)
+    .sort((a, b) => (a.tier ?? 9) - (b.tier ?? 9) || a.p.name.localeCompare(b.p.name));
   const remFor = (processId: string, kind: 'rto' | 'rpo') =>
     ws.remediations.find((r) => r.processId === processId && r.kind === kind);
 
@@ -99,7 +105,7 @@ export default async function ReportPage() {
     <>
       <div className="no-print">
         <PageHeader
-          kicker="Step 09"
+          kicker="Step 10"
           title="Business continuity plan"
           intro="Preview below; the download produces the official PDF document with cover page, document control, approvals, and page numbering."
           actions={
@@ -381,7 +387,148 @@ export default async function ReportPage() {
           )}
         </Section>
 
-        <Section num="07" title="Recovery workflows">
+        <Section num="07" title="Plan activation & response team">
+          {!plan ? (
+            <p className="text-sm text-ink-muted">
+              No activation plan recorded yet. Without declaration criteria, a response roster, and
+              a communications plan, the analysis above cannot be executed during an incident.
+            </p>
+          ) : (
+            <>
+              <table className="mb-5 w-full text-sm">
+                <tbody>
+                  {[
+                    ['Declaration authority', plan.declarationAuthority],
+                    ['Stand-down authority', plan.standDownAuthority],
+                    ['Command location', plan.commandLocation],
+                    ['Response bridge', plan.bridgeDetails],
+                  ].map(([label, value]) => (
+                    <tr key={label}>
+                      <td className={`${td} w-52 font-mono text-[10px] uppercase tracking-wider text-ink-muted`}>
+                        {label}
+                      </td>
+                      <td className={td}>{value || 'Not specified'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {plan.triggers.length > 0 && (
+                <>
+                  <h3 className="mb-2 font-display text-lg font-semibold">Activation criteria</h3>
+                  <table className="mb-5 w-full text-sm">
+                    <thead>
+                      <tr>
+                        {['Level', 'Condition', 'Declared by'].map((h) => (
+                          <th key={h} className={th}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plan.triggers.map((t) => (
+                        <tr key={t.id}>
+                          <td className={td}>{ACTIVATION_LABELS[t.level]}</td>
+                          <td className={td}>{t.condition || 'Not specified'}</td>
+                          <td className={td}>{t.authority || 'Not specified'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+
+              {plan.team.length > 0 && (
+                <>
+                  <h3 className="mb-2 font-display text-lg font-semibold">Response team</h3>
+                  <table className="mb-5 w-full text-sm">
+                    <thead>
+                      <tr>
+                        {['Role', 'Name', 'Contact', 'Deputy'].map((h) => (
+                          <th key={h} className={th}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plan.team.map((m) => (
+                        <tr key={m.id}>
+                          <td className={td}>{m.role}</td>
+                          <td className={td}>
+                            {m.name}
+                            {m.title ? (
+                              <span className="block text-xs text-ink-muted">{m.title}</span>
+                            ) : null}
+                          </td>
+                          <td className={`${td} text-xs`}>
+                            {m.phone}
+                            {m.email ? <span className="block">{m.email}</span> : null}
+                          </td>
+                          <td className={`${td} text-xs`}>
+                            {m.deputy}
+                            {m.deputyPhone ? <span className="block">{m.deputyPhone}</span> : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+
+              {plan.communications.length > 0 && (
+                <>
+                  <h3 className="mb-2 font-display text-lg font-semibold">Communications</h3>
+                  <table className="mb-5 w-full text-sm">
+                    <thead>
+                      <tr>
+                        {['Audience', 'Channel', 'Timing', 'Owner', 'Key message'].map((h) => (
+                          <th key={h} className={th}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plan.communications.map((c) => (
+                        <tr key={c.id}>
+                          <td className={td}>{c.audience}</td>
+                          <td className={td}>{c.channel}</td>
+                          <td className={td}>{c.timing}</td>
+                          <td className={td}>{c.owner}</td>
+                          <td className={`${td} text-xs`}>{c.keyMessage}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </>
+          )}
+
+          {contactDirectory.length > 0 && (
+            <>
+              <h3 className="mb-2 font-display text-lg font-semibold">Process owner directory</h3>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    {['Process', 'Tier', 'Owner', 'Email', 'Phone'].map((h) => (
+                      <th key={h} className={th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {contactDirectory.map(({ p, tier }) => (
+                    <tr key={p.id}>
+                      <td className={td}>{p.name}</td>
+                      <td className={td}><TierBadge tier={tier} /></td>
+                      <td className={td}>{p.owner}</td>
+                      <td className={`${td} text-xs`}>{p.ownerEmail || '·'}</td>
+                      <td className={`${td} text-xs`}>{p.ownerPhone || '·'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </Section>
+
+        <Section num="08" title="Recovery workflows">
           {ws.workflows.length === 0 ? (
             <p className="text-sm text-ink-muted">No recovery workflows documented yet.</p>
           ) : (
@@ -470,7 +617,7 @@ export default async function ReportPage() {
           )}
         </Section>
 
-        <Section num="08" title="Dependency recovery requirements">
+        <Section num="09" title="Dependency recovery requirements">
           <p className="mb-3 text-sm leading-relaxed text-ink-soft">
             The BIA handed down to IT and third-party management: each application inherits the
             strictest recovery objectives of the processes that depend on it, and each supplier
@@ -568,7 +715,7 @@ export default async function ReportPage() {
           )}
         </Section>
 
-        <Section num="09" title="Exercise program">
+        <Section num="10" title="Exercise program">
           <p className="mb-3 text-sm leading-relaxed text-ink-soft">
             The following tabletop scenarios are available, generated from this plan&apos;s data.
             Recommended cadence: two exercises per year minimum, rotating categories, with
@@ -584,7 +731,7 @@ export default async function ReportPage() {
           </ul>
         </Section>
 
-        <Section num="10" title="Maturity & roadmap">
+        <Section num="11" title="Maturity & roadmap">
           {maturity.overall == null ? (
             <p className="text-sm text-ink-muted">Maturity assessment not yet completed.</p>
           ) : (

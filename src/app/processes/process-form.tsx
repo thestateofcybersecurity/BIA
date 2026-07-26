@@ -78,6 +78,8 @@ export function ProcessForm({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
     owner: initial?.owner ?? '',
+    ownerEmail: initial?.ownerEmail ?? '',
+    ownerPhone: initial?.ownerPhone ?? '',
     department: initial?.department ?? '',
     usersServed: initial?.usersServed ?? '',
     peakPeriods: initial?.peakPeriods ?? '',
@@ -142,6 +144,25 @@ export function ProcessForm({
               id="p-dept"
               value={form.department}
               onChange={(e) => set('department', e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="p-owner-email">Owner email</label>
+            <input
+              id="p-owner-email"
+              type="email"
+              value={form.ownerEmail}
+              onChange={(e) => set('ownerEmail', e.target.value)}
+              placeholder="Used for the plan directory and sign-off requests"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="p-owner-phone">Owner phone</label>
+            <input
+              id="p-owner-phone"
+              value={form.ownerPhone}
+              onChange={(e) => set('ownerPhone', e.target.value)}
+              placeholder="Reachable out of hours"
             />
           </div>
           <div className="flex flex-col gap-1">

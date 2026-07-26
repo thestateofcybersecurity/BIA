@@ -7,6 +7,7 @@ import type {
   RiskAppetite,
   Tier,
   DependencyClass,
+  ActivationLevel,
 } from './types';
 
 export const HORIZONS: Horizon[] = ['h4', 'h24', 'd3', 'w1', 'm1'];
@@ -161,3 +162,45 @@ export const DEPENDENCY_LABELS: Record<DependencyClass, string> = {
 
 /** RTO should leave headroom below MTPD. */
 export const RTO_BUFFER_FRACTION = 0.8;
+
+export const ACTIVATION_LEVELS: ActivationLevel[] = ['monitor', 'partial', 'full'];
+
+export const ACTIVATION_LABELS: Record<ActivationLevel, string> = {
+  monitor: 'Monitor',
+  partial: 'Partial activation',
+  full: 'Full activation',
+};
+
+export const ACTIVATION_DESCRIPTIONS: Record<ActivationLevel, string> = {
+  monitor:
+    'Response team notified and tracking; no continuity plans invoked and business as usual continues.',
+  partial:
+    'Continuity plans invoked for affected processes only; the response team runs a bridge and communications begin.',
+  full: 'Organization-wide invocation: command location stood up, all Tier 1 recovery plans running, external communications issued.',
+};
+
+/**
+ * Roles a response team is expected to fill (NIST SP 800-34 and BCI GPG).
+ * Offered as starting points; the roster is free-form.
+ */
+export const SUGGESTED_RESPONSE_ROLES = [
+  'Incident Commander',
+  'Deputy Incident Commander',
+  'Operations Lead',
+  'IT / Technical Recovery Lead',
+  'Communications Lead',
+  'Legal & Regulatory Lead',
+  'HR / People Lead',
+  'Facilities Lead',
+  'Scribe / Loggist',
+];
+
+/** Audiences a continuity communications plan is expected to cover. */
+export const SUGGESTED_AUDIENCES = [
+  'Staff',
+  'Customers',
+  'Regulators',
+  'Key suppliers',
+  'Board & executives',
+  'Media',
+];

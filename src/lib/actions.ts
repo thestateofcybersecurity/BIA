@@ -70,6 +70,8 @@ const processSchema = z.object({
   name: z.string().trim().min(1),
   description: z.string(),
   owner: z.string(),
+  ownerEmail: z.string().trim().optional(),
+  ownerPhone: z.string().trim().optional(),
   department: z.string(),
   usersServed: z.string(),
   peakPeriods: z.string(),
@@ -561,6 +563,52 @@ export async function generateExerciseReport(sessionId: string) {
 export async function deleteExercise(sessionId: string) {
   await withWorkspace((ws) => {
     ws.exercises = ws.exercises.filter((e) => e.id !== sessionId);
+  });
+}
+
+// ---------------- Continuity plan (activation & comms) ----------------
+
+const planSchema = z.object({
+  declarationAuthority: z.string(),
+  standDownAuthority: z.string(),
+  commandLocation: z.string(),
+  bridgeDetails: z.string(),
+  team: z.array(
+    z.object({
+      id: z.string(),
+      role: z.string(),
+      name: z.string(),
+      title: z.string(),
+      email: z.string(),
+      phone: z.string(),
+      deputy: z.string(),
+      deputyPhone: z.string(),
+    })
+  ),
+  triggers: z.array(
+    z.object({
+      id: z.string(),
+      level: z.enum(['monitor', 'partial', 'full']),
+      condition: z.string(),
+      authority: z.string(),
+    })
+  ),
+  communications: z.array(
+    z.object({
+      id: z.string(),
+      audience: z.string(),
+      channel: z.string(),
+      timing: z.string(),
+      owner: z.string(),
+      keyMessage: z.string(),
+    })
+  ),
+});
+
+export async function savePlan(input: z.infer<typeof planSchema>) {
+  const parsed = planSchema.parse(input);
+  await withWorkspace((ws) => {
+    ws.plan = { ...parsed, updatedAt: new Date().toISOString() };
   });
 }
 

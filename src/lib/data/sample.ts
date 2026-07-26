@@ -35,6 +35,8 @@ interface Def {
   name: string;
   description: string;
   owner: string;
+  ownerEmail: string;
+  ownerPhone: string;
   department: string;
   usersServed: string;
   peakPeriods: string;
@@ -53,6 +55,8 @@ const DEFS: Def[] = [
     name: 'Customer contact center',
     description: 'Inbound phone and chat support for policyholders, including first notice of loss for claims.',
     owner: 'Dana Whitfield',
+    ownerEmail: 'dana.whitfield@lakesidemutual.example',
+    ownerPhone: '585-555-0142',
     department: 'Customer Operations',
     usersServed: 'All policyholders (approx. 210,000)',
     peakPeriods: 'Severe weather events, renewal season (Nov-Jan)',
@@ -76,6 +80,8 @@ const DEFS: Def[] = [
     name: 'Claims processing',
     description: 'Intake, adjudication, and payment of policyholder claims.',
     owner: 'Marcus Yee',
+    ownerEmail: 'marcus.yee@lakesidemutual.example',
+    ownerPhone: '585-555-0177',
     department: 'Claims',
     usersServed: 'Policyholders with open claims (approx. 4,800 active)',
     peakPeriods: 'Catastrophe events',
@@ -98,6 +104,8 @@ const DEFS: Def[] = [
     name: 'Policy administration',
     description: 'Policy issuance, endorsements, renewals, and cancellations.',
     owner: 'Priya Raman',
+    ownerEmail: 'priya.raman@lakesidemutual.example',
+    ownerPhone: '585-555-0118',
     department: 'Operations',
     usersServed: 'Policyholders and 320 independent agents',
     peakPeriods: 'Renewal season (Nov-Jan)',
@@ -120,6 +128,8 @@ const DEFS: Def[] = [
     name: 'Premium billing & payments',
     description: 'Premium invoicing, payment collection, and reconciliation.',
     owner: 'Tom Okafor',
+    ownerEmail: 'tom.okafor@lakesidemutual.example',
+    ownerPhone: '585-555-0163',
     department: 'Finance',
     usersServed: 'All policyholders',
     peakPeriods: 'Month-end billing cycles',
@@ -141,6 +151,8 @@ const DEFS: Def[] = [
     name: 'Agent portal',
     description: 'Self-service quoting, binding, and policy inquiry for independent agents.',
     owner: 'Priya Raman',
+    ownerEmail: 'priya.raman@lakesidemutual.example',
+    ownerPhone: '585-555-0118',
     department: 'Distribution',
     usersServed: '320 independent agents',
     peakPeriods: 'Business hours, quarter-end',
@@ -161,6 +173,8 @@ const DEFS: Def[] = [
     name: 'Payroll',
     description: 'Biweekly payroll for 450 employees, tax withholding and remittance.',
     owner: 'Elena Sorensen',
+    ownerEmail: 'elena.sorensen@lakesidemutual.example',
+    ownerPhone: '585-555-0129',
     department: 'HR',
     usersServed: '450 employees',
     peakPeriods: 'Biweekly pay runs, year-end',
@@ -182,6 +196,8 @@ const DEFS: Def[] = [
     name: 'New business underwriting',
     description: 'Risk evaluation and pricing for new policy applications.',
     owner: 'James Calloway',
+    ownerEmail: 'james.calloway@lakesidemutual.example',
+    ownerPhone: '585-555-0154',
     department: 'Underwriting',
     usersServed: 'Agents and prospective policyholders',
     peakPeriods: 'Renewal season',
@@ -203,6 +219,8 @@ const DEFS: Def[] = [
     name: 'Financial reporting',
     description: 'Statutory and regulatory financial reporting, general ledger close.',
     owner: 'Tom Okafor',
+    ownerEmail: 'tom.okafor@lakesidemutual.example',
+    ownerPhone: '585-555-0163',
     department: 'Finance',
     usersServed: 'Regulators, board, rating agencies',
     peakPeriods: 'Quarter-end and annual statutory filing deadlines',
@@ -229,6 +247,8 @@ export function sampleWorkspace(): Workspace {
     name: d.name,
     description: d.description,
     owner: d.owner,
+    ownerEmail: d.ownerEmail,
+    ownerPhone: d.ownerPhone,
     department: d.department,
     usersServed: d.usersServed,
     peakPeriods: d.peakPeriods,
@@ -327,6 +347,128 @@ export function sampleWorkspace(): Workspace {
         updatedAt: ts,
       },
     ],
+    plan: {
+      declarationAuthority:
+        'Chief Operating Officer; in their absence the Incident Commander, confirmed to the CEO within 1 hour.',
+      standDownAuthority:
+        'Incident Commander, after each recovered process confirms normal service and the backlog is cleared.',
+      commandLocation: 'Rochester HQ, boardroom 4A / alternate: Buffalo branch, training room B',
+      bridgeDetails: 'Standing bridge 585-555-0900 pin 88421 · Teams channel #incident-response',
+      team: [
+        {
+          id: 'm1',
+          role: 'Incident Commander',
+          name: 'Priya Raman',
+          title: 'VP Operations',
+          email: 'priya.raman@lakesidemutual.example',
+          phone: '585-555-0118',
+          deputy: 'Dana Whitfield',
+          deputyPhone: '585-555-0142',
+        },
+        {
+          id: 'm2',
+          role: 'IT / Technical Recovery Lead',
+          name: 'Elena Sorensen',
+          title: 'Director of IT',
+          email: 'elena.sorensen@lakesidemutual.example',
+          phone: '585-555-0129',
+          deputy: 'Infrastructure on-call',
+          deputyPhone: '585-555-0130',
+        },
+        {
+          id: 'm3',
+          role: 'Communications Lead',
+          name: 'Marcus Yee',
+          title: 'Head of Claims',
+          email: 'marcus.yee@lakesidemutual.example',
+          phone: '585-555-0177',
+          deputy: 'Corporate Communications duty officer',
+          deputyPhone: '585-555-0180',
+        },
+        {
+          id: 'm4',
+          role: 'Legal & Regulatory Lead',
+          name: 'James Calloway',
+          title: 'General Counsel',
+          email: 'james.calloway@lakesidemutual.example',
+          phone: '585-555-0154',
+          deputy: 'Compliance Manager',
+          deputyPhone: '585-555-0155',
+        },
+        {
+          id: 'm5',
+          role: 'Scribe / Loggist',
+          name: 'Tom Okafor',
+          title: 'Finance Systems Manager',
+          email: 'tom.okafor@lakesidemutual.example',
+          phone: '585-555-0163',
+          deputy: 'Operations analyst on duty',
+          deputyPhone: '585-555-0164',
+        },
+      ],
+      triggers: [
+        {
+          id: 't1',
+          level: 'monitor',
+          condition:
+            'Any Tier 1 or Tier 2 process degraded, or a supplier reports an incident affecting us, with service still being delivered.',
+          authority: 'Duty manager',
+        },
+        {
+          id: 't2',
+          level: 'partial',
+          condition:
+            'Any Tier 1 process fully unavailable beyond 1 hour with no restoration estimate, or any confirmed data loss affecting policy or claims records.',
+          authority: 'Incident Commander',
+        },
+        {
+          id: 't3',
+          level: 'full',
+          condition:
+            'Loss of the Rochester HQ, a confirmed ransomware detonation, or two or more Tier 1 processes down simultaneously.',
+          authority: 'Chief Operating Officer',
+        },
+      ],
+      communications: [
+        {
+          id: 'c1',
+          audience: 'Staff',
+          channel: 'SMS alert plus email, repeated on the Teams channel',
+          timing: 'Within 30 minutes of declaration',
+          owner: 'Communications Lead',
+          keyMessage:
+            'What is known, which systems are affected, where to report for work, and when the next update comes. No speculation about cause.',
+        },
+        {
+          id: 'c2',
+          audience: 'Customers',
+          channel: 'Status page, IVR message, agent script',
+          timing: 'Within 1 hour of declaration',
+          owner: 'Head of Claims',
+          keyMessage:
+            'Which services are available, how to reach us for urgent claims, and expected restoration window. Claims intake continues by phone regardless of system state.',
+        },
+        {
+          id: 'c3',
+          audience: 'Regulators (NY DFS)',
+          channel: 'Written notification per 23 NYCRR 500.17',
+          timing: 'Within 72 hours of determining a reportable cybersecurity event',
+          owner: 'General Counsel',
+          keyMessage:
+            'Nature of the event, systems and data affected, containment actions taken, and remediation plan.',
+        },
+        {
+          id: 'c4',
+          audience: 'Key suppliers',
+          channel: 'Direct call to named account manager',
+          timing: 'Within 2 hours of declaration',
+          owner: 'Incident Commander',
+          keyMessage:
+            'Support required, escalation path, and any change to transaction volumes or cutover to backup arrangements.',
+        },
+      ],
+      updatedAt: ts,
+    },
     maturity: {
       updatedAt: ts,
       answers: {

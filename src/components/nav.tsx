@@ -11,9 +11,10 @@ const STEPS = [
   { href: '/gaps', num: '04', label: 'Objectives & gaps' },
   { href: '/recovery', num: '05', label: 'Recovery workflows' },
   { href: '/requirements', num: '06', label: 'Requirements' },
-  { href: '/maturity', num: '07', label: 'Maturity' },
-  { href: '/exercises', num: '08', label: 'Tabletop exercises' },
-  { href: '/report', num: '09', label: 'BC plan report' },
+  { href: '/activation', num: '07', label: 'Activation & comms' },
+  { href: '/maturity', num: '08', label: 'Maturity' },
+  { href: '/exercises', num: '09', label: 'Tabletop exercises' },
+  { href: '/report', num: '10', label: 'BC plan report' },
 ];
 
 export function Nav({ account }: { account?: React.ReactNode }) {

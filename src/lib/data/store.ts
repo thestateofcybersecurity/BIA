@@ -20,6 +20,7 @@ export function emptyWorkspace(): Workspace {
     maturity: null,
     exercises: [],
     resourceProfiles: [],
+    plan: null,
   };
 }
 

@@ -144,7 +144,19 @@ Circular process dependencies are detected and reported: if A cannot run without
 
 Application and supplier dependencies are matched by name (case-insensitive), which is why consistent dependency naming in the process inventory matters; process links are matched by id, so they are exact.
 
-## 8. Maturity assessment
+## 8. Plan activation and communications
+
+Everything above establishes how bad a disruption would be and how fast recovery must happen. This section is the operational half of the plan (NIST SP 800-34 notification and activation phase), without which the analysis cannot be executed during an incident:
+
+- **Activation criteria** at three levels (Monitor, Partial, Full), each stated as an observable condition rather than a judgement, with the role authorised to declare it. The MTPD values derived in section 4 are the natural source of these thresholds: the tolerance already documented is the trigger.
+- **Command and authority**: who declares, who stands down, the primary and alternate command locations, and the standing response bridge.
+- **Response team roster**: role, named primary with out-of-hours contact details, and a named deputy for every role, because a roster with a single name per role fails whenever that person is unreachable.
+- **Communications plan** by audience (staff, customers, regulators, suppliers, board, media), each with channel, timing, accountable owner, and the key message. Timing is expressed against obligations where they exist, such as a regulator's reporting clock, not against intentions.
+- **Process owner directory**, derived from the process inventory and ordered by criticality, so the people accountable for each process are reachable without a second document.
+
+All of it is printed into the BC plan report, which is what makes the generated document usable at 2am rather than only at audit time.
+
+## 9. Maturity assessment
 
 The 37-question ISO 22301 self-assessment is retained for coverage but restructured:
 
@@ -153,7 +165,7 @@ The 37-question ISO 22301 self-assessment is retained for coverage but restructu
 - Domain score = mean of its questions. Overall score = weighted mean of domains (BIA and Strategies weighted 1.5x, others 1x, weights configurable in code).
 - Output: radar chart by domain, weakest-domain callouts, and a suggested roadmap (lowest domains first).
 
-## 9. Tabletop exercises
+## 10. Tabletop exercises
 
 A curated library covers six scenario types: ransomware, cloud or data center outage, critical supplier failure, facility loss or regional disaster, workforce disruption, and insider threat. Each template is generated from live assessment data: it names the organization's actual Tier 1 processes, injects real RTO gaps and dependency concentrations, and structures the exercise as phases with discussion questions and evaluation criteria mapped to maturity domains.
 
@@ -164,7 +176,7 @@ Any scenario can be run as a **live session**: the facilitator steps through the
 
 Structured outputs are schema-validated at the boundary; a refusal or malformed response is surfaced to the facilitator, never silently stored. Without an API key, the template library and live sessions work fully; only generation and the AI report are disabled.
 
-## 10. Business continuity plan report
+## 11. Business continuity plan report
 
 Generated fully from data, printable to PDF from the browser:
 
@@ -174,9 +186,10 @@ Generated fully from data, printable to PDF from the browser:
 4. Process inventory and dependency map
 5. BIA results: tiering table with owner sign-off status, MTPD overrides with justifications
 6. Recovery objectives (including WRT) and gap register
-7. Recovery workflows and resource requirements
-8. Dependency recovery requirements (application and supplier roll-down)
-9. Tabletop exercise program
-10. Maturity results and roadmap
+7. Plan activation, response team roster, communications, and the process owner directory
+8. Recovery workflows and resource requirements
+9. Dependency recovery requirements (application, supplier, and process-chain roll-down)
+10. Tabletop exercise program
+11. Maturity results and roadmap
 
 Nothing in the report is boilerplate about a fictional company; every table and number traces to entered data.

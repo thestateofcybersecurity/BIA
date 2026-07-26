@@ -43,6 +43,9 @@ export interface BusinessProcess {
   name: string;
   description: string;
   owner: string;
+  /** Owner contact details; used for the plan contact directory and sign-off requests. */
+  ownerEmail?: string;
+  ownerPhone?: string;
   department: string;
   usersServed: string;
   peakPeriods: string;
@@ -137,6 +140,62 @@ export interface MaturityAssessment {
   updatedAt: string;
 }
 
+// ---------------- Plan activation ----------------
+
+/**
+ * The operational half of the plan (NIST SP 800-34 notification and
+ * activation phase): who declares an incident, who runs the response, and
+ * who gets told what. The BIA says how bad a disruption is; this says what
+ * happens at 2am when one starts.
+ */
+
+export type ActivationLevel = 'monitor' | 'partial' | 'full';
+
+export interface TeamMember {
+  id: string;
+  /** Response role, for example Incident Commander or Communications Lead. */
+  role: string;
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+  /** Named backup who holds the role when the primary is unreachable. */
+  deputy: string;
+  deputyPhone: string;
+}
+
+export interface ActivationTrigger {
+  id: string;
+  level: ActivationLevel;
+  /** Observable condition, for example "any Tier 1 process down beyond 1 hour". */
+  condition: string;
+  /** Role authorised to declare at this level. */
+  authority: string;
+}
+
+export interface CommunicationEntry {
+  id: string;
+  audience: string;
+  channel: string;
+  /** When this audience must hear from us, relative to declaration. */
+  timing: string;
+  owner: string;
+  keyMessage: string;
+}
+
+export interface ContinuityPlan {
+  declarationAuthority: string;
+  standDownAuthority: string;
+  /** Primary and alternate command locations. */
+  commandLocation: string;
+  /** Conference bridge, war room, or channel used to run the response. */
+  bridgeDetails: string;
+  team: TeamMember[];
+  triggers: ActivationTrigger[];
+  communications: CommunicationEntry[];
+  updatedAt: string;
+}
+
 // ---------------- Tabletop exercises ----------------
 
 export interface ScenarioPhase {
@@ -216,6 +275,7 @@ export interface Workspace {
   maturity: MaturityAssessment | null;
   exercises: ExerciseSession[];
   resourceProfiles: RecoveryResourceProfile[];
+  plan: ContinuityPlan | null;
   /** Email notification toggles; a missing key means enabled. */
   notifications?: {
     signOffRequests?: boolean;

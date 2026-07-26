@@ -25,6 +25,7 @@ import {
   DEPENDENCY_LABELS,
   RATED_CATEGORIES,
   SEVERITY_LABELS,
+  ACTIVATION_LABELS,
 } from '@/lib/domain/constants';
 import { formatCurrency, formatCompactCurrency, formatHours, formatDate } from '@/lib/format';
 
@@ -240,6 +241,11 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
     .sort((a, b) => b.gapHours - a.gapHours);
 
   const nameOf = (id: string) => ws.processes.find((p) => p.id === id)?.name ?? id;
+  const plan = ws.plan;
+  const contactDirectory = ws.processes
+    .map((p) => ({ p, tier: derived.get(p.id)?.tier ?? null }))
+    .filter(({ p }) => p.owner.trim().length > 0)
+    .sort((a, b) => (a.tier ?? 9) - (b.tier ?? 9) || a.p.name.localeCompare(b.p.name));
   const remFor = (processId: string, kind: 'rto' | 'rpo') =>
     ws.remediations.find((r) => r.processId === processId && r.kind === kind);
 
@@ -648,8 +654,132 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
           </>
         )}
 
-        {/* 07 Workflows + resources */}
-        <SectionTitle num="07" title="Recovery workflows & resource requirements" />
+        {/* 07 Activation */}
+        <SectionTitle num="07" title="Plan activation & response team" />
+        {!plan ? (
+          <Text style={s.body}>
+            No activation plan recorded yet. Without declaration criteria, a response roster, and a
+            communications plan, the analysis above cannot be executed during an incident.
+          </Text>
+        ) : (
+          <>
+            <View style={s.table}>
+              {(
+                [
+                  ['Declaration authority', plan.declarationAuthority],
+                  ['Stand-down authority', plan.standDownAuthority],
+                  ['Command location', plan.commandLocation],
+                  ['Response bridge', plan.bridgeDetails],
+                ] as const
+              ).map(([label, value], i) => (
+                <View key={label} style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}>
+                  <Td width="28%" strong>{label}</Td>
+                  <Td width="72%">{value || 'Not specified'}</Td>
+                </View>
+              ))}
+            </View>
+
+            {plan.triggers.length > 0 && (
+              <>
+                <Text style={s.subTitle}>Activation criteria</Text>
+                <View style={s.table}>
+                  <View style={s.thRow}>
+                    <Th width="20%">Level</Th>
+                    <Th width="52%">Condition</Th>
+                    <Th width="28%">Declared by</Th>
+                  </View>
+                  {plan.triggers.map((t, i) => (
+                    <View key={t.id} style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}>
+                      <Td width="20%" strong>{ACTIVATION_LABELS[t.level]}</Td>
+                      <Td width="52%">{t.condition || 'Not specified'}</Td>
+                      <Td width="28%">{t.authority || 'Not specified'}</Td>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {plan.team.length > 0 && (
+              <>
+                <Text style={s.subTitle}>Response team</Text>
+                <View style={s.table}>
+                  <View style={s.thRow}>
+                    <Th width="24%">Role</Th>
+                    <Th width="22%">Name</Th>
+                    <Th width="30%">Contact</Th>
+                    <Th width="24%">Deputy</Th>
+                  </View>
+                  {plan.team.map((m, i) => (
+                    <View key={m.id} style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}>
+                      <Td width="24%" strong>{m.role}</Td>
+                      <Td width="22%">{m.title ? `${m.name} (${m.title})` : m.name}</Td>
+                      <Td width="30%">
+                        {[m.phone, m.email].filter(Boolean).join(' · ') || '·'}
+                      </Td>
+                      <Td width="24%">
+                        {[m.deputy, m.deputyPhone].filter(Boolean).join(' · ') || '·'}
+                      </Td>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {plan.communications.length > 0 && (
+              <>
+                <Text style={s.subTitle}>Communications</Text>
+                <View style={s.table}>
+                  <View style={s.thRow}>
+                    <Th width="16%">Audience</Th>
+                    <Th width="16%">Channel</Th>
+                    <Th width="14%">Timing</Th>
+                    <Th width="16%">Owner</Th>
+                    <Th width="38%">Key message</Th>
+                  </View>
+                  {plan.communications.map((c, i) => (
+                    <View key={c.id} style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}>
+                      <Td width="16%" strong>{c.audience}</Td>
+                      <Td width="16%">{c.channel}</Td>
+                      <Td width="14%">{c.timing}</Td>
+                      <Td width="16%">{c.owner}</Td>
+                      <Td width="38%">{c.keyMessage}</Td>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </>
+        )}
+
+        {contactDirectory.length > 0 && (
+          <>
+            <Text style={s.subTitle}>Process owner directory</Text>
+            <View style={s.table}>
+              <View style={s.thRow}>
+                <Th width="28%">Process</Th>
+                <Th width="12%">Tier</Th>
+                <Th width="22%">Owner</Th>
+                <Th width="24%">Email</Th>
+                <Th width="14%">Phone</Th>
+              </View>
+              {contactDirectory.map(({ p, tier }, i) => (
+                <View
+                  key={p.id}
+                  style={[s.tr, ...(i % 2 ? [s.trAlt] : []), { alignItems: 'center' }]}
+                >
+                  <Td width="28%" strong>{p.name}</Td>
+                  <View style={col('12%')}><TierChip tier={tier} /></View>
+                  <Td width="22%">{p.owner}</Td>
+                  <Td width="24%">{p.ownerEmail || '·'}</Td>
+                  <Td width="14%">{p.ownerPhone || '·'}</Td>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* 08 Workflows + resources */}
+        <SectionTitle num="08" title="Recovery workflows & resource requirements" />
         {ws.workflows.length === 0 ? (
           <Text style={s.body}>No recovery workflows documented yet.</Text>
         ) : (
@@ -729,7 +859,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
         )}
 
         {/* 08 Roll-down */}
-        <SectionTitle num="08" title="Dependency recovery requirements" />
+        <SectionTitle num="09" title="Dependency recovery requirements" />
         <Text style={s.body}>
           The BIA handed down to IT and third-party management: each application inherits the
           strictest recovery objectives of the processes that depend on it, and each supplier
@@ -812,7 +942,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
         )}
 
         {/* 09 Exercise program */}
-        <SectionTitle num="09" title="Exercise program" />
+        <SectionTitle num="10" title="Exercise program" />
         <Text style={s.body}>
           Recommended cadence: two tabletop exercises per year minimum, rotating categories, with
           results feeding the maturity assessment and the gap register.
@@ -858,7 +988,7 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
         )}
 
         {/* 10 Maturity */}
-        <SectionTitle num="10" title="Maturity & roadmap" />
+        <SectionTitle num="11" title="Maturity & roadmap" />
         {maturity.overall == null ? (
           <Text style={s.body}>Maturity assessment not yet completed.</Text>
         ) : (
