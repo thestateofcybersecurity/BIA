@@ -21,6 +21,7 @@ export function emptyWorkspace(): Workspace {
     exercises: [],
     resourceProfiles: [],
     plan: null,
+    collectionRequests: [],
   };
 }
 

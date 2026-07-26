@@ -156,6 +156,26 @@ export interface MaturityAssessment {
   updatedAt: string;
 }
 
+// ---------------- Delegated data collection ----------------
+
+export type CollectionStatus = 'sent' | 'submitted' | 'revoked';
+
+/**
+ * A request to a process owner to complete their own impact assessment
+ * through a signed link. Revoking a request invalidates its link.
+ */
+export interface CollectionRequest {
+  id: string;
+  processId: string;
+  ownerName: string;
+  email: string;
+  status: CollectionStatus;
+  sentAt: string;
+  submittedAt?: string | null;
+  /** Whether the emailed link actually went out (false in demo mode). */
+  emailed: boolean;
+}
+
 // ---------------- Plan activation ----------------
 
 /**
@@ -292,6 +312,7 @@ export interface Workspace {
   exercises: ExerciseSession[];
   resourceProfiles: RecoveryResourceProfile[];
   plan: ContinuityPlan | null;
+  collectionRequests: CollectionRequest[];
   /** Email notification toggles; a missing key means enabled. */
   notifications?: {
     signOffRequests?: boolean;

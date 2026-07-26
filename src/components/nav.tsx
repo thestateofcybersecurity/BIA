@@ -20,6 +20,11 @@ const STEPS = [
 export function Nav({ account }: { account?: React.ReactNode }) {
   const pathname = usePathname();
 
+  // Contribution pages are for invited process owners with no account: the
+  // workspace navigation is not theirs to see, and every link would bounce
+  // them to sign-in.
+  if (pathname.startsWith('/contribute')) return null;
+
   return (
     <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface/80 px-5 py-8 backdrop-blur md:flex">
       <Link href="/" className="mb-10 block">

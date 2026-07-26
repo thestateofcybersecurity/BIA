@@ -130,6 +130,14 @@ Each gap is also priced from data the assessment already holds. **Exposure** is 
 
 Placing the remediation cost beside the exposure makes the investment case explicit: spending less than a single occurrence costs is straightforward to defend, and spending more requires an argument about event frequency or about the non-financial impacts (safety, licence to operate) that the financial curve does not capture. The comparison is per occurrence, not annualised, because the BIA deliberately does not estimate likelihood; that is the risk assessment's job.
 
+### Delegated data collection
+
+Workshops with the process owner give the best calibration, but an inventory of any size outgrows them. A coordinator can instead request an assessment from the named owner, who receives a personal link that opens exactly one process and nothing else in the workspace: no navigation, no other process, no gap register, and no financial profile beyond the severity bands needed to answer the questions.
+
+The link authenticates by an HMAC-signed token rather than a session. It carries only the workspace, process, and request ids; it is verified against a server secret with a constant-time comparison, so a token altered to point at another process or another workspace fails; it expires after 30 days; and it is checked against a request record the coordinator can revoke at any time. Because the token is a bearer credential delivered by email, revocation and expiry are what bound it, exactly as with any emailed link.
+
+The contributor sees the rating grid but not the governance controls: MTPD override and sign-off stay with the coordinator. A complete submission from the invited owner does record their sign-off, since that is precisely what owner sign-off means; an incomplete one leaves the assessment pending.
+
 ### Governance
 
 Each completed assessment carries an owner sign-off (name and date); any edit to the assessment clears the sign-off and it must be re-approved. Assessments are due for review 12 months after their last approval or edit (ISO 22301 review cadence); overdue assessments are flagged in the app.

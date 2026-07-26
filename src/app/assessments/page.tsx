@@ -5,6 +5,8 @@ import { MTPD_LABELS } from '@/lib/domain/constants';
 import { PageHeader, Card, TierBadge, StatusPill, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { formatCompactCurrency } from '@/lib/format';
+import { contributionsEnabled } from '@/lib/contribution/token';
+import { RequestButton } from './request-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +14,7 @@ export default async function AssessmentsPage() {
   const ws = await loadWorkspace();
   const derived = deriveAll(ws);
   const currency = ws.org?.currency ?? 'USD';
+  const contributionsAvailable = contributionsEnabled();
 
   return (
     <>
@@ -45,6 +48,13 @@ export default async function AssessmentsPage() {
             Run these as short workshops with the process owner; the anchor descriptions under
             the rating grid keep different owners calibrated to the same scale.
           </li>
+          <li>
+            <strong>Or let the owner fill it in.</strong> &quot;Request from owner&quot; emails a personal,
+            expiring link that opens just their process and nothing else in the workspace. A
+            complete submission records their sign-off, and you can revoke a link at any time.
+            Workshops still produce better calibration; delegation scales to an inventory that
+            will not fit in workshops.
+          </li>
         </ul>
       </HelpBox>
 
@@ -73,14 +83,20 @@ export default async function AssessmentsPage() {
             const d = derived.get(p.id)!;
             const assessment = ws.assessments.find((a) => a.processId === p.id);
             const started = assessment != null;
+            const request =
+              [...ws.collectionRequests]
+                .reverse()
+                .find((r) => r.processId === p.id && r.status !== 'revoked') ?? null;
             return (
-              <Link key={p.id} href={`/assessments/${p.id}`} className="group">
-                <Card className="h-full transition-colors group-hover:border-accent">
+              <Card key={p.id} className="h-full">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="font-display text-lg font-semibold group-hover:text-accent">
+                      <Link
+                        href={`/assessments/${p.id}`}
+                        className="font-display text-lg font-semibold hover:text-accent"
+                      >
                         {p.name}
-                      </h3>
+                      </Link>
                       <p className="mt-0.5 text-xs text-ink-muted">
                         {p.owner || 'No owner'} · {p.department || 'No department'}
                       </p>
@@ -117,8 +133,26 @@ export default async function AssessmentsPage() {
                       </StatusPill>
                     )}
                   </div>
-                </Card>
-              </Link>
+                  {contributionsAvailable && (
+                    <div className="mt-4 border-t border-line/60 pt-3">
+                      {p.ownerEmail ? (
+                        <RequestButton
+                          processId={p.id}
+                          ownerEmail={p.ownerEmail}
+                          request={request}
+                        />
+                      ) : (
+                        <p className="text-xs text-ink-muted">
+                          Add an email for {p.owner || 'the owner'} on the{' '}
+                          <Link href={`/processes/${p.id}`} className="text-accent underline">
+                            process record
+                          </Link>{' '}
+                          to request their assessment directly.
+                        </p>
+                      )}
+                    </div>
+                  )}
+              </Card>
             );
           })}
         </div>

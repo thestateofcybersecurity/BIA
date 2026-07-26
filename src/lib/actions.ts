@@ -580,6 +580,97 @@ export async function deleteExercise(sessionId: string) {
   });
 }
 
+// ---------------- Delegated data collection ----------------
+
+/**
+ * Ask a process owner to complete their own impact assessment through a
+ * signed link. Creating a new request supersedes any earlier one for the
+ * same process, so a resend invalidates the previous link.
+ */
+export async function requestAssessmentFromOwner(processId: string, emailOverride?: string) {
+  const { createContributionToken, contributionsEnabled, CONTRIBUTION_TTL_MS } = await import(
+    '@/lib/contribution/token'
+  );
+  if (!contributionsEnabled()) {
+    return { ok: false as const, reason: 'unconfigured' as const };
+  }
+
+  const userId = await getUserId();
+  const store = getStore();
+  const ws = await store.load(userId);
+  const process = ws.processes.find((p) => p.id === processId);
+  if (!process) return { ok: false as const, reason: 'not_found' as const };
+
+  const address = (emailOverride ?? process.ownerEmail ?? '').trim();
+  if (!address) return { ok: false as const, reason: 'no_email' as const };
+
+  const now = new Date();
+  const requestId = nanoid(12);
+  for (const r of ws.collectionRequests) {
+    if (r.processId === processId && r.status === 'sent') r.status = 'revoked';
+  }
+
+  const token = createContributionToken({
+    userId,
+    processId,
+    requestId,
+    issuedAt: now.getTime(),
+  });
+
+  const { emailEnabled, APP_URL } = await import('@/lib/email/client');
+  const { assessmentRequestEmail } = await import('@/lib/email/templates');
+  const link = `${APP_URL}/contribute/${token}`;
+  let emailed = false;
+
+  if (emailEnabled()) {
+    const { getResend, EMAIL_FROM } = await import('@/lib/email/client');
+    const content = assessmentRequestEmail({
+      orgName: ws.org?.name ?? 'your organization',
+      processName: process.name,
+      ownerName: process.owner,
+      link,
+      expiresInDays: Math.round(CONTRIBUTION_TTL_MS / (24 * 60 * 60 * 1000)),
+    });
+    try {
+      const { error } = await getResend().emails.send({
+        from: EMAIL_FROM,
+        to: address,
+        subject: content.subject,
+        html: content.html,
+        text: content.text,
+      });
+      if (error) console.error('[email] assessment request failed:', error.message ?? error);
+      else emailed = true;
+    } catch (e) {
+      console.error('[email] assessment request threw:', e instanceof Error ? e.message : e);
+    }
+  }
+
+  ws.collectionRequests.push({
+    id: requestId,
+    processId,
+    ownerName: process.owner,
+    email: address,
+    status: 'sent',
+    sentAt: now.toISOString(),
+    submittedAt: null,
+    emailed,
+  });
+  await store.save(userId, ws);
+  revalidatePath('/', 'layout');
+
+  // The link is returned so the coordinator can pass it on themselves when
+  // email is not configured, or when the owner never received it.
+  return { ok: true as const, link, emailed };
+}
+
+export async function revokeAssessmentRequest(requestId: string) {
+  await withWorkspace((ws) => {
+    const request = ws.collectionRequests.find((r) => r.id === requestId);
+    if (request) request.status = 'revoked';
+  });
+}
+
 // ---------------- Continuity plan (activation & comms) ----------------
 
 const planSchema = z.object({

@@ -58,6 +58,27 @@ export function signOffRequestEmail(args: {
   };
 }
 
+export function assessmentRequestEmail(args: {
+  orgName: string;
+  processName: string;
+  ownerName: string;
+  link: string;
+  expiresInDays: number;
+}): EmailContent {
+  const title = 'Your input is needed for the continuity plan';
+  const body = `${args.ownerName ? `${args.ownerName}, you` : 'You'} are recorded as the owner of <strong>${args.processName}</strong> in ${args.orgName}'s business impact assessment.<br><br>
+    The link below opens a short form asking one question five times over: how bad would it be if this process stopped for 4 hours, 24 hours, 3 days, 1 week, and 1 month? Estimate the financial loss and rate the operational, customer, legal, and safety impact at each point. It usually takes about fifteen minutes, and your answers derive how quickly the organization commits to recovering your process.<br><br>
+    The link is personal to you and this one process, and it expires in ${args.expiresInDays} days.`;
+  return {
+    subject: `Business impact assessment: ${args.processName}`,
+    html: shell(title, `<p style="margin:0">${body}</p>`, {
+      label: 'Complete the assessment',
+      href: args.link,
+    }),
+    text: `${title}\n\n${args.ownerName ? `${args.ownerName}, you` : 'You'} are recorded as the owner of "${args.processName}" in ${args.orgName}'s business impact assessment.\n\nThe form asks how bad it would be if this process stopped for 4 hours, 24 hours, 3 days, 1 week, and 1 month. It takes about fifteen minutes.\n\nComplete it here (personal to you, expires in ${args.expiresInDays} days):\n${args.link}`,
+  };
+}
+
 export function aarReadyEmail(args: {
   exerciseTitle: string;
   sessionId: string;

@@ -39,18 +39,33 @@ const emptyHorizons = <T,>(v: T): Record<Horizon, T> => ({
   h4: v, h24: v, d3: v, w1: v, m1: v,
 });
 
+export interface AssessmentSubmission {
+  financialLoss: Losses;
+  ratings: Ratings;
+  notes: string;
+}
+
 export function AssessmentForm({
   process,
   initial,
   org,
+  /** Contributor mode drops sign-off and MTPD override: the invited owner
+   *  supplies ratings, the coordinator keeps the governance controls. */
+  variant = 'owner',
+  submit,
+  submitLabel = 'Save assessment',
 }: {
   process: BusinessProcess;
   initial: ImpactAssessment | null;
   org: OrgProfile | null;
+  variant?: 'owner' | 'contributor';
+  submit?: (payload: AssessmentSubmission) => Promise<{ ok: boolean; message?: string }>;
+  submitLabel?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [losses, setLosses] = useState<Losses>(
     initial?.financialLoss ?? emptyHorizons<number | null>(null)
@@ -292,6 +307,7 @@ export function AssessmentForm({
           )}
         </Card>
 
+        {variant === 'owner' && (
         <Card
           title="MTPD override"
           subtitle="Use only when the derived value is demonstrably wrong; overrides are flagged in the report"
@@ -348,7 +364,9 @@ export function AssessmentForm({
             </button>
           )}
         </Card>
+        )}
 
+        {variant === 'owner' && (
         <Card
           title="Owner sign-off"
           subtitle="Editing the assessment clears the sign-off; it must be re-approved"
@@ -393,6 +411,7 @@ export function AssessmentForm({
             </div>
           )}
         </Card>
+        )}
 
         <div className="flex items-center gap-3">
           <button
@@ -400,22 +419,36 @@ export function AssessmentForm({
             disabled={pending || (override != null && override.justification.trim() === '')}
             onClick={() =>
               start(async () => {
-                await saveAssessment({
-                  processId: process.id,
-                  financialLoss: losses,
-                  ratings,
-                  mtpdOverride: override,
-                  notes,
-                });
+                if (submit) {
+                  const result = await submit({ financialLoss: losses, ratings, notes });
+                  if (!result.ok) {
+                    setError(result.message ?? 'Submission failed.');
+                    return;
+                  }
+                  setError(null);
+                } else {
+                  await saveAssessment({
+                    processId: process.id,
+                    financialLoss: losses,
+                    ratings,
+                    mtpdOverride: override,
+                    notes,
+                  });
+                }
                 setSaved(true);
                 setDirty(false);
                 router.refresh();
               })
             }
           >
-            {pending ? 'Saving…' : 'Save assessment'}
+            {pending ? 'Saving…' : submitLabel}
           </button>
-          {saved && !pending && <span className="text-sm text-ok">Saved.</span>}
+          {saved && !pending && (
+            <span className="text-sm text-ok">
+              {variant === 'contributor' ? 'Submitted. Thank you.' : 'Saved.'}
+            </span>
+          )}
+          {error && <span className="text-sm text-bad">{error}</span>}
         </div>
       </div>
     </div>

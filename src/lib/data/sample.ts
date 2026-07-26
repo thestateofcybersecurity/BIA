@@ -347,6 +347,7 @@ export function sampleWorkspace(): Workspace {
         updatedAt: ts,
       },
     ],
+    collectionRequests: [],
     plan: {
       declarationAuthority:
         'Chief Operating Officer; in their absence the Incident Commander, confirmed to the CEO within 1 hour.',
