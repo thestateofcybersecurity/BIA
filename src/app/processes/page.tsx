@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { loadWorkspace } from '@/lib/actions';
 import { deriveAll } from '@/lib/domain/scoring';
 import { DEPENDENCY_CLASSES } from '@/lib/domain/constants';
-import { PageHeader, Card, TierBadge, EmptyState, btn, StatusPill } from '@/components/ui';
+import { PageHeader, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
+import { ProcessTable } from './process-table';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,71 +64,29 @@ export default async function ProcessesPage() {
           </Link>
         </EmptyState>
       ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line text-left">
-                  {['Process', 'Owner', 'Department', 'Dependencies', 'Assessment', 'Tier'].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="pb-2 pr-4 font-mono text-[10px] font-normal uppercase tracking-wider text-ink-muted"
-                      >
-                        {h}
-                      </th>
-                    )
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {ws.processes.map((p) => {
-                  const d = derived.get(p.id)!;
-                  const depCount = DEPENDENCY_CLASSES.reduce(
-                    (s, c) => s + p.dependencies[c].length,
-                    0
-                  );
-                  return (
-                    <tr key={p.id} className="border-b border-line/60 last:border-0">
-                      <td className="py-3 pr-4">
-                        <Link
-                          href={`/processes/${p.id}`}
-                          className="font-medium hover:text-accent"
-                        >
-                          {p.name}
-                        </Link>
-                        {p.description && (
-                          <p className="mt-0.5 max-w-sm truncate text-xs text-ink-muted">
-                            {p.description}
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-3 pr-4 text-ink-soft">{p.owner || '·'}</td>
-                      <td className="py-3 pr-4 text-ink-soft">{p.department || '·'}</td>
-                      <td className="tnum py-3 pr-4 text-ink-soft">{depCount}</td>
-                      <td className="py-3 pr-4">
-                        {d.assessmentComplete ? (
-                          <StatusPill tone="ok">Complete</StatusPill>
-                        ) : (
-                          <Link href={`/assessments/${p.id}`}>
-                            <StatusPill tone="warn">
-                              {ws.assessments.some((a) => a.processId === p.id)
-                                ? 'In progress'
-                                : 'Not started'}
-                            </StatusPill>
-                          </Link>
-                        )}
-                      </td>
-                      <td className="py-3">
-                        <TierBadge tier={d.tier} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <ProcessTable
+          rows={ws.processes.map((p) => {
+            const d = derived.get(p.id)!;
+            return {
+              id: p.id,
+              name: p.name,
+              description: p.description,
+              owner: p.owner,
+              department: p.department,
+              dependencyCount: DEPENDENCY_CLASSES.reduce(
+                (sum, c) => sum + p.dependencies[c].length,
+                0
+              ),
+              tier: d.tier,
+              priority: d.priority,
+              assessment: d.assessmentComplete
+                ? ('complete' as const)
+                : ws.assessments.some((a) => a.processId === p.id)
+                  ? ('in_progress' as const)
+                  : ('not_started' as const),
+            };
+          })}
+        />
       )}
     </>
   );
