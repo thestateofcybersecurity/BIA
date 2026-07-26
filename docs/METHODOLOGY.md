@@ -138,8 +138,11 @@ The BIA handed down to IT and third-party management, fully derived (nothing ent
 
 - Each **application** inherits the strictest (lowest) RTO and RPO targets of every process that depends on it, plus their highest criticality tier. An application supporting a Tier 1 process must itself be recoverable inside that process's targets.
 - Each **supplier** inherits the highest criticality of the processes it supports, and the roll-down shows concentration: a supplier appearing under many processes is a single point of failure.
+- Each **upstream process** inherits from every process downstream of it, followed transitively through the chain: a process must be at least as critical, and recover at least as fast, as everything that cannot run without it. Where a process's own tier, RTO, or RPO is weaker than what its dependants require, the conflict is reported as a finding rather than silently tolerated, because the downstream target is unachievable while the upstream one stands.
 
-Dependencies are matched by name (case-insensitive), which is why consistent dependency naming in the process inventory matters.
+Circular process dependencies are detected and reported: if A cannot run without B and B cannot run without A, neither can be restored first and the recovery sequence is undefined. Traversal is cycle-safe, so a loop produces a finding instead of a hang.
+
+Application and supplier dependencies are matched by name (case-insensitive), which is why consistent dependency naming in the process inventory matters; process links are matched by id, so they are exact.
 
 ## 8. Maturity assessment
 

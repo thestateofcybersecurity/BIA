@@ -10,7 +10,7 @@ const STEPS = [
   { href: '/assessments', num: '03', label: 'Impact assessment' },
   { href: '/gaps', num: '04', label: 'Objectives & gaps' },
   { href: '/recovery', num: '05', label: 'Recovery workflows' },
-  { href: '/requirements', num: '06', label: 'IT & supplier needs' },
+  { href: '/requirements', num: '06', label: 'Requirements' },
   { href: '/maturity', num: '07', label: 'Maturity' },
   { href: '/exercises', num: '08', label: 'Tabletop exercises' },
   { href: '/report', num: '09', label: 'BC plan report' },

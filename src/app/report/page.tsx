@@ -3,7 +3,11 @@ import { loadWorkspace } from '@/lib/actions';
 import { deriveAll, computeGaps } from '@/lib/domain/scoring';
 import { scoreMaturity, MATURITY_DOMAINS } from '@/lib/domain/maturity';
 import { CATALOG } from '@/lib/domain/scenarios';
-import { rollDownRequirements } from '@/lib/domain/rolldown';
+import {
+  rollDownRequirements,
+  processChainRequirements,
+  detectDependencyCycles,
+} from '@/lib/domain/rolldown';
 import {
   MTPD_LABELS,
   TIER_LABELS,
@@ -86,6 +90,8 @@ export default async function ReportPage() {
 
   const nameOf = (id: string) => ws.processes.find((p) => p.id === id)?.name ?? id;
   const rollDown = rollDownRequirements(ws);
+  const chain = processChainRequirements(ws);
+  const cycles = detectDependencyCycles(ws);
   const remFor = (processId: string, kind: 'rto' | 'rpo') =>
     ws.remediations.find((r) => r.processId === processId && r.kind === kind);
 
@@ -505,6 +511,60 @@ export default async function ReportPage() {
                 </table>
               </div>
             )
+          )}
+
+          {chain.length > 0 && (
+            <div className="mb-5">
+              <h3 className="mb-2 font-display text-lg font-semibold">Process chain</h3>
+              <p className="mb-2 text-sm leading-relaxed text-ink-soft">
+                Upstream processes inherit from everything downstream that cannot run without
+                them. Conflicts listed here mean a process promises less than its dependants
+                require.
+              </p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    {['Process', 'Own tier / RTO', 'Required', 'Supports', 'Conflicts'].map((h) => (
+                      <th key={h} className={th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {chain.map((r) => (
+                    <tr key={r.processId}>
+                      <td className={td}>{r.name}</td>
+                      <td className={`${td} tnum font-mono text-xs`}>
+                        {r.ownTier != null ? `T${r.ownTier}` : '·'}
+                        {' / '}
+                        {r.ownRtoHours != null ? formatHours(r.ownRtoHours) : '·'}
+                      </td>
+                      <td className={`${td} tnum font-mono text-xs`}>
+                        {r.requiredTier != null ? `T${r.requiredTier}` : '·'}
+                        {' / '}
+                        {r.requiredRtoHours != null ? `≤ ${formatHours(r.requiredRtoHours)}` : '·'}
+                      </td>
+                      <td className={`${td} text-xs`}>
+                        {r.consumers.map((c) => c.name).join(', ')}
+                      </td>
+                      <td className={`${td} text-xs`}>
+                        {r.findings.length === 0
+                          ? 'None'
+                          : r.findings.map((f) => f.message).join(' ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {cycles.length > 0 && (
+                <p className="mt-2 text-sm text-bad">
+                  Circular dependencies detected:{' '}
+                  {cycles
+                    .map((c) => `${c.map(nameOf).join(' → ')} → ${nameOf(c[0])}`)
+                    .join('; ')}
+                  . Recovery cannot be sequenced until these are broken.
+                </p>
+              )}
+            </div>
           )}
         </Section>
 

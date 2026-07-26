@@ -9,7 +9,11 @@ import {
 import type { Workspace, Tier, Severity, Horizon } from '@/lib/domain/types';
 import { deriveAll, computeGaps, REVIEW_INTERVAL_MONTHS } from '@/lib/domain/scoring';
 import { scoreMaturity, MATURITY_DOMAINS } from '@/lib/domain/maturity';
-import { rollDownRequirements } from '@/lib/domain/rolldown';
+import {
+  rollDownRequirements,
+  processChainRequirements,
+  detectDependencyCycles,
+} from '@/lib/domain/rolldown';
 import { CATALOG } from '@/lib/domain/scenarios';
 import {
   HORIZONS,
@@ -218,6 +222,8 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
   const derived = deriveAll(ws);
   const maturity = scoreMaturity(ws.maturity);
   const rollDown = rollDownRequirements(ws);
+  const chain = processChainRequirements(ws);
+  const cycles = detectDependencyCycles(ws);
   const generated = formatDate(generatedAt);
 
   const ranked = ws.processes
@@ -762,6 +768,47 @@ export function ReportDocument({ ws, generatedAt }: { ws: Workspace; generatedAt
               </View>
             </View>
           )
+        )}
+
+        {chain.length > 0 && (
+          <View>
+            <Text style={s.subTitle}>Process chain</Text>
+            <Text style={s.body}>
+              Upstream processes inherit from everything downstream that cannot run without them.
+              A conflict means a process promises less than its dependants require.
+            </Text>
+            <View style={s.table}>
+              <View style={s.thRow}>
+                <Th width="22%">Process</Th>
+                <Th width="13%">Own</Th>
+                <Th width="13%">Required</Th>
+                <Th width="24%">Supports</Th>
+                <Th width="28%">Conflicts</Th>
+              </View>
+              {chain.map((r, i) => (
+                <View key={r.processId} style={[s.tr, ...(i % 2 ? [s.trAlt] : [])]}>
+                  <Td width="22%" strong>{r.name}</Td>
+                  <Td width="13%">
+                    {`${r.ownTier != null ? `T${r.ownTier}` : '·'} / ${r.ownRtoHours != null ? formatHours(r.ownRtoHours) : '·'}`}
+                  </Td>
+                  <Td width="13%">
+                    {`${r.requiredTier != null ? `T${r.requiredTier}` : '·'} / ${r.requiredRtoHours != null ? `<= ${formatHours(r.requiredRtoHours)}` : '·'}`}
+                  </Td>
+                  <Td width="24%">{r.consumers.map((c) => c.name).join(', ')}</Td>
+                  <Td width="28%">
+                    {r.findings.length === 0 ? 'None' : r.findings.map((f) => f.message).join(' ')}
+                  </Td>
+                </View>
+              ))}
+            </View>
+            {cycles.length > 0 && (
+              <Text style={[s.body, { color: BAD }]}>
+                {`Circular dependencies detected: ${cycles
+                  .map((c) => `${c.map(nameOf).join(' > ')} > ${nameOf(c[0])}`)
+                  .join('; ')}. Recovery cannot be sequenced until these are broken.`}
+              </Text>
+            )}
+          </View>
         )}
 
         {/* 09 Exercise program */}
