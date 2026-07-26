@@ -15,6 +15,7 @@ import type {
   RecoveryObjectives,
   GapRemediation,
   RecoveryWorkflow,
+  RecoveryStep,
   MaturityLevel,
   DependencyMap,
 } from '@/lib/domain/types';
@@ -578,6 +579,50 @@ export async function deleteExercise(sessionId: string) {
   await withWorkspace((ws) => {
     ws.exercises = ws.exercises.filter((e) => e.id !== sessionId);
   });
+}
+
+// ---------------- AI recovery workflow draft ----------------
+
+export interface WorkflowDraft {
+  steps: RecoveryStep[];
+  assumptions: string[];
+  sequencingNotes: string;
+  fitsRto: boolean;
+  rtoCommentary: string;
+}
+
+/**
+ * Drafts a recovery workflow from the process's own assessment data. The
+ * draft is returned for review rather than saved: a generated sequence is a
+ * starting point for the people who would actually run it, and the person
+ * accountable should press save.
+ */
+export async function draftWorkflowWithAi(
+  processId: string,
+  focus: string
+): Promise<WorkflowDraft> {
+  const { aiEnabled } = await import('@/lib/ai/client');
+  if (!aiEnabled()) throw new Error('AI drafting requires ANTHROPIC_API_KEY to be configured.');
+  const { generateWorkflowWithClaude } = await import('@/lib/ai/generate');
+
+  const ws = await loadWorkspace();
+  if (!ws.processes.some((p) => p.id === processId)) throw new Error('Process not found');
+
+  const draft = await generateWorkflowWithClaude({ ws, processId, focus });
+  return {
+    steps: draft.steps.map((s) => ({
+      id: nanoid(8),
+      description: s.description,
+      team: s.team,
+      durationHours: Math.max(0, s.durationHours),
+      dependencies: s.dependencies,
+      alternateStaff: s.alternateStaff,
+    })),
+    assumptions: draft.assumptions,
+    sequencingNotes: draft.sequencingNotes,
+    fitsRto: draft.fitsRto,
+    rtoCommentary: draft.rtoCommentary,
+  };
 }
 
 // ---------------- Risk register ----------------

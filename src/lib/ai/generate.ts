@@ -7,13 +7,15 @@ import type {
   AfterActionReport,
 } from '@/lib/domain/types';
 import { getAnthropic, AI_MODEL } from './client';
-import { AiScenarioSchema, AarSchema } from './schemas';
-import { workspaceBrief } from './context';
+import { AiScenarioSchema, AarSchema, AiWorkflowSchema, type AiWorkflow } from './schemas';
+import { workspaceBrief, orgBrief, processBrief } from './context';
 import {
   SCENARIO_SYSTEM,
   scenarioUserPrompt,
   AAR_SYSTEM,
   aarUserPrompt,
+  WORKFLOW_SYSTEM,
+  workflowUserPrompt,
 } from './prompts';
 
 function assertUsable(stopReason: string | null): void {
@@ -66,6 +68,41 @@ export async function generateScenarioWithClaude(args: {
     phases: parsed.phases,
     evaluates: parsed.evaluates,
   };
+}
+
+export async function generateWorkflowWithClaude(args: {
+  ws: Workspace;
+  processId: string;
+  focus: string;
+}): Promise<AiWorkflow> {
+  const client = getAnthropic();
+  const response = await client.messages.parse({
+    model: AI_MODEL,
+    max_tokens: 16000,
+    thinking: { type: 'adaptive' },
+    system: WORKFLOW_SYSTEM,
+    messages: [
+      {
+        role: 'user',
+        content: workflowUserPrompt({
+          orgBrief: orgBrief(args.ws),
+          processBrief: processBrief(args.ws, args.processId),
+          focus: args.focus,
+          existingStepCount:
+            args.ws.workflows.find((w) => w.processId === args.processId)?.steps.length ?? 0,
+        }),
+      },
+    ],
+    output_config: { format: zodOutputFormat(AiWorkflowSchema) },
+  });
+
+  assertUsable(response.stop_reason);
+  const parsed = response.parsed_output;
+  if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
+  if (parsed.steps.length === 0) {
+    throw new Error('Claude returned no steps. Add recovery objectives or dependencies and retry.');
+  }
+  return parsed;
 }
 
 export async function generateAarWithClaude(args: {

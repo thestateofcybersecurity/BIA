@@ -51,6 +51,52 @@ export const AiScenarioSchema = z.object({
 
 export type AiScenario = z.infer<typeof AiScenarioSchema>;
 
+/** Mirrors DependencyMap so generated steps drop straight into the editor. */
+const dependencyMap = z.object({
+  people: z.array(z.string()),
+  applications: z.array(z.string()),
+  equipment: z.array(z.string()),
+  facilities: z.array(z.string()),
+  suppliers: z.array(z.string()),
+  data: z.array(z.string()),
+});
+
+export const AiWorkflowSchema = z.object({
+  steps: z.array(
+    z.object({
+      description: z
+        .string()
+        .describe('One action, phrased so its completion is verifiable'),
+      team: z.string().describe('The team or role accountable for this step'),
+      durationHours: z
+        .number()
+        .describe('Hours from starting the step to it being verifiably done'),
+      dependencies: dependencyMap.describe(
+        'Only resources this specific step needs, named exactly as the inventory names them'
+      ),
+      alternateStaff: z
+        .array(z.string())
+        .describe('Who executes this step if the primary team is unavailable'),
+    })
+  ),
+  assumptions: z
+    .array(z.string())
+    .describe('What the sequence assumes that the assessment data does not state'),
+  sequencingNotes: z
+    .string()
+    .describe('Why the order is what it is, and where the critical path runs'),
+  fitsRto: z
+    .boolean()
+    .describe('Whether the sequential total fits inside the stated RTO budget'),
+  rtoCommentary: z
+    .string()
+    .describe(
+      'If it does not fit, what would have to change (parallelism, pre-staging, a strategy investment); if it does, where the headroom is thin'
+    ),
+});
+
+export type AiWorkflow = z.infer<typeof AiWorkflowSchema>;
+
 export const AarSchema = z.object({
   executiveSummary: z.string(),
   timeline: z.array(z.object({ phase: z.string(), summary: z.string() })),

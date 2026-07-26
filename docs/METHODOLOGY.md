@@ -179,6 +179,10 @@ Each completed assessment carries an owner sign-off (name and date); any edit to
 
 Ordered recovery steps per process, each with responsible team, dependencies (same six classes), alternate staff, and estimated duration. The sum of step durations is compared to the target RTO; if the critical path exceeds RTO the app flags it.
 
+With Claude configured, a workflow can be **drafted from the process's own data**: its tier and MTPD, recovery objectives including the RTO budget the sequence must fit, dependency inventory, minimum resource profile at each horizon, open recovery gaps with their remediation, and the threats registered against it. The draft returns the ordered steps plus its sequencing rationale, the assumptions it had to make, and an explicit judgement on whether the sequential total fits the RTO. The prompt instructs the model to report an overrun rather than shrink estimates to fit, because a plan that only fits because the numbers were massaged is worse than no plan.
+
+A draft is never saved automatically. It loads into the editor for review, and the person accountable for the process presses save. The generated durations are a starting point for the people who would actually execute the steps: an estimate nobody has argued with is the one that fails in an exercise.
+
 Each process also carries a **recovery resource profile** (ISO 22317 resource requirements at time of recovery): the minimum staff, workstations or equipment, and facility seats needed at each of the five horizons, plus the vital records and data sets the process cannot operate without. This is what alternate-site sizing and surge planning must actually provide.
 
 ## 8. Dependency requirement roll-down

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { loadWorkspace } from '@/lib/actions';
+import { aiEnabled } from '@/lib/ai/client';
 import { PageHeader } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { WorkflowEditor } from './workflow-editor';
@@ -52,6 +53,7 @@ export default async function WorkflowPage({
         processId={process.id}
         initial={workflow}
         rtoTargetHours={objectives?.rtoTargetHours ?? null}
+        aiAvailable={aiEnabled()}
       />
     </>
   );

@@ -597,14 +597,21 @@ export function sampleWorkspace(): Workspace {
     },
     maturity: {
       updatedAt: ts,
+      // Ratings track what this workspace actually demonstrates, with one
+      // deliberate exception: annualTesting claims a yearly exercise cadence
+      // while no exercise has ever been completed here. That is the most
+      // common self-assessment discrepancy in real programs, and it gives the
+      // evidence check something true to catch.
       answers: {
-        bcpScope: 3, businessOperations: 3, dependencies: 2, alternativesForDependencies: 2,
+        bcpScope: 3, businessOperations: 3, dependencies: 3, alternativesForDependencies: 2,
         legalAndRegulatoryRequirements: 4, internalStakeholders: 3, externalStakeholders: 2, organizationalObjectives: 3,
         bcPolicy: 3, bcPolicyCommunication: 2, bcmTeam: 3, reviewMaintenancePlan: 2, bcmsProjectPlan: 2, topManagementParticipation: 2,
-        riskManagement: 3, riskAssessment: 3,
-        biaProcess: 2, biaConducted: 2, rtosRposDefined: 2, biaReviewed: 1,
-        incidentResponsePlans: 3, recoveryPlanFlexibility: 2, incidentResponseResources: 2, interimProcesses: 1, returnToNormalProcedures: 1,
-        crisisCommunication: 3, emergencyResponsePlans: 4, crisisManagementPlans: 3, crisisTesting: 2,
+        riskManagement: 3, riskAssessment: 3, riskCoverage: 3, riskTreatmentOwnership: 3, riskConcentration: 2,
+        biaProcess: 3, biaConducted: 3, rtosRposDefined: 2, biaSignOff: 2, biaReviewed: 2,
+        incidentResponsePlans: 3, strategySelection: 2, strategyInvestmentCase: 2, dependencyRequirements: 2,
+        recoveryPlanFlexibility: 2, incidentResponseResources: 2, interimProcesses: 1, returnToNormalProcedures: 1,
+        activationCriteria: 3, responseTeamRoster: 3, crisisCommunication: 3,
+        emergencyResponsePlans: 4, crisisManagementPlans: 3, crisisTesting: 1,
         bcTesting: 1, testDocumentation: 1, testReview: 1, annualTesting: 2,
         changeManagementProcedures: 2, documentationSecurity: 3, documentationVersionControl: 2, externalDocumentationControl: 1,
       },

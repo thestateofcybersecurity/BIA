@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { nanoid } from 'nanoid';
-import { saveWorkflow } from '@/lib/actions';
+import { saveWorkflow, draftWorkflowWithAi, type WorkflowDraft } from '@/lib/actions';
 import type { RecoveryWorkflow, RecoveryStep, DependencyMap } from '@/lib/domain/types';
 import { DEPENDENCY_CLASSES, DEPENDENCY_LABELS } from '@/lib/domain/constants';
 import { Card, btn, StatusPill } from '@/components/ui';
@@ -28,16 +28,35 @@ export function WorkflowEditor({
   processId,
   initial,
   rtoTargetHours,
+  aiAvailable,
 }: {
   processId: string;
   initial: RecoveryWorkflow | null;
   rtoTargetHours: number | null;
+  aiAvailable: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
   const [steps, setSteps] = useState<RecoveryStep[]>(initial?.steps ?? []);
   const [open, setOpen] = useState<string | null>(null);
+  const [drafting, startDraft] = useTransition();
+  const [focus, setFocus] = useState('');
+  const [draftNotes, setDraftNotes] = useState<WorkflowDraft | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  const runDraft = () =>
+    startDraft(async () => {
+      setDraftError(null);
+      try {
+        const draft = await draftWorkflowWithAi(processId, focus);
+        setSteps(draft.steps);
+        setDraftNotes(draft);
+        setSaved(false);
+      } catch (e) {
+        setDraftError(e instanceof Error ? e.message : 'Drafting failed.');
+      }
+    });
 
   const update = (id: string, patch: Partial<RecoveryStep>) => {
     setSaved(false);
@@ -60,6 +79,77 @@ export function WorkflowEditor({
 
   return (
     <div className="flex flex-col gap-4">
+      {aiAvailable && (
+        <Card
+          title="Draft with Claude"
+          subtitle="Builds a sequence from this process's objectives, dependencies, resource profile, gaps, and threats"
+        >
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex min-w-[240px] flex-1 flex-col gap-1">
+              <label htmlFor="wf-focus">Anything specific to account for (optional)</label>
+              <input
+                id="wf-focus"
+                value={focus}
+                onChange={(e) => setFocus(e.target.value)}
+                placeholder="Assume the primary site is unreachable, or plan around the untested payment cutover"
+              />
+            </div>
+            <button
+              type="button"
+              className={btn.primary}
+              disabled={drafting}
+              onClick={runDraft}
+            >
+              {drafting ? 'Drafting…' : steps.length > 0 ? 'Replace with a draft' : 'Draft the workflow'}
+            </button>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+            The draft loads into the editor below for review and is not saved until you press save.
+            Treat the durations as a starting point for the people who would actually run the
+            steps: an estimate nobody has argued with is the one that fails in an exercise.
+            {steps.length > 0 && ' Drafting replaces the steps currently in the editor.'}
+          </p>
+          {draftError && <p className="mt-2 text-sm text-bad">{draftError}</p>}
+          {draftNotes && (
+            <div className="mt-4 flex flex-col gap-3 border-t border-line pt-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                  Against the RTO
+                </p>
+                <div className="mt-1 flex items-start gap-2">
+                  <StatusPill tone={draftNotes.fitsRto ? 'ok' : 'bad'}>
+                    {draftNotes.fitsRto ? 'Fits' : 'Does not fit'}
+                  </StatusPill>
+                  <p className="text-sm text-ink-soft">{draftNotes.rtoCommentary}</p>
+                </div>
+              </div>
+              {draftNotes.sequencingNotes && (
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                    Why this order
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-soft">
+                    {draftNotes.sequencingNotes}
+                  </p>
+                </div>
+              )}
+              {draftNotes.assumptions.length > 0 && (
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                    Assumptions to confirm
+                  </p>
+                  <ul className="mt-1 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-soft">
+                    {draftNotes.assumptions.map((a) => (
+                      <li key={a}>{a}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <span className="tnum font-mono text-sm text-ink-soft">
           {steps.length} steps · {formatHours(total)} sequential time
