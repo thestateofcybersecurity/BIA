@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { getAuthContext } from '@/lib/auth';
-import { listOrgMembers } from '@/lib/org-actions';
+import { listOrgMembers, listOrgDomains } from '@/lib/org-actions';
 import { tenancyEnabled } from '@/lib/data/tenancy';
 import { can, ROLE_LABELS } from '@/lib/domain/authz';
-import { PageHeader, Card, StatusPill, EmptyState, btn } from '@/components/ui';
+import { PageHeader, Card, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { MembersClient } from './members-client';
+import { OrgSettings } from './org-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,8 @@ export default async function TeamPage() {
 
   const members = await listOrgMembers();
   const canManage = can(ctx.role, 'member:manage');
+  const canManageOrg = can(ctx.role, 'org:manage');
+  const domains = await listOrgDomains();
 
   return (
     <>
@@ -84,7 +87,7 @@ export default async function TeamPage() {
         </ul>
       </HelpBox>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col gap-6">
         <Card title="Organization" subtitle="This workspace and how it is identified">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3 text-sm">
             <span>
@@ -95,9 +98,10 @@ export default async function TeamPage() {
             </span>
             <span>
               <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-                Domain
+                Joining domain
               </span>
-              {ctx.organization.primaryDomain ?? 'Private workspace, no domain'}
+              {domains.find((d) => d.status === 'active')?.domain ??
+                'None active; this workspace is private to its members'}
             </span>
             <span>
               <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-muted">
@@ -105,27 +109,10 @@ export default async function TeamPage() {
               </span>
               {ROLE_LABELS[ctx.role]}
             </span>
-            {ctx.organization.primaryDomain && (
-              <span>
-                <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-                  Domain status
-                </span>
-                {ctx.organization.domainVerifiedAt ? (
-                  <StatusPill tone="ok">Verified</StatusPill>
-                ) : (
-                  <StatusPill tone="warn">Claimed, not verified</StatusPill>
-                )}
-              </span>
-            )}
           </div>
-          {ctx.organization.primaryDomain && !ctx.organization.domainVerifiedAt && (
-            <p className="mt-3 text-xs leading-relaxed text-ink-muted">
-              This domain was claimed by whoever registered first rather than proven by DNS. That
-              is fine for a team that knows who set the workspace up; proving it becomes worth
-              doing before the plan holds anything you would not want a new starter to read.
-            </p>
-          )}
         </Card>
+
+        {canManageOrg && <OrgSettings orgName={ctx.organization.name} domains={domains} />}
       </div>
 
       <MembersClient members={members} myRole={ctx.role} canManage={canManage} />

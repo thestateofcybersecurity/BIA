@@ -8,6 +8,13 @@ import {
   setMemberRole,
   removeMember,
   getMembership,
+  listDomains,
+  addDomainClaim,
+  verifyDomainClaim,
+  removeDomainClaim,
+  renameOrganization,
+  verificationHost,
+  verificationRecord,
   type Organization,
 } from '@/lib/data/tenancy';
 import { assertCan, ORG_ROLES, type OrgRole } from '@/lib/domain/authz';
@@ -161,4 +168,85 @@ export async function currentOrganization(): Promise<{
 }> {
   const ctx = await getAuthContext();
   return { organization: ctx.organization, role: ctx.role };
+}
+
+// ---------------- Organization identity ----------------
+
+export async function renameOrg(name: string): Promise<MemberActionResult> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'org:manage');
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return { ok: false, message: 'Give the organization a name.' };
+  if (trimmed.length > 120) return { ok: false, message: 'That name is too long.' };
+  await renameOrganization(ctx.organization.id, trimmed);
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+export interface DomainView {
+  domain: string;
+  status: 'pending' | 'active';
+  verifiedAt: string | null;
+  /** Present only while a claim is pending, so the owner can publish it. */
+  recordHost: string | null;
+  recordValue: string | null;
+}
+
+export async function listOrgDomains(): Promise<DomainView[]> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'member:view');
+  const claims = await listDomains(ctx.organization.id);
+  return claims.map((c) => ({
+    domain: c.domain,
+    status: c.status,
+    verifiedAt: c.verifiedAt,
+    recordHost: c.verificationToken ? verificationHost(c.domain) : null,
+    recordValue: c.verificationToken ? verificationRecord(c.verificationToken) : null,
+  }));
+}
+
+export async function addOrgDomain(domain: string): Promise<MemberActionResult> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'org:manage');
+  const result = await addDomainClaim(ctx.organization.id, domain, ctx.userId);
+  if (!result.ok) {
+    return {
+      ok: false,
+      message:
+        result.reason === 'taken'
+          ? 'That domain is already claimed by another organization.'
+          : 'That domain cannot be claimed. Personal mailbox providers, disposable address services, and reserved domains are excluded.',
+    };
+  }
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+export async function verifyOrgDomain(domain: string): Promise<MemberActionResult> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'org:manage');
+  const result = await verifyDomainClaim(ctx.organization.id, domain);
+  if (!result.ok) {
+    const detail =
+      result.found.length > 0 ? ` Found instead: ${result.found.join(', ')}` : '';
+    return {
+      ok: false,
+      message:
+        result.reason === 'not_found'
+          ? 'That domain is not claimed by this organization.'
+          : result.reason === 'no_record'
+            ? `No TXT record found at ${verificationHost(domain)}. DNS changes can take a few minutes to publish.`
+            : `The TXT record does not match the expected value.${detail}`,
+    };
+  }
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+export async function removeOrgDomain(domain: string): Promise<MemberActionResult> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'org:manage');
+  await removeDomainClaim(ctx.organization.id, domain);
+  revalidatePath('/', 'layout');
+  return { ok: true };
 }

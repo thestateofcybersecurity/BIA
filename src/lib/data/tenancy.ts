@@ -110,6 +110,13 @@ async function getSql() {
           added_by text,
           created_at timestamptz NOT NULL DEFAULT now()
         )`;
+      // A domain added by an owner is inert until DNS proves it. Only an
+      // active domain admits new members, which is what stops someone
+      // claiming a company they have no connection to and collecting its
+      // staff as they sign up. Domains claimed the original way, by the first
+      // verified mailbox at that domain, default to active.
+      await sql`ALTER TABLE org_domains ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active'`;
+      await sql`ALTER TABLE org_domains ADD COLUMN IF NOT EXISTS verification_token text`;
       await sql`
         CREATE TABLE IF NOT EXISTS memberships (
           org_id text NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -266,9 +273,11 @@ export async function resolveOrgForUser(user: {
   }
 
   const domain = verdict.domain;
+  // Only an active domain admits members; a pending claim awaiting DNS
+  // proof must not collect people.
   const claimed = (await sql`
     SELECT o.* FROM org_domains d JOIN organizations o ON o.id = d.org_id
-    WHERE d.domain = ${domain}
+    WHERE d.domain = ${domain} AND d.status = 'active'
   `) as OrgRow[];
 
   if (claimed.length > 0) {
@@ -414,6 +423,154 @@ export async function removeMember(
   }
   await sql`DELETE FROM memberships WHERE org_id = ${orgId} AND user_id = ${targetUserId}`;
   return { ok: true };
+}
+
+// ---------------- Domain claims ----------------
+
+export type DomainStatus = 'pending' | 'active';
+
+export interface DomainClaim {
+  domain: string;
+  orgId: string;
+  status: DomainStatus;
+  verifiedAt: string | null;
+  /** Value the TXT record must contain; null once claimed the original way. */
+  verificationToken: string | null;
+  createdAt: string;
+}
+
+/** Host the TXT record goes on, kept off the apex to avoid clobbering SPF. */
+export function verificationHost(domain: string): string {
+  return `_bia-challenge.${domain}`;
+}
+
+export function verificationRecord(token: string): string {
+  return `bia-verification=${token}`;
+}
+
+type DomainRow = {
+  domain: string;
+  org_id: string;
+  status: string;
+  verified_at: Date | string | null;
+  verification_token: string | null;
+  created_at: Date | string;
+};
+
+const toDomain = (r: DomainRow): DomainClaim => ({
+  domain: r.domain,
+  orgId: r.org_id,
+  status: r.status as DomainStatus,
+  verifiedAt: iso(r.verified_at),
+  verificationToken: r.verification_token,
+  createdAt: iso(r.created_at)!,
+});
+
+export async function listDomains(orgId: string): Promise<DomainClaim[]> {
+  if (!tenancyEnabled()) return [];
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT * FROM org_domains WHERE org_id = ${orgId} ORDER BY created_at ASC
+  `) as DomainRow[];
+  return rows.map(toDomain);
+}
+
+export type AddDomainResult =
+  | { ok: true; claim: DomainClaim }
+  | { ok: false; reason: 'not_claimable' | 'taken' };
+
+/**
+ * Start a domain claim for an existing organization. The claim is pending
+ * until DNS proves it: possessing a mailbox at a domain is reasonable
+ * evidence of belonging to it, but typing a domain into a form is not, so an
+ * owner adding a domain has to demonstrate control of it.
+ */
+export async function addDomainClaim(
+  orgId: string,
+  rawDomain: string,
+  addedBy: string
+): Promise<AddDomainResult> {
+  const domain = rawDomain.trim().toLowerCase().replace(/^@/, '').replace(/\.$/, '');
+  // Reuse the signup policy: consumer, disposable, and reserved domains are
+  // no more claimable here than they are there.
+  const verdict = evaluateDomain(`someone@${domain}`, true);
+  if (!verdict.claimable) return { ok: false, reason: 'not_claimable' };
+
+  const sql = await getSql();
+  const token = nanoid(24);
+  const rows = (await sql`
+    INSERT INTO org_domains (domain, org_id, added_by, status, verification_token)
+    VALUES (${domain}, ${orgId}, ${addedBy}, 'pending', ${token})
+    ON CONFLICT (domain) DO NOTHING
+    RETURNING *
+  `) as DomainRow[];
+  if (rows.length === 0) return { ok: false, reason: 'taken' };
+  return { ok: true, claim: toDomain(rows[0]) };
+}
+
+export async function removeDomainClaim(orgId: string, domain: string): Promise<void> {
+  const sql = await getSql();
+  await sql`DELETE FROM org_domains WHERE org_id = ${orgId} AND domain = ${domain}`;
+}
+
+export type TxtResolver = (host: string) => Promise<string[][]>;
+
+async function defaultResolver(host: string): Promise<string[][]> {
+  const { resolveTxt } = await import('node:dns/promises');
+  return resolveTxt(host);
+}
+
+export type VerifyResult =
+  | { ok: true }
+  | { ok: false; reason: 'not_found' | 'no_record' | 'mismatch'; found: string[] };
+
+/**
+ * Check the TXT record and activate the domain if it matches. Resolver is
+ * injectable so the matching logic can be tested without a live zone.
+ */
+export async function verifyDomainClaim(
+  orgId: string,
+  domain: string,
+  resolver: TxtResolver = defaultResolver
+): Promise<VerifyResult> {
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT * FROM org_domains WHERE org_id = ${orgId} AND domain = ${domain}
+  `) as DomainRow[];
+  if (rows.length === 0) return { ok: false, reason: 'not_found', found: [] };
+  const claim = toDomain(rows[0]);
+  if (!claim.verificationToken) return { ok: true };
+
+  const expected = verificationRecord(claim.verificationToken);
+  let records: string[][];
+  try {
+    records = await resolver(verificationHost(domain));
+  } catch {
+    return { ok: false, reason: 'no_record', found: [] };
+  }
+  // A TXT answer arrives as chunks that concatenate; long values are split
+  // at 255 characters by the protocol.
+  const values = records.map((chunks) => chunks.join('').trim());
+  if (values.length === 0) return { ok: false, reason: 'no_record', found: [] };
+  if (!values.includes(expected)) return { ok: false, reason: 'mismatch', found: values };
+
+  await sql`
+    UPDATE org_domains
+    SET status = 'active', verified_at = now(), verification_token = NULL
+    WHERE org_id = ${orgId} AND domain = ${domain}
+  `;
+  // A verified domain becomes the organization's identity when it has none.
+  await sql`
+    UPDATE organizations SET primary_domain = COALESCE(primary_domain, ${domain}),
+                             domain_verified_at = now()
+    WHERE id = ${orgId}
+  `;
+  return { ok: true };
+}
+
+export async function renameOrganization(orgId: string, name: string): Promise<void> {
+  const sql = await getSql();
+  await sql`UPDATE organizations SET name = ${name.trim()} WHERE id = ${orgId}`;
 }
 
 /** Organization ids with a workspace, for the scheduled notification job. */
