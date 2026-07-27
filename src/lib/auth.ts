@@ -102,6 +102,18 @@ export async function getAuthContext(): Promise<AuthContext> {
   };
 }
 
+/**
+ * Same as getAuthContext but returns null instead of redirecting, for
+ * chrome that renders on public routes such as the contribution links.
+ */
+export async function getAuthContextOptional(): Promise<AuthContext | null> {
+  if (authEnabled()) {
+    const { data: session } = await getAuth().getSession();
+    if (!session?.user) return null;
+  }
+  return getAuthContext();
+}
+
 /** The workspace key for the caller's active organization. */
 export async function getOrgId(): Promise<string> {
   return (await getAuthContext()).organization.id;

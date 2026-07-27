@@ -2,24 +2,40 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import type { Capability } from '@/lib/domain/authz';
 
-const STEPS = [
-  { href: '/', num: '00', label: 'Dashboard' },
-  { href: '/organization', num: '01', label: 'Organization' },
-  { href: '/processes', num: '02', label: 'Processes' },
-  { href: '/assessments', num: '03', label: 'Impact assessment' },
-  { href: '/risks', num: '04', label: 'Risk register' },
-  { href: '/gaps', num: '05', label: 'Objectives & gaps' },
-  { href: '/recovery', num: '06', label: 'Recovery workflows' },
-  { href: '/requirements', num: '07', label: 'Requirements' },
-  { href: '/activation', num: '08', label: 'Activation & comms' },
-  { href: '/maturity', num: '09', label: 'Maturity' },
-  { href: '/exercises', num: '10', label: 'Tabletop exercises' },
-  { href: '/report', num: '11', label: 'BC plan report' },
+/**
+ * Each step names the capability needed to open it. Hiding a link is not
+ * access control (the pages and actions enforce their own), but showing
+ * someone a link that will refuse them is its own kind of rudeness.
+ */
+const STEPS: { href: string; num: string; label: string; needs: Capability }[] = [
+  { href: '/', num: '00', label: 'Dashboard', needs: 'dashboard:view' },
+  { href: '/organization', num: '01', label: 'Organization', needs: 'process:read' },
+  { href: '/processes', num: '02', label: 'Processes', needs: 'process:read' },
+  { href: '/assessments', num: '03', label: 'Impact assessment', needs: 'assessment:read' },
+  { href: '/risks', num: '04', label: 'Risk register', needs: 'risk:read' },
+  { href: '/gaps', num: '05', label: 'Objectives & gaps', needs: 'objectives:read' },
+  { href: '/recovery', num: '06', label: 'Recovery workflows', needs: 'workflow:read' },
+  { href: '/requirements', num: '07', label: 'Requirements', needs: 'requirements:read' },
+  { href: '/activation', num: '08', label: 'Activation & comms', needs: 'plan:read' },
+  { href: '/maturity', num: '09', label: 'Maturity', needs: 'maturity:read' },
+  { href: '/exercises', num: '10', label: 'Tabletop exercises', needs: 'exercise:read' },
+  { href: '/report', num: '11', label: 'BC plan report', needs: 'report:export' },
 ];
 
-export function Nav({ account }: { account?: React.ReactNode }) {
+export function Nav({
+  account,
+  allowed,
+  canViewTeam,
+}: {
+  account?: React.ReactNode;
+  /** Capabilities the signed-in member holds. */
+  allowed: Capability[];
+  canViewTeam: boolean;
+}) {
   const pathname = usePathname();
+  const held = new Set(allowed);
 
   // Contribution pages are for invited process owners with no account: the
   // workspace navigation is not theirs to see, and every link would bounce
@@ -38,7 +54,7 @@ export function Nav({ account }: { account?: React.ReactNode }) {
       </Link>
 
       <nav className="flex flex-col gap-0.5">
-        {STEPS.map((s) => {
+        {STEPS.filter((s) => held.has(s.needs)).map((s) => {
           const active =
             s.href === '/' ? pathname === '/' : pathname.startsWith(s.href);
           return (
@@ -65,6 +81,18 @@ export function Nav({ account }: { account?: React.ReactNode }) {
       </nav>
 
       <div className="mt-auto flex flex-col gap-3 border-t border-line pt-4">
+        {canViewTeam && (
+          <Link
+            href="/team"
+            className={`rounded-md px-3 py-2 text-sm transition-colors ${
+              pathname.startsWith('/team')
+                ? 'bg-ink text-paper'
+                : 'text-ink-soft hover:bg-accent-soft hover:text-ink'
+            }`}
+          >
+            People &amp; access
+          </Link>
+        )}
         {account}
         <p className="font-mono text-[10px] leading-relaxed text-ink-faint">
           ISO 22317 · ISO 22301

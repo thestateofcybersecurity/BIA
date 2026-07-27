@@ -24,6 +24,37 @@ const QUERIES = [
   (sql: Sql, id: string) => sql`SELECT email, name FROM neon_auth.users_sync WHERE id = ${id}`,
 ];
 
+/**
+ * Names and addresses for a set of users, for the members list. Falls back
+ * to an empty map rather than failing the page: a members list showing ids
+ * is worse than nothing, but a members page that will not load is worse
+ * still.
+ */
+export async function getUserContacts(
+  userIds: string[]
+): Promise<Map<string, UserContact>> {
+  const out = new Map<string, UserContact>();
+  const url = process.env.DATABASE_URL;
+  if (!url || userIds.length === 0) return out;
+  const sql = neon(url);
+  const batched = [
+    () => sql`SELECT id, email, name FROM neon_auth."user" WHERE id = ANY(${userIds})`,
+    () => sql`SELECT id, email, name FROM neon_auth.users_sync WHERE id = ANY(${userIds})`,
+  ];
+  for (const run of batched) {
+    try {
+      const rows = (await run()) as { id: string; email?: string; name?: string }[];
+      for (const r of rows) {
+        if (r.email) out.set(r.id, { email: r.email, name: r.name ?? null });
+      }
+      if (out.size > 0) return out;
+    } catch {
+      // Table missing in this layout; try the next.
+    }
+  }
+  return out;
+}
+
 export async function getUserContact(userId: string): Promise<UserContact | null> {
   const url = process.env.DATABASE_URL;
   if (!url) return null;

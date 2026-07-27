@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { connection } from 'next/server';
 import { authEnabled, getAuth } from '@/lib/neon-auth';
 import { SignOutButton } from '@/components/sign-out-button';
+import { OrgSwitcher } from '@/components/org-switcher';
+import { listSwitchableOrgs } from '@/lib/org-actions';
+import { tenancyEnabled } from '@/lib/data/tenancy';
 
 /** Server component rendered into the sidebar footer. */
 export async function AccountWidget() {
@@ -29,13 +32,18 @@ export async function AccountWidget() {
     );
   }
 
+  const orgs = tenancyEnabled() ? await listSwitchableOrgs() : [];
+
   return (
-    <div className="min-w-0">
-      <p className="truncate text-xs text-ink-soft" title={session.user.email ?? undefined}>
-        {session.user.name || session.user.email}
-      </p>
-      <div className="mt-1">
-        <SignOutButton />
+    <div className="flex min-w-0 flex-col gap-2">
+      {orgs.length > 0 && <OrgSwitcher options={orgs} />}
+      <div className="min-w-0 border-t border-line/60 pt-2">
+        <p className="truncate text-xs text-ink-soft" title={session.user.email ?? undefined}>
+          {session.user.name || session.user.email}
+        </p>
+        <div className="mt-1">
+          <SignOutButton />
+        </div>
       </div>
     </div>
   );
