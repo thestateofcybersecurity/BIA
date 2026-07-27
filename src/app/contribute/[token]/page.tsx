@@ -44,8 +44,8 @@ export default async function ContributePage({
     );
   }
 
-  const { userId, processId, requestId } = verified.claims;
-  const ws = await getStore().load(userId);
+  const { orgId, processId, requestId } = verified.claims;
+  const ws = await getStore().load(orgId);
   const request = ws.collectionRequests.find((r) => r.id === requestId);
   const process = ws.processes.find((p) => p.id === processId);
 

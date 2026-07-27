@@ -12,8 +12,8 @@ const TTL_DAYS = 30;
 export const CONTRIBUTION_TTL_MS = TTL_DAYS * 24 * 60 * 60 * 1000;
 
 export interface ContributionClaims {
-  /** Workspace owner (the BIA coordinator). */
-  userId: string;
+  /** Organization owning the workspace. */
+  orgId: string;
   processId: string;
   /** Collection request id, so a revoked request invalidates the link. */
   requestId: string;
@@ -45,7 +45,7 @@ export function createContributionToken(claims: ContributionClaims): string {
   const payload = b64url(
     Buffer.from(
       JSON.stringify({
-        u: claims.userId,
+        u: claims.orgId,
         p: claims.processId,
         r: claims.requestId,
         i: claims.issuedAt,
@@ -91,5 +91,5 @@ export function verifyContributionToken(
   }
   if (now - i > CONTRIBUTION_TTL_MS) return { ok: false, reason: 'expired' };
 
-  return { ok: true, claims: { userId: u, processId: p, requestId: r, issuedAt: i } };
+  return { ok: true, claims: { orgId: u, processId: p, requestId: r, issuedAt: i } };
 }

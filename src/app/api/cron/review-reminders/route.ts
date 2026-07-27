@@ -1,6 +1,8 @@
 import { getStore } from '@/lib/data/store';
 import { isAssessmentComplete, isReviewDue } from '@/lib/domain/scoring';
 import { emailEnabled } from '@/lib/email/client';
+import { listMembers } from '@/lib/data/tenancy';
+import { can } from '@/lib/domain/authz';
 import { notifyWorkspaceUser, notificationsAllowed } from '@/lib/email/send';
 import { reviewReminderEmail } from '@/lib/email/templates';
 
@@ -22,14 +24,14 @@ export async function GET(req: Request) {
   }
 
   const store = getStore();
-  const userIds = await store.listUserIds();
+  const orgIds = await store.listOrgIds();
   let sent = 0;
   let skippedPrefs = 0;
   let nothingDue = 0;
   let noContact = 0;
 
-  for (const userId of userIds) {
-    const ws = await store.load(userId);
+  for (const orgId of orgIds) {
+    const ws = await store.load(orgId);
     if (!notificationsAllowed(ws, 'reviewReminders')) {
       skippedPrefs++;
       continue;
@@ -44,23 +46,29 @@ export async function GET(req: Request) {
       nothingDue++;
       continue;
     }
-    const ok = await notifyWorkspaceUser(
-      ws,
-      userId,
-      'reviewReminders',
-      reviewReminderEmail({
-        orgName: ws.org?.name ?? 'your organization',
-        reviewDue,
-        awaitingSignOff,
-      })
+    // Reminders go to the people who can act on them, not to whoever
+    // happened to create the workspace.
+    const recipients = (await listMembers(orgId)).filter((m) =>
+      can(m.role, 'objectives:write')
     );
-    if (ok) sent++;
+    const content = reviewReminderEmail({
+      orgName: ws.org?.name ?? 'your organization',
+      reviewDue,
+      awaitingSignOff,
+    });
+    let delivered = 0;
+    for (const member of recipients) {
+      if (await notifyWorkspaceUser(ws, member.userId, 'reviewReminders', content)) {
+        delivered++;
+      }
+    }
+    if (delivered > 0) sent++;
     else noContact++;
   }
 
   return Response.json({
     ok: true,
-    workspaces: userIds.length,
+    workspaces: orgIds.length,
     sent,
     nothingDue,
     skippedPrefs,

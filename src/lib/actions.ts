@@ -3,9 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { getStore, emptyWorkspace } from '@/lib/data/store';
+import { getStore, emptyWorkspace, ConcurrentEditError } from '@/lib/data/store';
 import { isAssessmentComplete } from '@/lib/domain/scoring';
-import { getUserId } from '@/lib/auth';
+import { getAuthContext, getUserId } from '@/lib/auth';
+import {
+  assertCan,
+  assertCanWriteAssessment,
+  redactWorkspaceFor,
+  type Capability,
+} from '@/lib/domain/authz';
 import { sampleWorkspace } from '@/lib/data/sample';
 import type {
   Workspace,
@@ -20,20 +26,48 @@ import type {
   DependencyMap,
 } from '@/lib/domain/types';
 
+/**
+ * Every mutation goes through here: it checks the caller's role against the
+ * capability the action needs, then applies the change under optimistic
+ * concurrency. When another member saved first the mutation is replayed
+ * against fresh data rather than overwriting them, which is what stops two
+ * people editing different processes from destroying each other's work.
+ */
 async function withWorkspace(
+  capability: Capability,
   mutate: (ws: Workspace) => void
 ): Promise<void> {
-  const userId = await getUserId();
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, capability);
   const store = getStore();
-  const ws = await store.load(userId);
-  mutate(ws);
-  await store.save(userId, ws);
-  revalidatePath('/', 'layout');
+  const orgId = ctx.organization.id;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { workspace, version } = await store.loadForUpdate(orgId);
+    mutate(workspace);
+    if (await store.save(orgId, workspace, version)) {
+      revalidatePath('/', 'layout');
+      return;
+    }
+  }
+  throw new ConcurrentEditError();
 }
 
+/**
+ * The workspace as this member is allowed to see it. Redaction happens here
+ * rather than in the pages, so nothing a role cannot read is ever serialized
+ * into the response.
+ */
 export async function loadWorkspace(): Promise<Workspace> {
-  const userId = await getUserId();
-  return getStore().load(userId);
+  const ctx = await getAuthContext();
+  const ws = await getStore().load(ctx.organization.id);
+  return redactWorkspaceFor(ws, ctx.role);
+}
+
+/** Unredacted read for server-side work that has already checked its own access. */
+async function loadWorkspaceRaw(): Promise<Workspace> {
+  const ctx = await getAuthContext();
+  return getStore().load(ctx.organization.id);
 }
 
 // ---------------- Org profile ----------------
@@ -50,7 +84,7 @@ const orgSchema = z.object({
 
 export async function saveOrg(input: Omit<OrgProfile, 'updatedAt'>) {
   const parsed = orgSchema.parse(input);
-  await withWorkspace((ws) => {
+  await withWorkspace('profile:write', (ws) => {
     ws.org = { ...parsed, updatedAt: new Date().toISOString() };
   });
 }
@@ -84,7 +118,7 @@ export async function saveProcess(input: z.infer<typeof processSchema>) {
   const parsed = processSchema.parse(input);
   const now = new Date().toISOString();
   let id = parsed.id;
-  await withWorkspace((ws) => {
+  await withWorkspace('process:write', (ws) => {
     if (id) {
       const existing = ws.processes.find((p) => p.id === id);
       if (!existing) throw new Error('Process not found');
@@ -98,7 +132,7 @@ export async function saveProcess(input: z.infer<typeof processSchema>) {
 }
 
 export async function deleteProcess(id: string) {
-  await withWorkspace((ws) => {
+  await withWorkspace('process:write', (ws) => {
     ws.processes = ws.processes.filter((p) => p.id !== id);
     ws.assessments = ws.assessments.filter((a) => a.processId !== id);
     ws.objectives = ws.objectives.filter((o) => o.processId !== id);
@@ -145,7 +179,11 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
   let processName = '';
   let processOwner = '';
   let snapshot: Workspace | null = null;
-  await withWorkspace((ws) => {
+  const ctx = await getAuthContext();
+  await withWorkspace('assessment:writeOwn', (ws) => {
+    // Coordinators write any assessment; a contributor only their own.
+    const target = ws.processes.find((p) => p.id === parsed.processId);
+    if (target) assertCanWriteAssessment(ctx.member, target);
     const existing = ws.assessments.find((a) => a.processId === parsed.processId);
     const wasCompleteAndUnapproved =
       existing != null && isAssessmentComplete(existing) && !existing.approvedBy;
@@ -192,7 +230,7 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
 export async function approveAssessment(processId: string, approver: string) {
   const name = approver.trim();
   if (!name) throw new Error('Approver name is required.');
-  await withWorkspace((ws) => {
+  await withWorkspace('assessment:approve', (ws) => {
     const a = ws.assessments.find((x) => x.processId === processId);
     if (!a) throw new Error('Assessment not found');
     a.approvedBy = name;
@@ -216,7 +254,7 @@ const objectivesSchema = z.object({
 export async function saveObjectives(input: z.infer<typeof objectivesSchema>) {
   const parsed = objectivesSchema.parse(input);
   const now = new Date().toISOString();
-  await withWorkspace((ws) => {
+  await withWorkspace('objectives:write', (ws) => {
     const existing = ws.objectives.find((o) => o.processId === parsed.processId);
     if (existing) {
       Object.assign(existing, { ...parsed, id: existing.id, updatedAt: now });
@@ -251,7 +289,7 @@ const remediationSchema = z.object({
 export async function saveRemediation(input: z.infer<typeof remediationSchema>) {
   const parsed = remediationSchema.parse(input);
   const now = new Date().toISOString();
-  await withWorkspace((ws) => {
+  await withWorkspace('objectives:write', (ws) => {
     const existing = ws.remediations.find(
       (r) => r.processId === parsed.processId && r.kind === parsed.kind
     );
@@ -281,7 +319,7 @@ export async function saveResourceProfile(
 ) {
   const parsed = resourceProfileSchema.parse(input);
   const now = new Date().toISOString();
-  await withWorkspace((ws) => {
+  await withWorkspace('workflow:write', (ws) => {
     const existing = ws.resourceProfiles.find((r) => r.processId === parsed.processId);
     if (existing) {
       Object.assign(existing, { ...parsed, id: existing.id, updatedAt: now });
@@ -310,7 +348,7 @@ const workflowSchema = z.object({
 export async function saveWorkflow(input: z.infer<typeof workflowSchema>) {
   const parsed = workflowSchema.parse(input);
   const now = new Date().toISOString();
-  await withWorkspace((ws) => {
+  await withWorkspace('workflow:write', (ws) => {
     const existing = ws.workflows.find((w) => w.processId === parsed.processId);
     if (existing) {
       existing.steps = parsed.steps;
@@ -326,7 +364,7 @@ export async function saveWorkflow(input: z.infer<typeof workflowSchema>) {
 export async function saveMaturityAnswers(
   answers: Record<string, MaturityLevel | null>
 ) {
-  await withWorkspace((ws) => {
+  await withWorkspace('maturity:write', (ws) => {
     ws.maturity = {
       answers: { ...(ws.maturity?.answers ?? {}), ...answers },
       updatedAt: new Date().toISOString(),
@@ -365,7 +403,7 @@ export async function importCsv(
   if (valid.length === 0) return result;
 
   const now = new Date().toISOString();
-  await withWorkspace((ws) => {
+  await withWorkspace('process:write', (ws) => {
     const byName = new Map(ws.processes.map((p) => [p.name.toLowerCase(), p]));
 
     for (const row of valid) {
@@ -446,7 +484,7 @@ export async function startLibraryExercise(scenarioId: string): Promise<{ id: st
   if (!scenario) throw new Error('Unknown scenario');
   const now = new Date().toISOString();
   const id = nanoid(10);
-  await withWorkspace((w) => {
+  await withWorkspace('exercise:run', (w) => {
     w.exercises.push({
       id,
       scenarioId,
@@ -488,7 +526,7 @@ export async function startAiExercise(
 
   const now = new Date().toISOString();
   const id = nanoid(10);
-  await withWorkspace((w) => {
+  await withWorkspace('exercise:run', (w) => {
     w.exercises.push({
       id,
       scenarioId,
@@ -523,7 +561,7 @@ const progressSchema = z.object({
 
 export async function saveExerciseProgress(input: z.infer<typeof progressSchema>) {
   const parsed = progressSchema.parse(input);
-  await withWorkspace((ws) => {
+  await withWorkspace('exercise:run', (ws) => {
     const session = ws.exercises.find((e) => e.id === parsed.sessionId);
     if (!session) throw new Error('Session not found');
     session.currentPhase = parsed.currentPhase;
@@ -534,7 +572,7 @@ export async function saveExerciseProgress(input: z.infer<typeof progressSchema>
 }
 
 export async function completeExercise(sessionId: string) {
-  await withWorkspace((ws) => {
+  await withWorkspace('exercise:run', (ws) => {
     const session = ws.exercises.find((e) => e.id === sessionId);
     if (!session) throw new Error('Session not found');
     session.status = 'completed';
@@ -553,7 +591,7 @@ export async function generateExerciseReport(sessionId: string) {
   if (session.status !== 'completed') throw new Error('Complete the exercise before generating the report.');
 
   const report = await generateAarWithClaude({ ws, session });
-  await withWorkspace((w) => {
+  await withWorkspace('exercise:run', (w) => {
     const s = w.exercises.find((e) => e.id === sessionId);
     if (!s) throw new Error('Session not found');
     s.report = report;
@@ -576,7 +614,7 @@ export async function generateExerciseReport(sessionId: string) {
 }
 
 export async function deleteExercise(sessionId: string) {
-  await withWorkspace((ws) => {
+  await withWorkspace('exercise:run', (ws) => {
     ws.exercises = ws.exercises.filter((e) => e.id !== sessionId);
   });
 }
@@ -648,7 +686,7 @@ export async function saveRisk(input: z.infer<typeof riskSchema>) {
   const parsed = riskSchema.parse(input);
   const now = new Date().toISOString();
   let id = parsed.id;
-  await withWorkspace((ws) => {
+  await withWorkspace('risk:write', (ws) => {
     if (id) {
       const existing = ws.risks.find((r) => r.id === id);
       if (!existing) throw new Error('Risk not found');
@@ -662,7 +700,7 @@ export async function saveRisk(input: z.infer<typeof riskSchema>) {
 }
 
 export async function deleteRisk(id: string) {
-  await withWorkspace((ws) => {
+  await withWorkspace('risk:write', (ws) => {
     ws.risks = ws.risks.filter((r) => r.id !== id);
   });
 }
@@ -682,9 +720,10 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
     return { ok: false as const, reason: 'unconfigured' as const };
   }
 
-  const userId = await getUserId();
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'collection:manage');
   const store = getStore();
-  const ws = await store.load(userId);
+  const { workspace: ws, version } = await store.loadForUpdate(ctx.organization.id);
   const process = ws.processes.find((p) => p.id === processId);
   if (!process) return { ok: false as const, reason: 'not_found' as const };
 
@@ -698,7 +737,7 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
   }
 
   const token = createContributionToken({
-    userId,
+    orgId: ctx.organization.id,
     processId,
     requestId,
     issuedAt: now.getTime(),
@@ -743,7 +782,7 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
     submittedAt: null,
     emailed,
   });
-  await store.save(userId, ws);
+  if (!(await store.save(ctx.organization.id, ws, version))) throw new ConcurrentEditError();
   revalidatePath('/', 'layout');
 
   // The link is returned so the coordinator can pass it on themselves when
@@ -752,7 +791,7 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
 }
 
 export async function revokeAssessmentRequest(requestId: string) {
-  await withWorkspace((ws) => {
+  await withWorkspace('collection:manage', (ws) => {
     const request = ws.collectionRequests.find((r) => r.id === requestId);
     if (request) request.status = 'revoked';
   });
@@ -799,7 +838,7 @@ const planSchema = z.object({
 
 export async function savePlan(input: z.infer<typeof planSchema>) {
   const parsed = planSchema.parse(input);
-  await withWorkspace((ws) => {
+  await withWorkspace('plan:write', (ws) => {
     ws.plan = { ...parsed, updatedAt: new Date().toISOString() };
   });
 }
@@ -816,7 +855,7 @@ export async function saveNotificationPrefs(
   input: z.infer<typeof notificationPrefsSchema>
 ) {
   const parsed = notificationPrefsSchema.parse(input);
-  await withWorkspace((ws) => {
+  await withWorkspace('notifications:manage', (ws) => {
     ws.notifications = parsed;
   });
 }
@@ -824,13 +863,13 @@ export async function saveNotificationPrefs(
 // ---------------- Workspace utilities ----------------
 
 export async function loadSampleData() {
-  await withWorkspace((ws) => {
+  await withWorkspace('workspace:destroy', (ws) => {
     Object.assign(ws, sampleWorkspace());
   });
 }
 
 export async function resetWorkspace() {
-  await withWorkspace((ws) => {
+  await withWorkspace('workspace:destroy', (ws) => {
     Object.assign(ws, emptyWorkspace());
   });
 }
@@ -841,7 +880,7 @@ export async function importWorkspace(json: string) {
   if (typeof parsed !== 'object' || parsed === null || !Array.isArray(parsed.processes)) {
     throw new Error('Not a valid workspace export');
   }
-  await withWorkspace((ws) => {
+  await withWorkspace('workspace:destroy', (ws) => {
     Object.assign(ws, { ...emptyWorkspace(), ...parsed });
   });
 }

@@ -31,7 +31,7 @@ const submissionSchema = z.object({
 
 export type SubmitResult =
   | { ok: true; complete: boolean }
-  | { ok: false; reason: 'invalid' | 'revoked' | 'not_found' };
+  | { ok: false; reason: 'invalid' | 'revoked' | 'not_found' | 'conflict' };
 
 export async function submitContribution(
   input: z.infer<typeof submissionSchema>
@@ -39,10 +39,10 @@ export async function submitContribution(
   const parsed = submissionSchema.parse(input);
   const verified = verifyContributionToken(parsed.token);
   if (!verified.ok) return { ok: false, reason: 'invalid' };
-  const { userId, processId, requestId } = verified.claims;
+  const { orgId, processId, requestId } = verified.claims;
 
   const store = getStore();
-  const ws = await store.load(userId);
+  const { workspace: ws, version } = await store.loadForUpdate(orgId);
   const request = ws.collectionRequests.find((r) => r.id === requestId);
   if (!request || request.processId !== processId) return { ok: false, reason: 'not_found' };
   if (request.status === 'revoked') return { ok: false, reason: 'revoked' };
@@ -81,6 +81,10 @@ export async function submitContribution(
     assessment.approvedAt = null;
   }
 
-  await store.save(userId, ws);
+  if (!(await store.save(orgId, ws, version))) {
+    // Another member saved while the owner was filling the form; ask them to
+    // resubmit rather than silently discarding either copy.
+    return { ok: false, reason: 'conflict' };
+  }
   return { ok: true, complete };
 }
