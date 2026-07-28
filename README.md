@@ -42,6 +42,8 @@ Open http://localhost:3000. Without any configuration the app runs in single-wor
 | `NEXT_PUBLIC_APP_URL` | Base URL used for links inside emails, defaults to `https://bia.cybersecurityalphabetsoup.com` |
 | `BIA_WORKSPACE_ID` | Workspace id used in demo mode, defaults to `default` |
 
+Multi-tenancy: the organization is the tenant. The first person to sign in from a verified work domain claims it and becomes owner; later arrivals from that domain join automatically at the lowest role. Owners can rename the organization, claim further domains by publishing a DNS TXT record, and invite people outside their domains by email at a chosen role. Every capability maps to a minimum role in `src/lib/domain/authz.ts`, mutations are gated by it, and data a role cannot read is stripped server-side rather than hidden in the UI. Membership and role changes, domain claims, and workspace mutations are written to an append-only audit trail visible on People & access.
+
 Notification emails go to each user's Neon Auth account email and respect the per-workspace preferences on the Organization page. In demo mode (no auth) there is no recipient, so nothing is sent.
 
 `DATABASE_URL` and `NEON_AUTH_BASE_URL` come from the Neon integration; add `NEON_AUTH_COOKIE_SECRET` yourself. With both auth variables set, users sign in via `/auth/sign-in` (email and password through Neon Auth) and each user gets an isolated workspace; without them, the app runs in single-workspace demo mode.

@@ -12,6 +12,8 @@ import { authEnabled, getAuth } from '@/lib/neon-auth';
  * /contribute is excluded on purpose: those pages authenticate with a signed,
  * expiring, revocable token in the URL rather than a session, so that an
  * invited process owner can complete one assessment without an account.
+ * /invite is excluded so an invitation can be read before signing in; the
+ * accept action itself still requires a session and a matching address.
  */
 export default function proxy(request: NextRequest) {
   if (!authEnabled()) return;
@@ -22,6 +24,6 @@ export default function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next|api/auth|api/health|api/cron|auth/sign-in|contribute|icon.svg|apple-icon.png|favicon.ico).*)',
+    '/((?!_next|api/auth|api/health|api/cron|auth/sign-in|contribute|invite|icon.svg|apple-icon.png|favicon.ico).*)',
   ],
 };

@@ -1,12 +1,18 @@
 import Link from 'next/link';
 import { getAuthContext } from '@/lib/auth';
-import { listOrgMembers, listOrgDomains } from '@/lib/org-actions';
+import {
+  listOrgMembers,
+  listOrgDomains,
+  listOrgInvitations,
+  listOrgAudit,
+} from '@/lib/org-actions';
 import { tenancyEnabled } from '@/lib/data/tenancy';
 import { can, ROLE_LABELS } from '@/lib/domain/authz';
 import { PageHeader, Card, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { MembersClient } from './members-client';
 import { OrgSettings } from './org-settings';
+import { InvitesClient } from './invites-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +59,8 @@ export default async function TeamPage() {
   const canManage = can(ctx.role, 'member:manage');
   const canManageOrg = can(ctx.role, 'org:manage');
   const domains = await listOrgDomains();
+  const invitations = await listOrgInvitations();
+  const audit = await listOrgAudit();
 
   return (
     <>
@@ -116,6 +124,60 @@ export default async function TeamPage() {
       </div>
 
       <MembersClient members={members} myRole={ctx.role} canManage={canManage} />
+
+      <div className="mt-6 flex flex-col gap-6">
+        <InvitesClient
+          invitations={invitations}
+          myRole={ctx.role}
+          canManage={canManage}
+        />
+
+        <Card
+          title="Activity"
+          subtitle="Who changed what, newest first. Append-only, and kept for the audit trail ISO 22301 clause 7.5 expects"
+        >
+          {audit.length === 0 ? (
+            <p className="text-sm text-ink-muted">
+              Nothing recorded yet. Every change from here on is logged with the person who made
+              it.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line text-left">
+                    {['When', 'Who', 'What'].map((h) => (
+                      <th
+                        key={h}
+                        className="pb-2 pr-4 font-mono text-[10px] font-normal uppercase tracking-wider text-ink-muted"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {audit.map((e) => (
+                    <tr key={e.id} className="border-b border-line/60 align-top last:border-0">
+                      <td className="whitespace-nowrap py-2 pr-4 font-mono text-xs text-ink-muted">
+                        {new Date(e.at).toLocaleString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="py-2 pr-4 text-xs text-ink-soft">{e.actorEmail}</td>
+                      <td className="py-2 pr-4">{e.summary}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </div>
     </>
   );
 }

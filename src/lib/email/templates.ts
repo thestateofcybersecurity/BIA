@@ -79,6 +79,27 @@ export function assessmentRequestEmail(args: {
   };
 }
 
+export function invitationEmail(args: {
+  orgName: string;
+  roleLabel: string;
+  inviterName: string;
+  link: string;
+  expiresInDays: number;
+}): EmailContent {
+  const title = `You have been invited to ${args.orgName}`;
+  const body = `${args.inviterName ? `${args.inviterName} has` : 'You have been'} invited you to join <strong>${args.orgName}</strong>'s business continuity workspace as <strong>${args.roleLabel}</strong>.<br><br>
+    The workspace holds the organization's impact assessments, recovery objectives, and continuity plan. Your role decides what you can see and change.<br><br>
+    This invitation is tied to this email address and expires in ${args.expiresInDays} days. Sign in with this address to accept it.`;
+  return {
+    subject: `Invitation to ${args.orgName}'s continuity workspace`,
+    html: shell(title, `<p style="margin:0">${body}</p>`, {
+      label: 'Accept the invitation',
+      href: args.link,
+    }),
+    text: `${title}\n\n${args.inviterName ? `${args.inviterName} has` : 'You have been'} invited you to join ${args.orgName}'s business continuity workspace as ${args.roleLabel}.\n\nThis invitation is tied to this email address and expires in ${args.expiresInDays} days. Sign in with this address to accept it:\n${args.link}`,
+  };
+}
+
 export function aarReadyEmail(args: {
   exerciseTitle: string;
   sessionId: string;

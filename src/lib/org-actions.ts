@@ -15,9 +15,14 @@ import {
   renameOrganization,
   verificationHost,
   verificationRecord,
+  createInvitation,
+  listInvitations,
+  revokeInvitation,
+  recordAudit,
+  listAudit,
   type Organization,
 } from '@/lib/data/tenancy';
-import { assertCan, ORG_ROLES, type OrgRole } from '@/lib/domain/authz';
+import { assertCan, ORG_ROLES, ROLE_RANK, ROLE_LABELS, type OrgRole } from '@/lib/domain/authz';
 import { getUserContacts } from '@/lib/email/recipients';
 
 /**
@@ -83,6 +88,7 @@ export async function updateMemberRole(
     return { ok: false, message: 'Ask another administrator to change your own role.' };
   }
 
+  const previous = target.role;
   const result = await setMemberRole({ orgId: ctx.organization.id, targetUserId, role });
   if (!result.ok) {
     return {
@@ -93,6 +99,13 @@ export async function updateMemberRole(
           : 'That person is not a member of this organization.',
     };
   }
+  await recordAudit({
+    orgId: ctx.organization.id,
+    actorUserId: ctx.userId,
+    actorEmail: ctx.email,
+    action: 'member:manage',
+    summary: `Changed ${target.email || targetUserId} from ${ROLE_LABELS[previous]} to ${ROLE_LABELS[role]}`,
+  });
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -117,6 +130,13 @@ export async function removeOrgMember(targetUserId: string): Promise<MemberActio
           : 'That person is not a member of this organization.',
     };
   }
+  await recordAudit({
+    orgId: ctx.organization.id,
+    actorUserId: ctx.userId,
+    actorEmail: ctx.email,
+    action: 'member:manage',
+    summary: `Removed ${target?.email || targetUserId} from the organization`,
+  });
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -170,6 +190,144 @@ export async function currentOrganization(): Promise<{
   return { organization: ctx.organization, role: ctx.role };
 }
 
+// ---------------- Invitations ----------------
+
+export interface InvitationView {
+  id: string;
+  email: string;
+  role: OrgRole;
+  createdAt: string;
+  expiresAt: string;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+}
+
+export async function listOrgInvitations(): Promise<InvitationView[]> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'member:view');
+  const rows = await listInvitations(ctx.organization.id);
+  return rows.map((i) => ({
+    id: i.id,
+    email: i.email,
+    role: i.role,
+    createdAt: i.createdAt,
+    expiresAt: i.expiresAt,
+    status: i.revokedAt
+      ? 'revoked'
+      : i.acceptedAt
+        ? 'accepted'
+        : new Date(i.expiresAt).getTime() < Date.now()
+          ? 'expired'
+          : 'pending',
+  }));
+}
+
+/**
+ * Invite someone by email, at a chosen role. This is the route for people
+ * outside the joining domains, such as an external auditor or a client-side
+ * contact, and the only way to grant access to an address the domain rules
+ * would never admit.
+ */
+export async function inviteMember(
+  email: string,
+  role: OrgRole
+): Promise<MemberActionResult & { link?: string }> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'member:manage');
+  const address = email.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) {
+    return { ok: false, message: 'That does not look like an email address.' };
+  }
+  if (!ORG_ROLES.includes(role)) return { ok: false, message: 'Unknown role.' };
+  if (ROLE_RANK[role] > ROLE_RANK[ctx.role]) {
+    return { ok: false, message: 'You cannot invite someone at a role above your own.' };
+  }
+  if (role === 'owner' && ctx.role !== 'owner') {
+    return { ok: false, message: 'Only an owner can invite another owner.' };
+  }
+
+  const { invitation, token } = await createInvitation({
+    orgId: ctx.organization.id,
+    email: address,
+    role,
+    invitedBy: ctx.userId,
+  });
+
+  const { emailEnabled, APP_URL } = await import('@/lib/email/client');
+  const link = `${APP_URL}/invite/${token}`;
+  let emailed = false;
+  if (emailEnabled()) {
+    const { getResend, EMAIL_FROM } = await import('@/lib/email/client');
+    const { invitationEmail } = await import('@/lib/email/templates');
+    const content = invitationEmail({
+      orgName: ctx.organization.name,
+      roleLabel: ROLE_LABELS[role],
+      inviterName: ctx.email,
+      link,
+      expiresInDays: Math.max(
+        1,
+        Math.round((new Date(invitation.expiresAt).getTime() - Date.now()) / 86_400_000)
+      ),
+    });
+    try {
+      const { error } = await getResend().emails.send({
+        from: EMAIL_FROM,
+        to: address,
+        subject: content.subject,
+        html: content.html,
+        text: content.text,
+      });
+      if (error) console.error('[email] invitation failed:', error.message ?? error);
+      else emailed = true;
+    } catch (e) {
+      console.error('[email] invitation threw:', e instanceof Error ? e.message : e);
+    }
+  }
+
+  await recordAudit({
+    orgId: ctx.organization.id,
+    actorUserId: ctx.userId,
+    actorEmail: ctx.email,
+    action: 'member:manage',
+    summary: `Invited ${address} as ${ROLE_LABELS[role]}${emailed ? '' : ' (email not sent)'}`,
+  });
+  revalidatePath('/', 'layout');
+  // The link comes back so it can be passed on by hand when email is not
+  // configured, or when the invitation never arrives.
+  return { ok: true, link };
+}
+
+export async function revokeOrgInvitation(id: string): Promise<MemberActionResult> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'member:manage');
+  await revokeInvitation(ctx.organization.id, id);
+  await recordAudit({
+    orgId: ctx.organization.id,
+    actorUserId: ctx.userId,
+    actorEmail: ctx.email,
+    action: 'member:manage',
+    summary: `Revoked an invitation`,
+  });
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+// ---------------- Audit trail ----------------
+
+export async function listOrgAudit(): Promise<
+  { id: string; at: string; actorEmail: string; action: string; summary: string }[]
+> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'member:view');
+  const events = await listAudit(ctx.organization.id, 100);
+  return events.map((e) => ({
+    id: e.id,
+    at: e.at,
+    actorEmail: e.actorEmail || e.actorUserId,
+    action: e.action,
+    summary: e.summary,
+  }));
+}
+
 // ---------------- Organization identity ----------------
 
 export async function renameOrg(name: string): Promise<MemberActionResult> {
@@ -179,6 +337,11 @@ export async function renameOrg(name: string): Promise<MemberActionResult> {
   if (trimmed.length === 0) return { ok: false, message: 'Give the organization a name.' };
   if (trimmed.length > 120) return { ok: false, message: 'That name is too long.' };
   await renameOrganization(ctx.organization.id, trimmed);
+  await recordAudit({
+    orgId: ctx.organization.id, actorUserId: ctx.userId, actorEmail: ctx.email,
+    action: 'org:manage',
+    summary: `Renamed the organization from "${ctx.organization.name}" to "${trimmed}"`,
+  });
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -218,6 +381,10 @@ export async function addOrgDomain(domain: string): Promise<MemberActionResult> 
           : 'That domain cannot be claimed. Personal mailbox providers, disposable address services, and reserved domains are excluded.',
     };
   }
+  await recordAudit({
+    orgId: ctx.organization.id, actorUserId: ctx.userId, actorEmail: ctx.email,
+    action: 'org:manage', summary: `Claimed the domain ${domain.trim().toLowerCase()}, pending DNS verification`,
+  });
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -239,6 +406,11 @@ export async function verifyOrgDomain(domain: string): Promise<MemberActionResul
             : `The TXT record does not match the expected value.${detail}`,
     };
   }
+  await recordAudit({
+    orgId: ctx.organization.id, actorUserId: ctx.userId, actorEmail: ctx.email,
+    action: 'org:manage',
+    summary: `Verified the domain ${domain}; people with a verified address there now join automatically`,
+  });
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -247,6 +419,10 @@ export async function removeOrgDomain(domain: string): Promise<MemberActionResul
   const ctx = await getAuthContext();
   assertCan(ctx.role, 'org:manage');
   await removeDomainClaim(ctx.organization.id, domain);
+  await recordAudit({
+    orgId: ctx.organization.id, actorUserId: ctx.userId, actorEmail: ctx.email,
+    action: 'org:manage', summary: `Removed the domain ${domain}`,
+  });
   revalidatePath('/', 'layout');
   return { ok: true };
 }

@@ -138,6 +138,35 @@ async function getSql() {
           version integer NOT NULL DEFAULT 1,
           updated_at timestamptz NOT NULL DEFAULT now()
         )`;
+      await sql`
+        CREATE TABLE IF NOT EXISTS invitations (
+          id text PRIMARY KEY,
+          org_id text NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          email text NOT NULL,
+          role text NOT NULL,
+          token_hash text NOT NULL,
+          invited_by text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          expires_at timestamptz NOT NULL,
+          accepted_at timestamptz,
+          revoked_at timestamptz
+        )`;
+      await sql`CREATE INDEX IF NOT EXISTS invitations_org_idx ON invitations (org_id)`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS invitations_token_idx ON invitations (token_hash)`;
+      // Append-only by construction: nothing in the app updates or deletes a
+      // row here, which is the point of keeping it in its own table rather
+      // than as a field on the records it describes.
+      await sql`
+        CREATE TABLE IF NOT EXISTS audit_events (
+          id bigserial PRIMARY KEY,
+          org_id text NOT NULL,
+          at timestamptz NOT NULL DEFAULT now(),
+          actor_user_id text NOT NULL,
+          actor_email text NOT NULL DEFAULT '',
+          action text NOT NULL,
+          summary text NOT NULL DEFAULT ''
+        )`;
+      await sql`CREATE INDEX IF NOT EXISTS audit_events_org_idx ON audit_events (org_id, at DESC)`;
       // Pre-tenancy workspaces were keyed by user. Move them on first boot
       // after the upgrade so nobody signs in to an empty workspace; the
       // legacy table is left in place so the previous release still reads.
@@ -571,6 +600,225 @@ export async function verifyDomainClaim(
 export async function renameOrganization(orgId: string, name: string): Promise<void> {
   const sql = await getSql();
   await sql`UPDATE organizations SET name = ${name.trim()} WHERE id = ${orgId}`;
+}
+
+// ---------------- Invitations ----------------
+
+const INVITE_TTL_DAYS = 14;
+
+export interface Invitation {
+  id: string;
+  orgId: string;
+  email: string;
+  role: OrgRole;
+  invitedBy: string;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+}
+
+type InviteRow = {
+  id: string;
+  org_id: string;
+  email: string;
+  role: string;
+  invited_by: string;
+  created_at: Date | string;
+  expires_at: Date | string;
+  accepted_at: Date | string | null;
+  revoked_at: Date | string | null;
+};
+
+const toInvite = (r: InviteRow): Invitation => ({
+  id: r.id,
+  orgId: r.org_id,
+  email: r.email,
+  role: r.role as OrgRole,
+  invitedBy: r.invited_by,
+  createdAt: iso(r.created_at)!,
+  expiresAt: iso(r.expires_at)!,
+  acceptedAt: iso(r.accepted_at),
+  revokedAt: iso(r.revoked_at),
+});
+
+/**
+ * Only the hash is stored, so a copy of the database does not hand over
+ * working invitation links.
+ */
+async function hashToken(token: string): Promise<string> {
+  const { createHash } = await import('node:crypto');
+  return createHash('sha256').update(token).digest('hex');
+}
+
+export async function createInvitation(args: {
+  orgId: string;
+  email: string;
+  role: OrgRole;
+  invitedBy: string;
+}): Promise<{ invitation: Invitation; token: string }> {
+  const sql = await getSql();
+  const token = nanoid(32);
+  const id = `inv_${nanoid(12)}`;
+  const expires = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
+  const rows = (await sql`
+    INSERT INTO invitations (id, org_id, email, role, token_hash, invited_by, expires_at)
+    VALUES (${id}, ${args.orgId}, ${args.email.trim().toLowerCase()}, ${args.role},
+            ${await hashToken(token)}, ${args.invitedBy}, ${expires.toISOString()})
+    RETURNING *
+  `) as InviteRow[];
+  return { invitation: toInvite(rows[0]), token };
+}
+
+export async function listInvitations(orgId: string): Promise<Invitation[]> {
+  if (!tenancyEnabled()) return [];
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT * FROM invitations WHERE org_id = ${orgId} ORDER BY created_at DESC LIMIT 100
+  `) as InviteRow[];
+  return rows.map(toInvite);
+}
+
+export async function revokeInvitation(orgId: string, id: string): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    UPDATE invitations SET revoked_at = now()
+    WHERE org_id = ${orgId} AND id = ${id} AND accepted_at IS NULL
+  `;
+}
+
+export type InviteLookup =
+  | { ok: true; invitation: Invitation; organization: Organization }
+  | { ok: false; reason: 'not_found' | 'revoked' | 'expired' | 'accepted' };
+
+export async function lookupInvitation(token: string): Promise<InviteLookup> {
+  if (!tenancyEnabled()) return { ok: false, reason: 'not_found' };
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT i.*, o.id AS o_id, o.name, o.primary_domain, o.domain_verified_at,
+           o.created_at AS o_created
+    FROM invitations i JOIN organizations o ON o.id = i.org_id
+    WHERE i.token_hash = ${await hashToken(token)}
+  `) as (InviteRow & {
+    o_id: string;
+    name: string;
+    primary_domain: string | null;
+    domain_verified_at: Date | string | null;
+    o_created: Date | string;
+  })[];
+  if (rows.length === 0) return { ok: false, reason: 'not_found' };
+  const r = rows[0];
+  const invitation = toInvite(r);
+  if (invitation.revokedAt) return { ok: false, reason: 'revoked' };
+  if (invitation.acceptedAt) return { ok: false, reason: 'accepted' };
+  if (new Date(invitation.expiresAt).getTime() < Date.now()) {
+    return { ok: false, reason: 'expired' };
+  }
+  return {
+    ok: true,
+    invitation,
+    organization: toOrg({
+      id: r.o_id,
+      name: r.name,
+      primary_domain: r.primary_domain,
+      domain_verified_at: r.domain_verified_at,
+      created_at: r.o_created,
+    }),
+  };
+}
+
+export type AcceptResult =
+  | { ok: true; orgId: string; role: OrgRole }
+  | { ok: false; reason: 'not_found' | 'revoked' | 'expired' | 'accepted' | 'wrong_email' };
+
+/**
+ * Accept an invitation. The signed-in address must be the one invited:
+ * otherwise a forwarded link would hand access to whoever opened it.
+ */
+export async function acceptInvitation(
+  token: string,
+  user: { userId: string; email: string }
+): Promise<AcceptResult> {
+  const found = await lookupInvitation(token);
+  if (!found.ok) return { ok: false, reason: found.reason };
+  if (found.invitation.email !== user.email.trim().toLowerCase()) {
+    return { ok: false, reason: 'wrong_email' };
+  }
+  const sql = await getSql();
+  await upsertMembership(
+    found.invitation.orgId,
+    user.userId,
+    user.email,
+    found.invitation.role
+  );
+  // Set the role explicitly: upsert leaves an existing membership's role
+  // alone, and an invitation is a deliberate grant.
+  await sql`
+    UPDATE memberships SET role = ${found.invitation.role}
+    WHERE org_id = ${found.invitation.orgId} AND user_id = ${user.userId}
+  `;
+  await sql`UPDATE invitations SET accepted_at = now() WHERE id = ${found.invitation.id}`;
+  return { ok: true, orgId: found.invitation.orgId, role: found.invitation.role };
+}
+
+// ---------------- Audit trail ----------------
+
+export interface AuditEvent {
+  id: string;
+  at: string;
+  actorUserId: string;
+  actorEmail: string;
+  action: string;
+  summary: string;
+}
+
+/**
+ * Append one event. Never throws: an audit write failing must not take down
+ * the operation it describes, and a missing line is visible in the trail
+ * whereas a failed save is not.
+ */
+export async function recordAudit(args: {
+  orgId: string;
+  actorUserId: string;
+  actorEmail: string;
+  action: string;
+  summary: string;
+}): Promise<void> {
+  if (!tenancyEnabled()) return;
+  try {
+    const sql = await getSql();
+    await sql`
+      INSERT INTO audit_events (org_id, actor_user_id, actor_email, action, summary)
+      VALUES (${args.orgId}, ${args.actorUserId}, ${args.actorEmail}, ${args.action}, ${args.summary})
+    `;
+  } catch (e) {
+    console.error('[audit] failed to record:', e instanceof Error ? e.message : e);
+  }
+}
+
+export async function listAudit(orgId: string, limit = 100): Promise<AuditEvent[]> {
+  if (!tenancyEnabled()) return [];
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT id, at, actor_user_id, actor_email, action, summary
+    FROM audit_events WHERE org_id = ${orgId}
+    ORDER BY at DESC LIMIT ${limit}
+  `) as {
+    id: number | string;
+    at: Date | string;
+    actor_user_id: string;
+    actor_email: string;
+    action: string;
+    summary: string;
+  }[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    at: iso(r.at)!,
+    actorUserId: r.actor_user_id,
+    actorEmail: r.actor_email,
+    action: r.action,
+    summary: r.summary,
+  }));
 }
 
 /** Organization ids with a workspace, for the scheduled notification job. */

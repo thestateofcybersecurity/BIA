@@ -123,6 +123,39 @@ export const CAPABILITY_MINIMUM: Record<Capability, OrgRole> = {
   'maturity:read': 'viewer',
 };
 
+/** Plain-language verb for each capability, for the audit trail. */
+export const AUDIT_LABELS: Record<Capability, string> = {
+  'org:manage': 'Changed organization settings',
+  'member:manage': 'Changed membership',
+  'member:view': 'Viewed members',
+  'workspace:destroy': 'Replaced the whole workspace',
+  'notifications:manage': 'Changed notification preferences',
+  'dashboard:view': 'Viewed the dashboard',
+  'process:read': 'Viewed processes',
+  'assessment:read': 'Viewed assessments',
+  'objectives:read': 'Viewed objectives',
+  'requirements:read': 'Viewed requirements',
+  'maturity:read': 'Viewed maturity',
+  'profile:write': 'Updated the organization profile',
+  'process:write': 'Updated the process inventory',
+  'assessment:write': 'Updated an impact assessment',
+  'assessment:writeOwn': 'Updated an impact assessment',
+  'assessment:approve': 'Signed off an impact assessment',
+  'objectives:write': 'Updated recovery objectives or the gap register',
+  'maturity:write': 'Updated the maturity assessment',
+  'workflow:read': 'Viewed recovery workflows',
+  'workflow:write': 'Updated a recovery workflow',
+  'collection:manage': 'Changed a delegated assessment request',
+  'risk:read': 'Viewed the risk register',
+  'risk:write': 'Updated the risk register',
+  'plan:read': 'Viewed the activation plan',
+  'plan:write': 'Updated the activation plan',
+  'exercise:read': 'Viewed exercises',
+  'exercise:run': 'Ran or changed a tabletop exercise',
+  'report:export': 'Exported the BC plan',
+  'ai:generate': 'Generated content with Claude',
+};
+
 export function can(role: OrgRole, capability: Capability): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[CAPABILITY_MINIMUM[capability]];
 }

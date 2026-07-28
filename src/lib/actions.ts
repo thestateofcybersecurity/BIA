@@ -10,8 +10,10 @@ import {
   assertCan,
   assertCanWriteAssessment,
   redactWorkspaceFor,
+  AUDIT_LABELS,
   type Capability,
 } from '@/lib/domain/authz';
+import { recordAudit } from '@/lib/data/tenancy';
 import { sampleWorkspace } from '@/lib/data/sample';
 import type {
   Workspace,
@@ -35,7 +37,9 @@ import type {
  */
 async function withWorkspace(
   capability: Capability,
-  mutate: (ws: Workspace) => void
+  mutate: (ws: Workspace) => void,
+  /** What changed, in words, for the audit trail. */
+  summary?: string
 ): Promise<void> {
   const ctx = await getAuthContext();
   assertCan(ctx.role, capability);
@@ -46,6 +50,13 @@ async function withWorkspace(
     const { workspace, version } = await store.loadForUpdate(orgId);
     mutate(workspace);
     if (await store.save(orgId, workspace, version)) {
+      await recordAudit({
+        orgId,
+        actorUserId: ctx.userId,
+        actorEmail: ctx.email,
+        action: capability,
+        summary: summary ?? AUDIT_LABELS[capability],
+      });
       revalidatePath('/', 'layout');
       return;
     }
@@ -127,12 +138,14 @@ export async function saveProcess(input: z.infer<typeof processSchema>) {
       id = nanoid(10);
       ws.processes.push({ ...parsed, id, createdAt: now, updatedAt: now });
     }
-  });
+  }, `${parsed.id ? 'Updated' : 'Added'} process "${parsed.name}"`);
   return { id: id! };
 }
 
 export async function deleteProcess(id: string) {
+  let removed = id;
   await withWorkspace('process:write', (ws) => {
+    removed = ws.processes.find((p) => p.id === id)?.name ?? id;
     ws.processes = ws.processes.filter((p) => p.id !== id);
     ws.assessments = ws.assessments.filter((a) => a.processId !== id);
     ws.objectives = ws.objectives.filter((o) => o.processId !== id);
@@ -142,7 +155,7 @@ export async function deleteProcess(id: string) {
     for (const p of ws.processes) {
       p.upstreamProcessIds = p.upstreamProcessIds.filter((u) => u !== id);
     }
-  });
+  }, `Deleted process "${removed}" and everything attached to it`);
 }
 
 // ---------------- Impact assessment ----------------
@@ -213,7 +226,7 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
     // edits while already awaiting sign-off stay quiet.
     becameAwaitingSignOff = isAssessmentComplete(after) && !wasCompleteAndUnapproved;
     snapshot = ws;
-  });
+  }, `Updated the impact assessment for "${processName || parsed.processId}"`);
 
   if (becameAwaitingSignOff && snapshot) {
     const { notifyWorkspaceUser } = await import('@/lib/email/send');
@@ -230,12 +243,14 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
 export async function approveAssessment(processId: string, approver: string) {
   const name = approver.trim();
   if (!name) throw new Error('Approver name is required.');
+  let approvedName = processId;
   await withWorkspace('assessment:approve', (ws) => {
     const a = ws.assessments.find((x) => x.processId === processId);
     if (!a) throw new Error('Assessment not found');
     a.approvedBy = name;
     a.approvedAt = new Date().toISOString();
-  });
+    approvedName = ws.processes.find((p) => p.id === processId)?.name ?? processId;
+  }, `Signed off the impact assessment for "${approvedName}" as ${name}`);
 }
 
 // ---------------- Recovery objectives ----------------
@@ -695,14 +710,16 @@ export async function saveRisk(input: z.infer<typeof riskSchema>) {
       id = nanoid(10);
       ws.risks.push({ ...parsed, id, updatedAt: now });
     }
-  });
+  }, `${parsed.id ? 'Updated' : 'Registered'} risk "${parsed.title}"`);
   return { id: id! };
 }
 
 export async function deleteRisk(id: string) {
+  let removed = id;
   await withWorkspace('risk:write', (ws) => {
+    removed = ws.risks.find((r) => r.id === id)?.title ?? id;
     ws.risks = ws.risks.filter((r) => r.id !== id);
-  });
+  }, `Deleted risk "${removed}"`);
 }
 
 // ---------------- Delegated data collection ----------------
@@ -865,13 +882,13 @@ export async function saveNotificationPrefs(
 export async function loadSampleData() {
   await withWorkspace('workspace:destroy', (ws) => {
     Object.assign(ws, sampleWorkspace());
-  });
+  }, 'Replaced the entire workspace with the sample dataset');
 }
 
 export async function resetWorkspace() {
   await withWorkspace('workspace:destroy', (ws) => {
     Object.assign(ws, emptyWorkspace());
-  });
+  }, 'Erased the entire workspace');
 }
 
 export async function importWorkspace(json: string) {
