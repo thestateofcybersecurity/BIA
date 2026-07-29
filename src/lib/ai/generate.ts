@@ -7,7 +7,14 @@ import type {
   AfterActionReport,
 } from '@/lib/domain/types';
 import { getAnthropic, AI_MODEL } from './client';
-import { AiScenarioSchema, AarSchema, AiWorkflowSchema, type AiWorkflow } from './schemas';
+import {
+  AiScenarioSchema,
+  AarSchema,
+  AiWorkflowSchema,
+  AiRiskSuggestionsSchema,
+  type AiWorkflow,
+  type AiRiskSuggestions,
+} from './schemas';
 import { workspaceBrief, orgBrief, processBrief } from './context';
 import {
   SCENARIO_SYSTEM,
@@ -16,6 +23,8 @@ import {
   aarUserPrompt,
   WORKFLOW_SYSTEM,
   workflowUserPrompt,
+  RISK_SUGGEST_SYSTEM,
+  riskSuggestUserPrompt,
 } from './prompts';
 
 function assertUsable(stopReason: string | null): void {
@@ -102,6 +111,36 @@ export async function generateWorkflowWithClaude(args: {
   if (parsed.steps.length === 0) {
     throw new Error('Claude returned no steps. Add recovery objectives or dependencies and retry.');
   }
+  return parsed;
+}
+
+export async function generateRiskSuggestionsWithClaude(args: {
+  ws: Workspace;
+  existing: string;
+  derived: string;
+}): Promise<AiRiskSuggestions> {
+  const client = getAnthropic();
+  const response = await client.messages.parse({
+    model: AI_MODEL,
+    max_tokens: 16000,
+    thinking: { type: 'adaptive' },
+    system: RISK_SUGGEST_SYSTEM,
+    messages: [
+      {
+        role: 'user',
+        content: riskSuggestUserPrompt({
+          brief: workspaceBrief(args.ws),
+          existing: args.existing,
+          derived: args.derived,
+        }),
+      },
+    ],
+    output_config: { format: zodOutputFormat(AiRiskSuggestionsSchema) },
+  });
+
+  assertUsable(response.stop_reason);
+  const parsed = response.parsed_output;
+  if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
   return parsed;
 }
 

@@ -23,6 +23,8 @@ import {
   RISK_IMPACT_LABELS,
 } from '@/lib/domain/constants';
 import { Card, btn, StatusPill, TierBadge } from '@/components/ui';
+import { suggestRisksWithAi } from '@/lib/actions';
+import type { RiskSuggestion } from '@/lib/domain/risk-suggestions';
 import { formatCompactCurrency, formatDate } from '@/lib/format';
 
 export interface RiskRow {
@@ -392,15 +394,41 @@ export function RiskClient({
   dependencyOptions,
   matrix,
   currency,
+  suggestions,
+  aiAvailable,
 }: {
   rows: RiskRow[];
   processes: { id: string; name: string; tier: Tier | null }[];
   dependencyOptions: string[];
   matrix: number[][];
   currency: string;
+  suggestions: RiskSuggestion[];
+  aiAvailable: boolean;
 }) {
   const [editing, setEditing] = useState<RiskEntry | null>(null);
   const [creating, setCreating] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<RiskSuggestion[]>([]);
+  const [suggesting, startSuggest] = useTransition();
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+
+  const allSuggestions = [...suggestions, ...aiSuggestions].filter(
+    (s) => !dismissed.includes(s.id)
+  );
+
+  /** A suggestion opens the editor pre-filled; likelihood stays for the human. */
+  const startFromSuggestion = (s: RiskSuggestion) => {
+    setCreating(false);
+    setEditing({
+      ...emptyRisk(),
+      title: s.title,
+      category: s.category,
+      description: s.description,
+      processIds: s.processIds,
+      dependencies: s.dependencies,
+      likelihoodRationale: '',
+    });
+  };
 
   const maxCell = Math.max(1, ...matrix.flat());
 
@@ -419,11 +447,80 @@ export function RiskClient({
       )}
 
       {!creating && !editing && (
-        <div>
+        <div className="flex flex-wrap items-center gap-3">
           <button type="button" className={btn.primary} onClick={() => setCreating(true)}>
             Add risk
           </button>
+          {aiAvailable && (
+            <button
+              type="button"
+              className={btn.secondary}
+              disabled={suggesting}
+              onClick={() =>
+                startSuggest(async () => {
+                  setSuggestError(null);
+                  try {
+                    setAiSuggestions(await suggestRisksWithAi());
+                  } catch (e) {
+                    setSuggestError(e instanceof Error ? e.message : 'Suggestion failed.');
+                  }
+                })
+              }
+            >
+              {suggesting ? 'Thinking…' : 'Suggest more with Claude'}
+            </button>
+          )}
+          {suggestError && <span className="text-sm text-bad">{suggestError}</span>}
         </div>
+      )}
+
+      {!creating && !editing && allSuggestions.length > 0 && (
+        <Card
+          title="Suggested risks"
+          subtitle="Derived from your inventory, gaps, and notes. Nothing is registered until you add it."
+        >
+          <div className="flex flex-col gap-3">
+            {allSuggestions.map((s) => (
+              <div key={s.id} className="rounded-md border border-line bg-paper/60 p-3">
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                      {s.title}
+                      <StatusPill tone={s.source === 'ai' ? 'warn' : 'neutral'}>
+                        {s.source === 'ai' ? 'Claude' : s.category}
+                      </StatusPill>
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-ink-soft">{s.description}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                      <span className="font-mono uppercase tracking-wider">Why</span> {s.basis}
+                    </p>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      className={btn.small}
+                      onClick={() => startFromSuggestion(s)}
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-ink-faint hover:text-ink"
+                      onClick={() => setDismissed((d) => [...d, s.id])}
+                    >
+                      Dismiss
+                    </button>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-ink-muted">
+            Suggestions stop once a registered risk names the same dependency, so this list
+            shrinks as the register fills. Likelihood is never suggested: that judgement is
+            yours, and impact derives itself from the processes attached.
+          </p>
+        </Card>
       )}
 
       {rows.length > 0 && (

@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { loadWorkspace } from '@/lib/actions';
 import { deriveAll } from '@/lib/domain/scoring';
 import { deriveRisks, riskMatrix, riskConcentration, processRiskLoad } from '@/lib/domain/risk';
+import { suggestRisks } from '@/lib/domain/risk-suggestions';
+import { aiEnabled } from '@/lib/ai/client';
 import { DEPENDENCY_CLASSES } from '@/lib/domain/constants';
 import { PageHeader, Card, StatusPill, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
@@ -16,6 +18,8 @@ export default async function RisksPage() {
   const matrix = riskMatrix(rows);
   const concentration = riskConcentration(ws);
   const load = processRiskLoad(rows);
+  // Candidates the inventory already implies, minus anything registered.
+  const suggestions = suggestRisks(ws).slice(0, 12);
 
   // Every dependency named anywhere in the inventory, so risks reuse the
   // same spellings the roll-down matches on.
@@ -103,6 +107,8 @@ export default async function RisksPage() {
             dependencyOptions={dependencyOptions}
             matrix={matrix}
             currency={ws.org?.currency ?? 'USD'}
+            suggestions={suggestions}
+            aiAvailable={aiEnabled()}
           />
 
           {(uncovered.length > 0 || concentration.length > 0 || load.length > 0) && (

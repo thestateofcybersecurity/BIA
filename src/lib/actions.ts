@@ -15,6 +15,7 @@ import {
 } from '@/lib/domain/authz';
 import { recordAudit } from '@/lib/data/tenancy';
 import { sampleWorkspace } from '@/lib/data/sample';
+import type { RiskSuggestion } from '@/lib/domain/risk-suggestions';
 import type {
   Workspace,
   OrgProfile,
@@ -676,6 +677,56 @@ export async function draftWorkflowWithAi(
     fitsRto: draft.fitsRto,
     rtoCommentary: draft.rtoCommentary,
   };
+}
+
+// ---------------- Risk suggestions ----------------
+
+/**
+ * Ask Claude for threats the structural rules cannot reach: sector and
+ * regulator specifics, failure modes implied by the prose in the data, and
+ * combinations. Returns suggestions for review; nothing is saved.
+ */
+export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'risk:write');
+  assertCan(ctx.role, 'ai:generate');
+  const { aiEnabled } = await import('@/lib/ai/client');
+  if (!aiEnabled()) throw new Error('AI suggestions require ANTHROPIC_API_KEY to be configured.');
+
+  const ws = await loadWorkspaceRaw();
+  const { suggestRisks } = await import('@/lib/domain/risk-suggestions');
+  const derived = suggestRisks(ws);
+
+  const { generateRiskSuggestionsWithClaude } = await import('@/lib/ai/generate');
+  const result = await generateRiskSuggestionsWithClaude({
+    ws,
+    existing: ws.risks
+      .map((r) => `- ${r.title} [${r.category}] affecting ${r.processIds.length} processes`)
+      .join('\n'),
+    derived: derived.map((d) => `- ${d.title} [${d.category}]`).join('\n'),
+  });
+
+  const byName = new Map(ws.processes.map((p) => [p.name.trim().toLowerCase(), p.id]));
+  const knownDeps = new Set(
+    ws.processes.flatMap((p) =>
+      Object.values(p.dependencies).flat().map((d) => d.trim().toLowerCase())
+    )
+  );
+
+  return result.suggestions.map((s, i) => ({
+    id: `ai-${i}-${s.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`,
+    title: s.title,
+    category: s.category,
+    description: s.description,
+    // Names are mapped back to ids here; anything that does not match a real
+    // process is dropped rather than trusted.
+    processIds: s.processNames
+      .map((n) => byName.get(n.trim().toLowerCase()))
+      .filter((id): id is string => id != null),
+    dependencies: s.dependencies.filter((d) => knownDeps.has(d.trim().toLowerCase())),
+    basis: s.rationale,
+    source: 'ai' as const,
+  }));
 }
 
 // ---------------- Risk register ----------------

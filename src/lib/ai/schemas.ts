@@ -97,6 +97,29 @@ export const AiWorkflowSchema = z.object({
 
 export type AiWorkflow = z.infer<typeof AiWorkflowSchema>;
 
+export const AiRiskSuggestionsSchema = z.object({
+  suggestions: z.array(
+    z.object({
+      title: z.string().describe('The threat, phrased as something that happens'),
+      category: z.string().describe('One of the register categories, or a close fit'),
+      description: z
+        .string()
+        .describe('How it would unfold for this organization specifically'),
+      processNames: z
+        .array(z.string())
+        .describe('Affected processes, named exactly as the inventory names them'),
+      dependencies: z
+        .array(z.string())
+        .describe('Dependencies attacked, spelled exactly as the inventory spells them; empty if none apply'),
+      rationale: z
+        .string()
+        .describe('Why this organization in particular, citing its sector, regulator, or its own data'),
+    })
+  ),
+});
+
+export type AiRiskSuggestions = z.infer<typeof AiRiskSuggestionsSchema>;
+
 export const AarSchema = z.object({
   executiveSummary: z.string(),
   timeline: z.array(z.object({ phase: z.string(), summary: z.string() })),
