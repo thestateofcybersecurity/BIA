@@ -21,6 +21,8 @@ import type { MemberContext, OrgRole } from '@/lib/domain/authz';
  */
 
 export const ACTIVE_ORG_COOKIE = 'bia_org';
+/** Invitation carried across the sign-up round trip. */
+export const INVITE_COOKIE = 'bia_invite';
 
 export interface AuthContext {
   userId: string;
@@ -82,7 +84,13 @@ export async function getAuthContext(): Promise<AuthContext> {
   }
 
   if (!organization || !membership) {
-    const resolved = await resolveOrgForUser(user);
+    // An invitation the visitor opened before signing in is remembered here
+    // so that creating an account lands them in the organization that
+    // invited them, rather than in a private workspace of their own with
+    // the invitation left pending.
+    const jar = await cookies();
+    const inviteToken = jar.get(INVITE_COOKIE)?.value ?? null;
+    const resolved = await resolveOrgForUser(user, inviteToken);
     organization = resolved.organization;
     membership = resolved.membership;
   }

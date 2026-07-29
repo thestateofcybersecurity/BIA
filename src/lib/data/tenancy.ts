@@ -251,13 +251,56 @@ async function upsertMembership(
  * administrator grants more, so a claimed domain never exposes the plan to
  * everyone who happens to share the company's email suffix.
  */
-export async function resolveOrgForUser(user: {
-  userId: string;
-  email: string;
-  emailVerified: boolean;
-}): Promise<OrgResolution> {
+export async function resolveOrgForUser(
+  user: {
+    userId: string;
+    email: string;
+    emailVerified: boolean;
+  },
+  /**
+   * Invitation the visitor arrived with, carried across the sign-up round
+   * trip. Consumed before anything else, because creating an account must
+   * not strand the invitation that prompted it.
+   */
+  inviteToken?: string | null
+): Promise<OrgResolution> {
   if (!tenancyEnabled()) return demoResolution(user.userId);
   const sql = await getSql();
+
+  if (inviteToken) {
+    const accepted = await acceptInvitation(inviteToken, user);
+    if (accepted.ok) {
+      const joined = (await sql`
+        SELECT m.*, o.id AS o_id, o.name, o.primary_domain, o.domain_verified_at,
+               o.created_at AS o_created
+        FROM memberships m JOIN organizations o ON o.id = m.org_id
+        WHERE m.user_id = ${user.userId} AND m.org_id = ${accepted.orgId}
+      `) as (MemberRow & {
+        o_id: string;
+        name: string;
+        primary_domain: string | null;
+        domain_verified_at: Date | string | null;
+        o_created: Date | string;
+      })[];
+      if (joined.length > 0) {
+        const r = joined[0];
+        return {
+          organization: toOrg({
+            id: r.o_id,
+            name: r.name,
+            primary_domain: r.primary_domain,
+            domain_verified_at: r.domain_verified_at,
+            created_at: r.o_created,
+          }),
+          membership: toMember(r),
+          privateReason: null,
+          claimed: false,
+        };
+      }
+    }
+    // A used, expired, revoked, or mismatched invitation falls through to
+    // normal resolution rather than blocking sign-in.
+  }
 
   // An existing membership always wins: a domain policy change must never
   // strand somebody who already belongs somewhere.

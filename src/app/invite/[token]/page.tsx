@@ -4,6 +4,7 @@ import { getAuthContextOptional } from '@/lib/auth';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '@/lib/domain/authz';
 import { btn } from '@/components/ui';
 import { AcceptInvite } from './accept-invite';
+import { SignInToAccept } from './sign-in-to-accept';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,11 +81,7 @@ export default async function InvitePage({
           The invitation is tied to that address, so signing in with a different one will not work.
           Once signed in, open this link again.
         </p>
-        <div>
-          <Link href="/auth/sign-in" className={btn.primary}>
-            Sign in to accept
-          </Link>
-        </div>
+        <SignInToAccept token={decodeURIComponent(token)} />
       </Shell>
     );
   }
