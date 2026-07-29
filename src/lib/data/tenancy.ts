@@ -276,6 +276,16 @@ export async function resolveOrgForUser(user: {
   })[];
   if (existing.length > 0) {
     const r = existing[0];
+    // Migrated rows carry no email, and this is the only moment we reliably
+    // know it. Without backfilling, anything matching a person by address
+    // (the already-a-member check, contributor scoping) silently misses.
+    if (!r.email && user.email) {
+      await sql`
+        UPDATE memberships SET email = ${user.email}
+        WHERE org_id = ${r.org_id} AND user_id = ${user.userId}
+      `;
+      r.email = user.email;
+    }
     return {
       organization: toOrg({
         id: r.o_id,

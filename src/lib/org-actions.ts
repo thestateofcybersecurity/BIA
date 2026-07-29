@@ -247,8 +247,15 @@ export async function inviteMember(
 
   // Inviting somebody who is already here is almost always a mistake, and
   // the confusing kind: change their role on the members list instead.
+  // Addresses are matched against the identity provider as well as the
+  // membership row, because a migrated row may not carry one.
   const members = await listMembers(ctx.organization.id);
-  const already = members.find((m) => m.email.trim().toLowerCase() === address);
+  const contacts = await getUserContacts(members.map((m) => m.userId));
+  const already = members.find(
+    (m) =>
+      m.email.trim().toLowerCase() === address ||
+      contacts.get(m.userId)?.email.trim().toLowerCase() === address
+  );
   if (already) {
     return {
       ok: false,
