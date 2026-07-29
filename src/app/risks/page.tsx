@@ -10,6 +10,9 @@ import { HelpBox } from '@/components/help';
 import { RiskClient } from './risk-client';
 
 export const dynamic = 'force-dynamic';
+// The Claude suggestion action runs on this route and, once the register has
+// content to reason around, has taken minutes rather than seconds.
+export const maxDuration = 300;
 
 export default async function RisksPage() {
   const ws = await loadWorkspace();
