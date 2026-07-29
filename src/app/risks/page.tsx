@@ -18,8 +18,29 @@ export default async function RisksPage() {
   const matrix = riskMatrix(rows);
   const concentration = riskConcentration(ws);
   const load = processRiskLoad(rows);
-  // Candidates the inventory already implies, minus anything registered.
-  const suggestions = suggestRisks(ws).slice(0, 12);
+  // Candidates the inventory already implies, minus anything registered and
+  // anything already ruled on. Stored AI suggestions survive the reload that
+  // regenerating the derived ones does not.
+  const decided = new Set(
+    (ws.riskSuggestions ?? []).filter((s) => s.status !== 'open').map((s) => s.id)
+  );
+  const suggestions = [
+    ...suggestRisks(ws)
+      .filter((s) => !decided.has(s.id))
+      .slice(0, 12),
+    ...(ws.riskSuggestions ?? [])
+      .filter((s) => s.status === 'open')
+      .map((s) => ({
+        id: s.id,
+        title: s.title,
+        category: s.category,
+        description: s.description,
+        processIds: s.processIds,
+        dependencies: s.dependencies,
+        basis: s.basis,
+        source: 'ai' as const,
+      })),
+  ];
 
   // Every dependency named anywhere in the inventory, so risks reuse the
   // same spellings the roll-down matches on.

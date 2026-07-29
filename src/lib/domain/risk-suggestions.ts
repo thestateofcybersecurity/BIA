@@ -255,3 +255,44 @@ export function suggestRisks(ws: Workspace): RiskSuggestion[] {
     return b.processIds.length - a.processIds.length;
   });
 }
+
+/**
+ * Identity for deduplication. Titles are near-duplicates far more often than
+ * they are byte-identical ("Reinsurer fails to pay" vs "Reinsurance recovery
+ * fails"), so the key drops punctuation and the filler words that carry no
+ * distinguishing meaning, leaving the nouns the threat is actually about.
+ */
+const FILLER = new Set([
+  'a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'for', 'and', 'or', 'is',
+  'are', 'be', 'by', 'from', 'with', 'after', 'during', 'while', 'that',
+  'its', 'their', 'our', 'up', 'out', 'as', 'into', 'not',
+]);
+
+export function suggestionKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !FILLER.has(w))
+    .sort()
+    .join(' ');
+}
+
+/**
+ * True when a candidate repeats something already seen. Title key catches
+ * rewordings; the dependency-plus-category test catches the case where Claude
+ * describes the same failure of the same thing in entirely different words.
+ */
+export function isDuplicateSuggestion(
+  candidate: Pick<RiskSuggestion, 'title' | 'category' | 'dependencies' | 'processIds'>,
+  seen: Pick<RiskSuggestion, 'title' | 'category' | 'dependencies' | 'processIds'>[]
+): boolean {
+  const key = suggestionKey(candidate.title);
+  const deps = candidate.dependencies.map((d) => d.trim().toLowerCase()).filter(Boolean);
+  return seen.some((s) => {
+    if (suggestionKey(s.title) === key) return true;
+    if (deps.length === 0) return false;
+    if (s.category !== candidate.category) return false;
+    return s.dependencies.some((d) => deps.includes(d.trim().toLowerCase()));
+  });
+}

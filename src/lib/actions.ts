@@ -694,8 +694,9 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
   if (!aiEnabled()) throw new Error('AI suggestions require ANTHROPIC_API_KEY to be configured.');
 
   const ws = await loadWorkspaceRaw();
-  const { suggestRisks } = await import('@/lib/domain/risk-suggestions');
+  const { suggestRisks, isDuplicateSuggestion } = await import('@/lib/domain/risk-suggestions');
   const derived = suggestRisks(ws);
+  const priorAi = ws.riskSuggestions ?? [];
 
   const { generateRiskSuggestionsWithClaude } = await import('@/lib/ai/generate');
   const result = await generateRiskSuggestionsWithClaude({
@@ -704,6 +705,12 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
       .map((r) => `- ${r.title} [${r.category}] affecting ${r.processIds.length} processes`)
       .join('\n'),
     derived: derived.map((d) => `- ${d.title} [${d.category}]`).join('\n'),
+    // Everything Claude proposed on earlier runs, including what the assessor
+    // rejected. Repeating a dismissed suggestion is worse than repeating an
+    // accepted one: the answer was already no.
+    priorAi: priorAi
+      .map((s) => `- ${s.title} [${s.category}]${s.status === 'dismissed' ? ' (rejected by the assessor)' : ''}`)
+      .join('\n'),
   });
 
   const byName = new Map(ws.processes.map((p) => [p.name.trim().toLowerCase(), p.id]));
@@ -713,8 +720,8 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
     )
   );
 
-  return result.suggestions.map((s, i) => ({
-    id: `ai-${i}-${s.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`,
+  const candidates: RiskSuggestion[] = result.suggestions.map((s) => ({
+    id: '',
     title: s.title,
     category: s.category,
     description: s.description,
@@ -727,6 +734,100 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
     basis: s.rationale,
     source: 'ai' as const,
   }));
+
+  // The prompt asks for novelty but cannot guarantee it, so the same test runs
+  // against the register, the derived list, and every prior run. `seen` grows
+  // as we go, which also catches two near-identical items in one response.
+  const seen: RiskSuggestion[] = [
+    ...ws.risks.map((r) => ({ ...r, basis: '', source: 'derived' as const })),
+    ...derived,
+    ...priorAi.map((p) => ({ ...p, source: 'ai' as const })),
+  ];
+  const fresh: RiskSuggestion[] = [];
+  for (const c of candidates) {
+    if (isDuplicateSuggestion(c, seen)) continue;
+    const record = { ...c, id: nanoid(10) };
+    fresh.push(record);
+    seen.push(record);
+  }
+
+  const now = new Date().toISOString();
+  await withWorkspace(
+    'risk:write',
+    (draft) => {
+      draft.riskSuggestions = [
+        ...(draft.riskSuggestions ?? []),
+        ...fresh.map((f) => ({
+          id: f.id,
+          title: f.title,
+          category: f.category,
+          description: f.description,
+          processIds: f.processIds,
+          dependencies: f.dependencies,
+          basis: f.basis,
+          createdAt: now,
+          status: 'open' as const,
+        })),
+      ];
+    },
+    `Claude suggested ${fresh.length} risk${fresh.length === 1 ? '' : 's'}` +
+      (candidates.length > fresh.length
+        ? ` (${candidates.length - fresh.length} duplicate${candidates.length - fresh.length === 1 ? '' : 's'} discarded)`
+        : '')
+  );
+
+  // Everything still open, not just this run's additions, so the panel shows
+  // one consistent list however many times the button has been pressed.
+  return [
+    ...priorAi
+      .filter((p) => p.status === 'open')
+      .map((p) => ({ ...p, source: 'ai' as const })),
+    ...fresh,
+  ];
+}
+
+const suggestionSnapshotSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  category: z.string(),
+  description: z.string(),
+  processIds: z.array(z.string()),
+  dependencies: z.array(z.string()),
+  basis: z.string(),
+});
+
+/**
+ * Record a decision about a suggestion so it does not come back.
+ *
+ * Derived suggestions are recomputed from the inventory on every load and have
+ * no stored row until now, so a dismissal is stored as a tombstone carrying
+ * the same id the generator produces. AI suggestions already have a row and
+ * are updated in place.
+ */
+async function markSuggestion(
+  input: z.infer<typeof suggestionSnapshotSchema>,
+  status: 'dismissed' | 'added'
+) {
+  const snapshot = suggestionSnapshotSchema.parse(input);
+  const now = new Date().toISOString();
+  await withWorkspace(
+    'risk:write',
+    (ws) => {
+      const list = ws.riskSuggestions ?? (ws.riskSuggestions = []);
+      const existing = list.find((s) => s.id === snapshot.id);
+      if (existing) existing.status = status;
+      else list.push({ ...snapshot, createdAt: now, status });
+    },
+    `${status === 'dismissed' ? 'Dismissed' : 'Accepted'} suggested risk "${snapshot.title}"`
+  );
+}
+
+export async function dismissRiskSuggestion(input: z.infer<typeof suggestionSnapshotSchema>) {
+  await markSuggestion(input, 'dismissed');
+}
+
+export async function acceptRiskSuggestion(input: z.infer<typeof suggestionSnapshotSchema>) {
+  await markSuggestion(input, 'added');
 }
 
 // ---------------- Risk register ----------------

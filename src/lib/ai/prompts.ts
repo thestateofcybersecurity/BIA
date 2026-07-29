@@ -91,6 +91,7 @@ export function riskSuggestUserPrompt(args: {
   brief: string;
   existing: string;
   derived: string;
+  priorAi: string;
 }): string {
   return `Propose additional risks for the register below.
 
@@ -100,7 +101,14 @@ ${args.brief}
 ${args.existing || 'Nothing registered yet.'}
 
 ## Already suggested structurally (do not repeat)
-${args.derived || 'No structural suggestions.'}`;
+${args.derived || 'No structural suggestions.'}
+
+## Already suggested by you on earlier runs (do not repeat, in any rewording)
+${args.priorAi || 'This is the first run.'}
+
+Propose only threats absent from all three lists above. If the register is
+thorough enough that you have nothing genuinely new, return fewer suggestions
+rather than restating what is there.`;
 }
 
 export const AAR_SYSTEM = `You are an after-action report writer for business continuity tabletop exercises. You produce a structured executive report the organization can hand to leadership and auditors.

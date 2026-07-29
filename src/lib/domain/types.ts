@@ -190,6 +190,22 @@ export interface RiskEntry {
   updatedAt: string;
 }
 
+/**
+ * A suggestion Claude has already made, kept so repeat runs do not propose
+ * the same threats again and so a dismissal survives a page reload.
+ */
+export interface RiskSuggestionRecord {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  processIds: string[];
+  dependencies: string[];
+  basis: string;
+  createdAt: string;
+  status: 'open' | 'dismissed' | 'added';
+}
+
 // ---------------- Delegated data collection ----------------
 
 export type CollectionStatus = 'sent' | 'submitted' | 'revoked';
@@ -348,6 +364,7 @@ export interface Workspace {
   plan: ContinuityPlan | null;
   collectionRequests: CollectionRequest[];
   risks: RiskEntry[];
+  riskSuggestions: RiskSuggestionRecord[];
   /** Email notification toggles; a missing key means enabled. */
   notifications?: {
     signOffRequests?: boolean;

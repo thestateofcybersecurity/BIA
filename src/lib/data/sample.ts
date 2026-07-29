@@ -348,6 +348,7 @@ export function sampleWorkspace(): Workspace {
       },
     ],
     collectionRequests: [],
+    riskSuggestions: [],
     risks: [
       {
         id: 'risk-ransomware',

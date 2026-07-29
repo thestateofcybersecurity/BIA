@@ -193,6 +193,7 @@ export function capabilitiesFor(role: OrgRole): Capability[] {
 export function redactWorkspaceFor<
   T extends {
     risks: unknown[];
+    riskSuggestions: unknown[];
     plan: unknown;
     exercises: unknown[];
     collectionRequests: unknown[];
@@ -203,6 +204,9 @@ export function redactWorkspaceFor<
   const out: T = { ...ws };
 
   if (!can(role, 'risk:read')) out.risks = [];
+  // Suggestions describe the same threats the register does, and unregistered
+  // ones name weaknesses nobody has treated yet.
+  if (!can(role, 'risk:write')) out.riskSuggestions = [];
   if (!can(role, 'exercise:read')) out.exercises = [];
   if (!can(role, 'plan:read')) {
     out.plan = null;

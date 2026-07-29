@@ -23,7 +23,7 @@ import {
   RISK_IMPACT_LABELS,
 } from '@/lib/domain/constants';
 import { Card, btn, StatusPill, TierBadge } from '@/components/ui';
-import { suggestRisksWithAi } from '@/lib/actions';
+import { suggestRisksWithAi, dismissRiskSuggestion, acceptRiskSuggestion } from '@/lib/actions';
 import type { RiskSuggestion } from '@/lib/domain/risk-suggestions';
 import { formatCompactCurrency, formatDate } from '@/lib/format';
 
@@ -88,11 +88,13 @@ function RiskEditor({
   processes,
   dependencyOptions,
   onClose,
+  onSaved,
 }: {
   initial: RiskEntry | null;
   processes: { id: string; name: string; tier: Tier | null }[];
   dependencyOptions: string[];
   onClose: () => void;
+  onSaved?: () => Promise<void>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -131,6 +133,7 @@ function RiskEditor({
               id: form.id || undefined,
               targetDate: form.targetDate || null,
             });
+            await onSaved?.();
             router.refresh();
             onClose();
           });
@@ -407,18 +410,43 @@ export function RiskClient({
 }) {
   const [editing, setEditing] = useState<RiskEntry | null>(null);
   const [creating, setCreating] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<RiskSuggestion[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<RiskSuggestion[] | null>(null);
   const [suggesting, startSuggest] = useTransition();
   const [suggestError, setSuggestError] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState<string[]>([]);
+  // Local only until the server confirms; the decision itself is persisted so
+  // a dismissed suggestion does not reappear on the next load.
+  const [decided, setDecided] = useState<string[]>([]);
+  const [fromSuggestion, setFromSuggestion] = useState<RiskSuggestion | null>(null);
 
-  const allSuggestions = [...suggestions, ...aiSuggestions].filter(
-    (s) => !dismissed.includes(s.id)
-  );
+  // A fresh AI run replaces the server-rendered list, since the action returns
+  // every open suggestion rather than only that run's additions.
+  const allSuggestions = [
+    ...(aiSuggestions ?? suggestions.filter((s) => s.source === 'ai')),
+    ...suggestions.filter((s) => s.source !== 'ai'),
+  ].filter((s) => !decided.includes(s.id));
+
+  const snapshot = (s: RiskSuggestion) => ({
+    id: s.id,
+    title: s.title,
+    category: s.category,
+    description: s.description,
+    processIds: s.processIds,
+    dependencies: s.dependencies,
+    basis: s.basis,
+  });
+
+  const dismiss = (s: RiskSuggestion) => {
+    setDecided((d) => [...d, s.id]);
+    void dismissRiskSuggestion(snapshot(s)).catch(() =>
+      // Put it back rather than pretend it was dismissed.
+      setDecided((d) => d.filter((id) => id !== s.id))
+    );
+  };
 
   /** A suggestion opens the editor pre-filled; likelihood stays for the human. */
   const startFromSuggestion = (s: RiskSuggestion) => {
     setCreating(false);
+    setFromSuggestion(s);
     setEditing({
       ...emptyRisk(),
       title: s.title,
@@ -442,7 +470,17 @@ export function RiskClient({
           onClose={() => {
             setEditing(null);
             setCreating(false);
+            setFromSuggestion(null);
           }}
+          onSaved={
+            fromSuggestion
+              ? async () => {
+                  const s = fromSuggestion;
+                  setDecided((d) => [...d, s.id]);
+                  await acceptRiskSuggestion(snapshot(s));
+                }
+              : undefined
+          }
         />
       )}
 
@@ -506,7 +544,7 @@ export function RiskClient({
                     <button
                       type="button"
                       className="text-xs text-ink-faint hover:text-ink"
-                      onClick={() => setDismissed((d) => [...d, s.id])}
+                      onClick={() => dismiss(s)}
                     >
                       Dismiss
                     </button>
@@ -516,7 +554,8 @@ export function RiskClient({
             ))}
           </div>
           <p className="mt-3 text-xs leading-relaxed text-ink-muted">
-            Suggestions stop once a registered risk names the same dependency, so this list
+            Suggestions stop once a registered risk names the same dependency, and anything
+            you add or dismiss stays gone, including across sessions, so this list
             shrinks as the register fills. Likelihood is never suggested: that judgement is
             yours, and impact derives itself from the processes attached.
           </p>

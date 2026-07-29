@@ -118,6 +118,7 @@ export async function generateRiskSuggestionsWithClaude(args: {
   ws: Workspace;
   existing: string;
   derived: string;
+  priorAi: string;
 }): Promise<AiRiskSuggestions> {
   const client = getAnthropic();
   const response = await client.messages.parse({
@@ -132,6 +133,7 @@ export async function generateRiskSuggestionsWithClaude(args: {
           brief: workspaceBrief(args.ws),
           existing: args.existing,
           derived: args.derived,
+          priorAi: args.priorAi,
         }),
       },
     ],

@@ -23,6 +23,7 @@ export function emptyWorkspace(): Workspace {
     plan: null,
     collectionRequests: [],
     risks: [],
+    riskSuggestions: [],
   };
 }
 
