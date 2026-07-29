@@ -245,6 +245,17 @@ export async function inviteMember(
     return { ok: false, message: 'Only an owner can invite another owner.' };
   }
 
+  // Inviting somebody who is already here is almost always a mistake, and
+  // the confusing kind: change their role on the members list instead.
+  const members = await listMembers(ctx.organization.id);
+  const already = members.find((m) => m.email.trim().toLowerCase() === address);
+  if (already) {
+    return {
+      ok: false,
+      message: `${address} is already a member (${ROLE_LABELS[already.role]}). Change their role on the members list instead.`,
+    };
+  }
+
   const { invitation, token } = await createInvitation({
     orgId: ctx.organization.id,
     email: address,

@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { OrgRole } from '@/lib/domain/authz';
-import { DEFAULT_JOIN_ROLE } from '@/lib/domain/authz';
+import { DEFAULT_JOIN_ROLE, ROLE_RANK } from '@/lib/domain/authz';
 import {
   evaluateDomain,
   organizationNameFromDomain,
@@ -745,20 +745,24 @@ export async function acceptInvitation(
     return { ok: false, reason: 'wrong_email' };
   }
   const sql = await getSql();
-  await upsertMembership(
-    found.invitation.orgId,
-    user.userId,
-    user.email,
-    found.invitation.role
-  );
-  // Set the role explicitly: upsert leaves an existing membership's role
-  // alone, and an invitation is a deliberate grant.
+  const existing = await getMembership(found.invitation.orgId, user.userId);
+
+  // An invitation grants access; it must never take it away. Accepting one
+  // for a role below what somebody already holds would silently demote them,
+  // and accepting a Viewer invitation as the only owner would leave the
+  // organization with nobody able to administer it again.
+  const granted =
+    existing && ROLE_RANK[existing.role] >= ROLE_RANK[found.invitation.role]
+      ? existing.role
+      : found.invitation.role;
+
+  await upsertMembership(found.invitation.orgId, user.userId, user.email, granted);
   await sql`
-    UPDATE memberships SET role = ${found.invitation.role}
+    UPDATE memberships SET role = ${granted}
     WHERE org_id = ${found.invitation.orgId} AND user_id = ${user.userId}
   `;
   await sql`UPDATE invitations SET accepted_at = now() WHERE id = ${found.invitation.id}`;
-  return { ok: true, orgId: found.invitation.orgId, role: found.invitation.role };
+  return { ok: true, orgId: found.invitation.orgId, role: granted };
 }
 
 // ---------------- Audit trail ----------------
