@@ -14,6 +14,9 @@ import {
   type Capability,
 } from '@/lib/domain/authz';
 import { recordAudit } from '@/lib/data/tenancy';
+import { withAiQuota } from '@/lib/ai/quota';
+import type { AiStatus, AiAllowance } from '@/lib/ai/quota';
+import type { AiFeature } from '@/lib/domain/plans';
 import { sampleWorkspace } from '@/lib/data/sample';
 import type { RiskSuggestion } from '@/lib/domain/risk-suggestions';
 import type {
@@ -531,14 +534,24 @@ export async function startAiExercise(
   const base = CATALOG.find((s) => s.id === scenarioId);
   if (!base) throw new Error('Unknown scenario');
 
+  // Checked before the call, not just before the save: a member who cannot
+  // run exercises must not be able to spend the organization's allowance.
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'exercise:run');
+  assertCan(ctx.role, 'ai:generate');
   const ws = await loadWorkspace();
-  const scenario = await generateScenarioWithClaude({
-    ws,
-    category: base.category,
-    baseTitle: base.title,
-    baseSummary: base.summary,
-    focus,
-  });
+  const scenario = await withAiQuota(
+    { orgId: ctx.organization.id, userId: ctx.userId },
+    'exercise',
+    () =>
+      generateScenarioWithClaude({
+        ws,
+        category: base.category,
+        baseTitle: base.title,
+        baseSummary: base.summary,
+        focus,
+      })
+  );
 
   const now = new Date().toISOString();
   const id = nanoid(10);
@@ -606,7 +619,14 @@ export async function generateExerciseReport(sessionId: string) {
   if (!session) throw new Error('Session not found');
   if (session.status !== 'completed') throw new Error('Complete the exercise before generating the report.');
 
-  const report = await generateAarWithClaude({ ws, session });
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'exercise:run');
+  assertCan(ctx.role, 'ai:generate');
+  const report = await withAiQuota(
+    { orgId: ctx.organization.id, userId: ctx.userId },
+    'aar',
+    () => generateAarWithClaude({ ws, session })
+  );
   await withWorkspace('exercise:run', (w) => {
     const s = w.exercises.find((e) => e.id === sessionId);
     if (!s) throw new Error('Session not found');
@@ -662,7 +682,14 @@ export async function draftWorkflowWithAi(
   const ws = await loadWorkspace();
   if (!ws.processes.some((p) => p.id === processId)) throw new Error('Process not found');
 
-  const draft = await generateWorkflowWithClaude({ ws, processId, focus });
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'workflow:write');
+  assertCan(ctx.role, 'ai:generate');
+  const draft = await withAiQuota(
+    { orgId: ctx.organization.id, userId: ctx.userId },
+    'workflow',
+    () => generateWorkflowWithClaude({ ws, processId, focus })
+  );
   return {
     steps: draft.steps.map((s) => ({
       id: nanoid(8),
@@ -699,7 +726,10 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
   const priorAi = ws.riskSuggestions ?? [];
 
   const { generateRiskSuggestionsWithClaude } = await import('@/lib/ai/generate');
-  const result = await generateRiskSuggestionsWithClaude({
+  const result = await withAiQuota(
+    { orgId: ctx.organization.id, userId: ctx.userId },
+    'risk',
+    () => generateRiskSuggestionsWithClaude({
     ws,
     existing: ws.risks
       .map((r) => `- ${r.title} [${r.category}] affecting ${r.processIds.length} processes`)
@@ -711,7 +741,8 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
     priorAi: priorAi
       .map((s) => `- ${s.title} [${s.category}]${s.status === 'dismissed' ? ' (rejected by the assessor)' : ''}`)
       .join('\n'),
-  });
+    })
+  );
 
   const byName = new Map(ws.processes.map((p) => [p.name.trim().toLowerCase(), p.id]));
   const knownDeps = new Set(
@@ -1052,4 +1083,29 @@ export async function importWorkspace(json: string) {
   await withWorkspace('workspace:destroy', (ws) => {
     Object.assign(ws, { ...emptyWorkspace(), ...parsed });
   });
+}
+
+// ---------------- AI plan limits ----------------
+
+/**
+ * Whether a given AI control can be used right now, and why not if it cannot.
+ * Pages call this so a control that would fail is disabled with the real
+ * reason attached, rather than looking available and erroring on click.
+ */
+export async function getAiStatus(feature: AiFeature): Promise<AiStatus> {
+  const { aiEnabled } = await import('@/lib/ai/client');
+  if (!aiEnabled()) return { enabled: false, blockedReason: null, allowance: null };
+  const ctx = await getAuthContext();
+  const { allowanceFor, blockedReason } = await import('@/lib/ai/quota');
+  const allowance = await allowanceFor(ctx.organization.id);
+  return { enabled: true, blockedReason: blockedReason(allowance, feature), allowance };
+}
+
+/** The organization's full AI standing, for the usage panel. */
+export async function getAiAllowance(): Promise<AiAllowance | null> {
+  const { aiEnabled } = await import('@/lib/ai/client');
+  if (!aiEnabled()) return null;
+  const ctx = await getAuthContext();
+  const { allowanceFor } = await import('@/lib/ai/quota');
+  return allowanceFor(ctx.organization.id);
 }

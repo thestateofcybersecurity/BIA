@@ -15,9 +15,12 @@ import { Card, btn } from '@/components/ui';
 export function SessionRunner({
   session,
   aiEnabled,
+  aiBlockedReason,
 }: {
   session: ExerciseSession;
   aiEnabled: boolean;
+  /** Plan limit standing in the way, if any. Null means it can be used. */
+  aiBlockedReason: string | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -207,7 +210,11 @@ export function SessionRunner({
             title="After-action report"
             subtitle="Claude reviews the recorded responses and notes against your BIA data"
           >
-            {aiEnabled ? (
+            {aiEnabled && aiBlockedReason ? (
+              <p className="rounded bg-s0 px-3 py-2 text-xs leading-relaxed text-ink-muted">
+                {aiBlockedReason}
+              </p>
+            ) : aiEnabled ? (
               <>
                 <button
                   className={btn.primary}

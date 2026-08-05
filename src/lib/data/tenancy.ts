@@ -167,6 +167,26 @@ async function getSql() {
           summary text NOT NULL DEFAULT ''
         )`;
       await sql`CREATE INDEX IF NOT EXISTS audit_events_org_idx ON audit_events (org_id, at DESC)`;
+      // Billing plan. Defaults to free, so an organization created before
+      // metering existed is metered from the moment this ships rather than
+      // being silently grandfathered.
+      await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS plan text NOT NULL DEFAULT 'free'`;
+      // AI usage ledger. An append-only event per generation rather than a
+      // counter column, so the allowance can be recomputed, disputed, and
+      // audited. Critically it lives outside the workspace document: replacing
+      // the workspace (loading sample data, importing a backup) must not hand
+      // anyone a fresh allowance.
+      await sql`
+        CREATE TABLE IF NOT EXISTS ai_usage (
+          id bigserial PRIMARY KEY,
+          org_id text NOT NULL,
+          at timestamptz NOT NULL DEFAULT now(),
+          actor_user_id text NOT NULL DEFAULT '',
+          feature text NOT NULL,
+          input_tokens integer NOT NULL DEFAULT 0,
+          output_tokens integer NOT NULL DEFAULT 0
+        )`;
+      await sql`CREATE INDEX IF NOT EXISTS ai_usage_org_idx ON ai_usage (org_id, at DESC)`;
       // Pre-tenancy workspaces were keyed by user. Move them on first boot
       // after the upgrade so nobody signs in to an empty workspace; the
       // legacy table is left in place so the previous release still reads.
@@ -939,4 +959,65 @@ async function migrateLegacyWorkspaces(
     migrated++;
   }
   return { migrated, skipped };
+}
+
+// ---------------- AI usage metering ----------------
+
+export interface AiUsageSummary {
+  plan: string;
+  /** Input plus output tokens consumed since the start of this UTC month. */
+  tokensThisMonth: number;
+  /** AI exercises generated over the lifetime of the organization. */
+  exercisesEver: number;
+}
+
+export async function getOrgPlan(orgId: string): Promise<string> {
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT plan FROM organizations WHERE id = ${orgId}
+  `) as { plan: string }[];
+  return rows[0]?.plan ?? 'free';
+}
+
+export async function setOrgPlan(orgId: string, plan: string): Promise<void> {
+  const sql = await getSql();
+  await sql`UPDATE organizations SET plan = ${plan} WHERE id = ${orgId}`;
+}
+
+/**
+ * Both meters in one round trip. Token spend is windowed to the current
+ * month; the exercise count is not, because the free exercise is a one-off
+ * trial rather than a monthly allowance.
+ */
+export async function aiUsage(orgId: string, since: Date): Promise<AiUsageSummary> {
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT
+      (SELECT plan FROM organizations WHERE id = ${orgId}) AS plan,
+      COALESCE(SUM(input_tokens + output_tokens)
+        FILTER (WHERE at >= ${since.toISOString()}), 0) AS tokens,
+      COUNT(*) FILTER (WHERE feature = 'exercise') AS exercises
+    FROM ai_usage WHERE org_id = ${orgId}
+  `) as { plan: string | null; tokens: string | number; exercises: string | number }[];
+  const r = rows[0];
+  return {
+    plan: r?.plan ?? 'free',
+    tokensThisMonth: Number(r?.tokens ?? 0),
+    exercisesEver: Number(r?.exercises ?? 0),
+  };
+}
+
+export async function recordAiUsage(entry: {
+  orgId: string;
+  actorUserId: string;
+  feature: string;
+  inputTokens: number;
+  outputTokens: number;
+}): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO ai_usage (org_id, actor_user_id, feature, input_tokens, output_tokens)
+    VALUES (${entry.orgId}, ${entry.actorUserId}, ${entry.feature},
+            ${entry.inputTokens}, ${entry.outputTokens})
+  `;
 }

@@ -3,7 +3,7 @@ import { loadWorkspace } from '@/lib/actions';
 import { deriveAll } from '@/lib/domain/scoring';
 import { deriveRisks, riskMatrix, riskConcentration, processRiskLoad } from '@/lib/domain/risk';
 import { suggestRisks } from '@/lib/domain/risk-suggestions';
-import { aiEnabled } from '@/lib/ai/client';
+import { getAiStatus } from '@/lib/actions';
 import { DEPENDENCY_CLASSES } from '@/lib/domain/constants';
 import { PageHeader, Card, StatusPill, EmptyState, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
@@ -16,6 +16,7 @@ export const maxDuration = 300;
 
 export default async function RisksPage() {
   const ws = await loadWorkspace();
+  const aiStatus = await getAiStatus('risk');
   const derived = deriveAll(ws);
   const rows = deriveRisks(ws);
   const matrix = riskMatrix(rows);
@@ -132,7 +133,8 @@ export default async function RisksPage() {
             matrix={matrix}
             currency={ws.org?.currency ?? 'USD'}
             suggestions={suggestions}
-            aiAvailable={aiEnabled()}
+            aiAvailable={aiStatus.enabled}
+            aiBlockedReason={aiStatus.blockedReason}
           />
 
           {(uncovered.length > 0 || concentration.length > 0 || load.length > 0) && (

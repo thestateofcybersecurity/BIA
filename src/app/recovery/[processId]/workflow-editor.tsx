@@ -29,11 +29,14 @@ export function WorkflowEditor({
   initial,
   rtoTargetHours,
   aiAvailable,
+  aiBlockedReason,
 }: {
   processId: string;
   initial: RecoveryWorkflow | null;
   rtoTargetHours: number | null;
   aiAvailable: boolean;
+  /** Plan limit standing in the way, if any. Null means it can be used. */
+  aiBlockedReason: string | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -79,7 +82,14 @@ export function WorkflowEditor({
 
   return (
     <div className="flex flex-col gap-4">
-      {aiAvailable && (
+      {aiAvailable && aiBlockedReason && (
+        <Card title="Draft with Claude">
+          <p className="rounded bg-s0 px-3 py-2 text-xs leading-relaxed text-ink-muted">
+            {aiBlockedReason}
+          </p>
+        </Card>
+      )}
+      {aiAvailable && !aiBlockedReason && (
         <Card
           title="Draft with Claude"
           subtitle="Builds a sequence from this process's objectives, dependencies, resource profile, gaps, and threats"

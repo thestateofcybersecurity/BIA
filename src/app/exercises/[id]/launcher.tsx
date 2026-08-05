@@ -8,9 +8,12 @@ import { Card, btn } from '@/components/ui';
 export function ExerciseLauncher({
   scenarioId,
   aiEnabled,
+  aiBlockedReason,
 }: {
   scenarioId: string;
   aiEnabled: boolean;
+  /** Plan limit standing in the way, if any. Null means it can be used. */
+  aiBlockedReason: string | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -68,7 +71,11 @@ export function ExerciseLauncher({
             injects that collide with your documented recovery gaps and aims the
             discussion at your weakest maturity domains.
           </p>
-          {aiEnabled ? (
+          {aiEnabled && aiBlockedReason ? (
+            <p className="mt-3 rounded bg-s0 px-3 py-2 text-xs leading-relaxed text-ink-muted">
+              {aiBlockedReason}
+            </p>
+          ) : aiEnabled ? (
             <>
               <textarea
                 rows={2}

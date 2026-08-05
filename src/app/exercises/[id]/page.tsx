@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { loadWorkspace } from '@/lib/actions';
 import { generateScenario } from '@/lib/domain/scenarios';
 import { MATURITY_DOMAINS } from '@/lib/domain/maturity';
-import { aiEnabled } from '@/lib/ai/client';
+import { getAiStatus } from '@/lib/actions';
 import { PageHeader, Card } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { PrintButton } from '@/components/print-button';
@@ -21,6 +21,7 @@ export default async function ExercisePage({
   const ws = await loadWorkspace();
   const scenario = generateScenario(ws, id);
   if (!scenario) notFound();
+  const aiStatus = await getAiStatus('exercise');
 
   const domainName = (id: string) =>
     MATURITY_DOMAINS.find((d) => d.id === id)?.name ?? id;
@@ -58,7 +59,11 @@ export default async function ExercisePage({
       </HelpBox>
 
       <div className="no-print">
-        <ExerciseLauncher scenarioId={id} aiEnabled={aiEnabled()} />
+        <ExerciseLauncher
+          scenarioId={id}
+          aiEnabled={aiStatus.enabled}
+          aiBlockedReason={aiStatus.blockedReason}
+        />
       </div>
 
       {scenario.contextNotes.length > 0 && (

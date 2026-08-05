@@ -8,7 +8,9 @@ import {
 } from '@/lib/org-actions';
 import { tenancyEnabled } from '@/lib/data/tenancy';
 import { can, ROLE_LABELS } from '@/lib/domain/authz';
-import { PageHeader, Card, EmptyState, btn } from '@/components/ui';
+import { getAiAllowance } from '@/lib/actions';
+import { AI_FEATURE_LABELS } from '@/lib/domain/plans';
+import { PageHeader, Card, EmptyState, StatusPill, btn } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { MembersClient } from './members-client';
 import { OrgSettings } from './org-settings';
@@ -61,6 +63,7 @@ export default async function TeamPage() {
   const domains = await listOrgDomains();
   const invitations = await listOrgInvitations();
   const audit = await listOrgAudit();
+  const ai = await getAiAllowance();
 
   return (
     <>
@@ -119,6 +122,57 @@ export default async function TeamPage() {
             </span>
           </div>
         </Card>
+
+        {ai && (
+          <Card
+            title="AI allowance"
+            subtitle="What Claude-backed generation this plan includes, and what is left"
+          >
+            <div className="flex flex-wrap items-start gap-x-10 gap-y-4 text-sm">
+              <span>
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                  Plan
+                </span>
+                {ai.planLabel}
+              </span>
+              <span>
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                  Tokens this month
+                </span>
+                <span className="tnum font-mono">
+                  {ai.tokensUsed.toLocaleString()}
+                  {ai.tokensLimit != null && ` / ${ai.tokensLimit.toLocaleString()}`}
+                </span>
+                {ai.tokensLimit == null && <span className="text-ink-muted"> · no limit</span>}
+                {ai.tokensRemaining === 0 && (
+                  <StatusPill tone="bad">Used up</StatusPill>
+                )}
+              </span>
+              <span>
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                  AI exercises generated
+                </span>
+                <span className="tnum font-mono">
+                  {ai.exercisesUsed}
+                  {ai.exercisesLimit != null && ` / ${ai.exercisesLimit}`}
+                </span>
+                {ai.exercisesLimit == null && <span className="text-ink-muted"> · no limit</span>}
+                {ai.exercisesRemaining === 0 && <StatusPill tone="bad">Used up</StatusPill>}
+              </span>
+              <span>
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                  Included
+                </span>
+                {ai.features.map((f) => AI_FEATURE_LABELS[f]).join(', ')}
+              </span>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-ink-muted">
+              The token budget resets on the 1st of each month. The AI exercise count does not
+              reset: it is a one-off allowance, and the scenario library stays unlimited whatever
+              the plan, so exercises can always be run.
+            </p>
+          </Card>
+        )}
 
         {canManageOrg && <OrgSettings orgName={ctx.organization.name} domains={domains} />}
       </div>

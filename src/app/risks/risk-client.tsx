@@ -398,6 +398,7 @@ export function RiskClient({
   matrix,
   currency,
   suggestions,
+  aiBlockedReason,
   aiAvailable,
 }: {
   rows: RiskRow[];
@@ -407,6 +408,8 @@ export function RiskClient({
   currency: string;
   suggestions: RiskSuggestion[];
   aiAvailable: boolean;
+  /** Plan limit standing in the way, if any. Null means it can be used. */
+  aiBlockedReason: string | null;
 }) {
   const [editing, setEditing] = useState<RiskEntry | null>(null);
   const [creating, setCreating] = useState(false);
@@ -489,7 +492,10 @@ export function RiskClient({
           <button type="button" className={btn.primary} onClick={() => setCreating(true)}>
             Add risk
           </button>
-          {aiAvailable && (
+          {aiAvailable && aiBlockedReason && (
+            <span className="text-xs leading-relaxed text-ink-muted">{aiBlockedReason}</span>
+          )}
+          {aiAvailable && !aiBlockedReason && (
             <button
               type="button"
               className={btn.secondary}

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { loadWorkspace } from '@/lib/actions';
-import { aiEnabled } from '@/lib/ai/client';
+import { getAiStatus } from '@/lib/actions';
 import { PageHeader, StatusPill } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { PrintButton } from '@/components/print-button';
@@ -18,6 +18,7 @@ export default async function ExerciseSessionPage({
 }) {
   const { sessionId } = await params;
   const ws = await loadWorkspace();
+  const aiStatus = await getAiStatus('aar');
   const session = ws.exercises.find((e) => e.id === sessionId);
   if (!session) notFound();
 
@@ -64,7 +65,11 @@ export default async function ExerciseSessionPage({
       {session.report ? (
         <AarView session={session} />
       ) : (
-        <SessionRunner session={session} aiEnabled={aiEnabled()} />
+        <SessionRunner
+          session={session}
+          aiEnabled={aiStatus.enabled}
+          aiBlockedReason={aiStatus.blockedReason}
+        />
       )}
     </>
   );

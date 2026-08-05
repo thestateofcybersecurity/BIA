@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { loadWorkspace } from '@/lib/actions';
-import { aiEnabled } from '@/lib/ai/client';
+import { getAiStatus } from '@/lib/actions';
 import { PageHeader } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { WorkflowEditor } from './workflow-editor';
@@ -15,6 +15,7 @@ export default async function WorkflowPage({
 }) {
   const { processId } = await params;
   const ws = await loadWorkspace();
+  const aiStatus = await getAiStatus('workflow');
   const process = ws.processes.find((p) => p.id === processId);
   if (!process) notFound();
 
@@ -53,7 +54,8 @@ export default async function WorkflowPage({
         processId={process.id}
         initial={workflow}
         rtoTargetHours={objectives?.rtoTargetHours ?? null}
-        aiAvailable={aiEnabled()}
+        aiAvailable={aiStatus.enabled}
+        aiBlockedReason={aiStatus.blockedReason}
       />
     </>
   );

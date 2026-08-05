@@ -7,6 +7,7 @@ import type {
   AfterActionReport,
 } from '@/lib/domain/types';
 import { getAnthropic, AI_MODEL } from './client';
+import type { AiResult, TokenUsage } from './quota';
 import {
   AiScenarioSchema,
   AarSchema,
@@ -27,6 +28,26 @@ import {
   riskSuggestUserPrompt,
 } from './prompts';
 
+/**
+ * Everything billable on a response. Cache fields are included because a
+ * cached read still costs, just less; leaving them out would under-report
+ * spend against the plan allowance.
+ */
+function usageOf(u: {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}): TokenUsage {
+  return {
+    input:
+      (u.input_tokens ?? 0) +
+      (u.cache_creation_input_tokens ?? 0) +
+      (u.cache_read_input_tokens ?? 0),
+    output: u.output_tokens ?? 0,
+  };
+}
+
 function assertUsable(stopReason: string | null): void {
   if (stopReason === 'refusal') {
     throw new Error('Claude declined to generate this content. Adjust the focus and try again.');
@@ -42,7 +63,7 @@ export async function generateScenarioWithClaude(args: {
   baseTitle: string;
   baseSummary: string;
   focus: string;
-}): Promise<GeneratedScenario> {
+}): Promise<AiResult<GeneratedScenario>> {
   const client = getAnthropic();
   const response = await client.messages.parse({
     model: AI_MODEL,
@@ -68,14 +89,17 @@ export async function generateScenarioWithClaude(args: {
   if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
 
   return {
-    id: `ai-${nanoid(8)}`,
-    category: args.category,
-    title: parsed.title,
-    duration: parsed.duration,
-    objective: parsed.objective,
-    contextNotes: parsed.contextNotes,
-    phases: parsed.phases,
-    evaluates: parsed.evaluates,
+    value: {
+      id: `ai-${nanoid(8)}`,
+      category: args.category,
+      title: parsed.title,
+      duration: parsed.duration,
+      objective: parsed.objective,
+      contextNotes: parsed.contextNotes,
+      phases: parsed.phases,
+      evaluates: parsed.evaluates,
+    },
+    usage: usageOf(response.usage),
   };
 }
 
@@ -83,7 +107,7 @@ export async function generateWorkflowWithClaude(args: {
   ws: Workspace;
   processId: string;
   focus: string;
-}): Promise<AiWorkflow> {
+}): Promise<AiResult<AiWorkflow>> {
   const client = getAnthropic();
   const response = await client.messages.parse({
     model: AI_MODEL,
@@ -111,7 +135,7 @@ export async function generateWorkflowWithClaude(args: {
   if (parsed.steps.length === 0) {
     throw new Error('Claude returned no steps. Add recovery objectives or dependencies and retry.');
   }
-  return parsed;
+  return { value: parsed, usage: usageOf(response.usage) };
 }
 
 export async function generateRiskSuggestionsWithClaude(args: {
@@ -119,7 +143,7 @@ export async function generateRiskSuggestionsWithClaude(args: {
   existing: string;
   derived: string;
   priorAi: string;
-}): Promise<AiRiskSuggestions> {
+}): Promise<AiResult<AiRiskSuggestions>> {
   const client = getAnthropic();
   const response = await client.messages.parse({
     model: AI_MODEL,
@@ -143,13 +167,13 @@ export async function generateRiskSuggestionsWithClaude(args: {
   assertUsable(response.stop_reason);
   const parsed = response.parsed_output;
   if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
-  return parsed;
+  return { value: parsed, usage: usageOf(response.usage) };
 }
 
 export async function generateAarWithClaude(args: {
   ws: Workspace;
   session: ExerciseSession;
-}): Promise<AfterActionReport> {
+}): Promise<AiResult<AfterActionReport>> {
   const { session } = args;
   const transcript = session.scenario.phases
     .map((phase, pi) => {
@@ -198,5 +222,8 @@ export async function generateAarWithClaude(args: {
   const parsed = response.parsed_output;
   if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
 
-  return { ...parsed, generatedAt: new Date().toISOString() };
+  return {
+    value: { ...parsed, generatedAt: new Date().toISOString() },
+    usage: usageOf(response.usage),
+  };
 }
