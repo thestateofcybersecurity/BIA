@@ -3,7 +3,6 @@ import { Fraunces, Archivo, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { NavShell } from '@/components/nav-shell';
 import { Analytics } from '@vercel/analytics/next';
-import Script from 'next/script';
 
 const display = Fraunces({
   subsets: ['latin'],
@@ -51,11 +50,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </main>
         </div>
         <Analytics />
-        <Script
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          strategy="afterInteractive"
-          data-cf-beacon='{"token": "a724ebd0b3e14872881d72258b832975"}'
-        />
       </body>
     </html>
   );
