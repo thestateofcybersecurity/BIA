@@ -270,16 +270,24 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
 }
 
 export async function approveAssessment(processId: string, approver: string) {
-  const name = approver.trim();
+  const name = approver.trim().slice(0, 100);
   if (!name) throw new Error('Approver name is required.');
+  // The typed name alone would let anyone attribute a sign-off to anybody.
+  // The authenticated account travels with it, so the record shows who
+  // claims the approval and which login actually performed it.
+  const ctx = await getAuthContext();
+  const attribution =
+    ctx.email && !name.toLowerCase().includes(ctx.email.toLowerCase())
+      ? `${name} (${ctx.email})`
+      : name;
   let approvedName = processId;
   await withWorkspace('assessment:approve', (ws) => {
     const a = ws.assessments.find((x) => x.processId === processId);
     if (!a) throw new Error('Assessment not found');
-    a.approvedBy = name;
+    a.approvedBy = attribution;
     a.approvedAt = new Date().toISOString();
     approvedName = ws.processes.find((p) => p.id === processId)?.name ?? processId;
-  }, `Signed off the impact assessment for "${approvedName}" as ${name}`);
+  }, `Signed off the impact assessment for "${approvedName}" as ${attribution}`);
 }
 
 // ---------------- Recovery objectives ----------------

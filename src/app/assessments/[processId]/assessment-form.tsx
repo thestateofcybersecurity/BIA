@@ -55,9 +55,12 @@ export function AssessmentForm({
   submit,
   submitLabel = 'Save assessment',
 }: {
-  process: BusinessProcess;
+  process: Pick<BusinessProcess, 'id' | 'name' | 'description' | 'owner'>;
   initial: ImpactAssessment | null;
-  org: OrgProfile | null;
+  /** Only the fields the form renders or derives from; the contributor
+   *  variant receives this from a public page, so owner contacts and the
+   *  rest of the profile must not ride along in the payload. */
+  org: Pick<OrgProfile, 'name' | 'currency' | 'annualRevenue' | 'riskAppetite'> | null;
   variant?: 'owner' | 'contributor';
   submit?: (payload: AssessmentSubmission) => Promise<{ ok: boolean; message?: string }>;
   submitLabel?: string;

@@ -21,13 +21,20 @@ import {
   RTO_BUFFER_FRACTION,
 } from './constants';
 
+/**
+ * The only org fields the financial math reads. Public-facing surfaces pass
+ * a slim object of just these, so the rest of the profile (industry,
+ * contacts-adjacent details, regulatory context) never reaches the client.
+ */
+export type OrgFinancials = Pick<OrgProfile, 'annualRevenue' | 'riskAppetite'>;
+
 /** Currency thresholds for financial severity, scaled to the org profile. */
-export function financialThresholds(org: OrgProfile): number[] {
+export function financialThresholds(org: OrgFinancials): number[] {
   const scale = APPETITE_MULTIPLIER[org.riskAppetite];
   return FINANCIAL_BAND_FRACTIONS.map((f) => f * org.annualRevenue * scale);
 }
 
-export function financialSeverity(loss: number, org: OrgProfile): Severity | null {
+export function financialSeverity(loss: number, org: OrgFinancials): Severity | null {
   // A zero or negative revenue collapses every threshold to zero, which
   // would score any loss - including zero - as Severe and drive the whole
   // portfolio to Tier 1. Treat financial impact as unscoreable, exactly as
@@ -51,7 +58,7 @@ export function mtpdToHours(mtpd: MtpdValue): number {
 /** Earliest horizon where any category reaches severity 4; 'beyond' if none does. */
 export function deriveMtpd(
   assessment: ImpactAssessment,
-  org: OrgProfile | null
+  org: OrgFinancials | null
 ): MtpdValue | null {
   if (!isAssessmentComplete(assessment)) return null;
   for (const h of HORIZONS) {
@@ -93,9 +100,11 @@ export function priorityScore(
 }
 
 export function deriveProcess(
-  process: BusinessProcess,
+  // Only the id is read; callers may pass a slimmed-down view model so
+  // untrusted surfaces never carry more of the record than they need.
+  process: Pick<BusinessProcess, 'id'>,
   assessment: ImpactAssessment | undefined,
-  org: OrgProfile | null
+  org: OrgFinancials | null
 ): ProcessDerived {
   const empty: ProcessDerived = {
     processId: process.id,

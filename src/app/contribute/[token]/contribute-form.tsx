@@ -1,7 +1,7 @@
 'use client';
 
 import { submitContribution } from '@/lib/contribution/actions';
-import type { BusinessProcess, ImpactAssessment, OrgProfile } from '@/lib/domain/types';
+import type { ImpactAssessment } from '@/lib/domain/types';
 import {
   AssessmentForm,
   type AssessmentSubmission,
@@ -20,9 +20,9 @@ export function ContributeForm({
   org,
 }: {
   token: string;
-  process: BusinessProcess;
+  process: Parameters<typeof AssessmentForm>[0]['process'];
   initial: ImpactAssessment | null;
-  org: OrgProfile | null;
+  org: Parameters<typeof AssessmentForm>[0]['org'];
 }) {
   return (
     <AssessmentForm
