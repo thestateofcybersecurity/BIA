@@ -139,13 +139,18 @@ function neonStore(url: string): Store {
     if (!g._biaTableReady) {
       // Tenancy owns org_workspaces; ensuring it here too keeps the store
       // usable on its own (scripts, the cron job) without ordering games.
+      // A failed attempt clears itself: a transient Neon cold-start error
+      // must not poison every subsequent request in this process.
       g._biaTableReady = g._biaSql`
         CREATE TABLE IF NOT EXISTS org_workspaces (
           org_id text PRIMARY KEY,
           data jsonb NOT NULL,
           version integer NOT NULL DEFAULT 1,
           updated_at timestamptz NOT NULL DEFAULT now()
-        )`;
+        )`.catch((e) => {
+        g._biaTableReady = undefined;
+        throw e;
+      });
     }
     await g._biaTableReady;
     return g._biaSql;

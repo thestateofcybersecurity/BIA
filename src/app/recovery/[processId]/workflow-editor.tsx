@@ -6,7 +6,7 @@ import { nanoid } from 'nanoid';
 import { saveWorkflow, draftWorkflowWithAi, type WorkflowDraft } from '@/lib/actions';
 import type { RecoveryWorkflow, RecoveryStep, DependencyMap } from '@/lib/domain/types';
 import { DEPENDENCY_CLASSES, DEPENDENCY_LABELS } from '@/lib/domain/constants';
-import { Card, btn, StatusPill } from '@/components/ui';
+import { Card, btn, StatusPill, useUnloadGuard } from '@/components/ui';
 import { formatHours } from '@/lib/format';
 
 const emptyDeps = (): DependencyMap => ({
@@ -23,6 +23,53 @@ const newStep = (): RecoveryStep => ({
 });
 
 const parseList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
+
+/**
+ * Comma-separated list input that only parses on blur. Parsing every
+ * keystroke mangled typing ("IT, Ops" became "IT" the moment the comma
+ * landed) and jumped the caret; here the raw text is kept locally until
+ * focus leaves, then committed as a clean list.
+ */
+function CommaListInput({
+  values,
+  onCommit,
+  placeholder,
+  className,
+  ariaLabel,
+}: {
+  values: string[];
+  onCommit: (next: string[]) => void;
+  placeholder?: string;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  const joined = values.join(', ');
+  const [raw, setRaw] = useState(joined);
+  const [syncedAt, setSyncedAt] = useState(joined);
+  if (joined !== syncedAt) {
+    // The committed value changed underneath us (save reset the editor,
+    // a draft loaded); resync once rather than on every keystroke.
+    setSyncedAt(joined);
+    setRaw(joined);
+  }
+  return (
+    <input
+      className={className}
+      value={raw}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      onChange={(e) => setRaw(e.target.value)}
+      onBlur={() => {
+        const next = parseList(raw);
+        if (next.join(', ') !== joined) onCommit(next);
+        else setSyncedAt(next.join(', '));
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 export function WorkflowEditor({
   processId,
@@ -43,13 +90,20 @@ export function WorkflowEditor({
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [steps, setSteps] = useState<RecoveryStep[]>(initial?.steps ?? []);
+  const [touched, setTouched] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [drafting, startDraft] = useTransition();
   const [focus, setFocus] = useState('');
   const [draftNotes, setDraftNotes] = useState<WorkflowDraft | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
 
-  const runDraft = () =>
+  const runDraft = () => {
+    // A draft replaces everything in the editor, and the editor is not saved
+    // until Save is pressed — so hand-typed steps can vanish without a trace.
+    const hasContent = steps.some((s) => s.description.trim() || s.team.trim());
+    if (hasContent && !window.confirm('Replace the steps currently in the editor with a Claude draft? Unsaved edits are lost.')) {
+      return;
+    }
     startDraft(async () => {
       setDraftError(null);
       try {
@@ -57,18 +111,22 @@ export function WorkflowEditor({
         setSteps(draft.steps);
         setDraftNotes(draft);
         setSaved(false);
+        setTouched(true);
       } catch (e) {
         setDraftError(e instanceof Error ? e.message : 'Drafting failed.');
       }
     });
+  };
 
   const update = (id: string, patch: Partial<RecoveryStep>) => {
     setSaved(false);
+    setTouched(true);
     setSteps((ss) => ss.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
   const move = (i: number, dir: -1 | 1) => {
     setSaved(false);
+    setTouched(true);
     setSteps((ss) => {
       const next = [...ss];
       const j = i + dir;
@@ -80,6 +138,8 @@ export function WorkflowEditor({
 
   const total = steps.reduce((s, x) => s + (x.durationHours || 0), 0);
   const over = rtoTargetHours != null && total > rtoTargetHours;
+
+  useUnloadGuard(touched && !pending);
 
   return (
     <div className="flex flex-col gap-4">
@@ -228,7 +288,7 @@ export function WorkflowEditor({
                 <button
                   type="button"
                   className="text-xs text-ink-faint hover:text-bad"
-                  onClick={() => { setSaved(false); setSteps((ss) => ss.filter((x) => x.id !== s.id)); }}
+                  onClick={() => { setSaved(false); setTouched(true); setSteps((ss) => ss.filter((x) => x.id !== s.id)); }}
                 >
                   Remove step
                 </button>
@@ -239,13 +299,13 @@ export function WorkflowEditor({
                   {DEPENDENCY_CLASSES.map((cls) => (
                     <div key={cls} className="flex flex-col gap-1">
                       <label>{DEPENDENCY_LABELS[cls]}</label>
-                      <input
+                      <CommaListInput
                         className="text-xs"
-                        value={s.dependencies[cls].join(', ')}
+                        values={s.dependencies[cls]}
                         placeholder="Comma separated"
-                        onChange={(e) =>
+                        onCommit={(next) =>
                           update(s.id, {
-                            dependencies: { ...s.dependencies, [cls]: parseList(e.target.value) },
+                            dependencies: { ...s.dependencies, [cls]: next },
                           })
                         }
                       />
@@ -253,11 +313,11 @@ export function WorkflowEditor({
                   ))}
                   <div className="flex flex-col gap-1 sm:col-span-2">
                     <label>Alternate staff</label>
-                    <input
+                    <CommaListInput
                       className="text-xs"
-                      value={s.alternateStaff.join(', ')}
+                      values={s.alternateStaff}
                       placeholder="Who can execute this step if the primary team is unavailable"
-                      onChange={(e) => update(s.id, { alternateStaff: parseList(e.target.value) })}
+                      onCommit={(next) => update(s.id, { alternateStaff: next })}
                     />
                   </div>
                 </div>
@@ -271,7 +331,7 @@ export function WorkflowEditor({
         <button
           type="button"
           className={btn.secondary}
-          onClick={() => { setSaved(false); setSteps((ss) => [...ss, newStep()]); }}
+          onClick={() => { setSaved(false); setTouched(true); setSteps((ss) => [...ss, newStep()]); }}
         >
           + Add step
         </button>
@@ -288,6 +348,7 @@ export function WorkflowEditor({
               }
               setSaveError(null);
               setSaved(true);
+              setTouched(false);
               router.refresh();
             })
           }

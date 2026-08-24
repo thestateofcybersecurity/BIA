@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { saveResourceProfile } from '@/lib/actions';
 import type { RecoveryResourceProfile, Horizon } from '@/lib/domain/types';
 import { HORIZONS, HORIZON_LABELS } from '@/lib/domain/constants';
-import { Card, btn } from '@/components/ui';
+import { Card, btn, useUnloadGuard } from '@/components/ui';
 
 const emptyHorizons = (): Record<Horizon, number | null> => ({
   h4: null, h24: null, d3: null, w1: null, m1: null,
@@ -37,12 +37,16 @@ export function ResourceProfileEditor({
     (initial?.vitalRecords ?? []).join(', ')
   );
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [touched, setTouched] = useState(false);
 
   const set = (row: (typeof ROWS)[number][0], h: Horizon, raw: string) => {
     setSaved(false);
+    setTouched(true);
     const v = raw === '' ? null : Math.max(0, Math.round(Number(raw)));
     setGrid((g) => ({ ...g, [row]: { ...g[row], [h]: v } }));
   };
+
+  useUnloadGuard(touched && !pending);
 
   return (
     <Card
@@ -94,7 +98,7 @@ export function ResourceProfileEditor({
             className="text-sm"
             value={vitalRecords}
             placeholder="Claims files, policy master records"
-            onChange={(e) => { setVitalRecords(e.target.value); setSaved(false); }}
+            onChange={(e) => { setVitalRecords(e.target.value); setSaved(false); setTouched(true); }}
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -103,7 +107,7 @@ export function ResourceProfileEditor({
             className="text-sm"
             value={notes}
             placeholder="Assumptions, surge arrangements, alternate site details"
-            onChange={(e) => { setNotes(e.target.value); setSaved(false); }}
+            onChange={(e) => { setNotes(e.target.value); setSaved(false); setTouched(true); }}
           />
         </div>
       </div>
@@ -127,6 +131,7 @@ export function ResourceProfileEditor({
               }
               setError(null);
               setSaved(true);
+              setTouched(false);
               router.refresh();
             })
           }

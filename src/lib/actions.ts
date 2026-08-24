@@ -87,10 +87,21 @@ async function loadWorkspaceRaw(): Promise<Workspace> {
 
 // ---------------- Org profile ----------------
 
+/**
+ * Input size caps. Everything here lands in one JSONB document that is read
+ * and written whole on every action, so an unbounded string lets one field
+ * slow every page for the whole organization.
+ */
+const SHORT = 200;
+const PROSE = 4000;
+const LIST_ITEMS = 50;
+const short = z.string().max(SHORT);
+const prose = z.string().max(PROSE);
+
 const orgSchema = z.object({
-  name: z.string().trim().min(1),
-  industry: z.string().trim(),
-  regulatoryContext: z.string().trim(),
+  name: z.string().trim().min(1).max(SHORT),
+  industry: z.string().trim().max(SHORT),
+  regulatoryContext: z.string().trim().max(PROSE),
   annualRevenue: z.number().positive(),
   employees: z.number().int().positive(),
   riskAppetite: z.enum(['conservative', 'moderate', 'aggressive']),
@@ -107,43 +118,43 @@ export async function saveOrg(input: Omit<OrgProfile, 'updatedAt'>) {
 // ---------------- Processes ----------------
 
 const depsSchema: z.ZodType<DependencyMap> = z.object({
-  people: z.array(z.string()),
-  applications: z.array(z.string()),
-  equipment: z.array(z.string()),
-  facilities: z.array(z.string()),
-  suppliers: z.array(z.string()),
-  data: z.array(z.string()),
+  people: z.array(short).max(LIST_ITEMS),
+  applications: z.array(short).max(LIST_ITEMS),
+  equipment: z.array(short).max(LIST_ITEMS),
+  facilities: z.array(short).max(LIST_ITEMS),
+  suppliers: z.array(short).max(LIST_ITEMS),
+  data: z.array(short).max(LIST_ITEMS),
 });
 
 const processSchema = z.object({
   id: z.string().optional(),
-  name: z.string().trim().min(1),
-  description: z.string(),
-  owner: z.string(),
-  ownerEmail: z.string().trim().optional(),
-  ownerPhone: z.string().trim().optional(),
-  department: z.string(),
-  usersServed: z.string(),
-  peakPeriods: z.string(),
+  name: z.string().trim().min(1).max(SHORT),
+  description: prose,
+  owner: short,
+  ownerEmail: z.string().trim().max(SHORT).optional(),
+  ownerPhone: z.string().trim().max(40).optional(),
+  department: short,
+  usersServed: short,
+  peakPeriods: short,
   dependencies: depsSchema,
-  upstreamProcessIds: z.array(z.string()),
+  upstreamProcessIds: z.array(z.string()).max(500),
 });
 
 export async function saveProcess(input: z.infer<typeof processSchema>) {
   const parsed = processSchema.parse(input);
   const now = new Date().toISOString();
-  let id = parsed.id;
+  // Minted up front so a concurrency retry reuses the same id; assigning
+  // inside the closure would turn a replay into a spurious "not found".
+  const id = parsed.id ?? nanoid(10);
   await withWorkspace('process:write', (ws) => {
-    if (id) {
-      const existing = ws.processes.find((p) => p.id === id);
-      if (!existing) throw new Error('Process not found');
+    const existing = ws.processes.find((p) => p.id === id);
+    if (existing) {
       Object.assign(existing, { ...parsed, id, updatedAt: now });
     } else {
-      id = nanoid(10);
       ws.processes.push({ ...parsed, id, createdAt: now, updatedAt: now });
     }
   }, `${parsed.id ? 'Updated' : 'Added'} process "${parsed.name}"`);
-  return { id: id! };
+  return { id };
 }
 
 export async function deleteProcess(id: string) {
@@ -156,6 +167,20 @@ export async function deleteProcess(id: string) {
     ws.remediations = ws.remediations.filter((r) => r.processId !== id);
     ws.workflows = ws.workflows.filter((w) => w.processId !== id);
     ws.resourceProfiles = ws.resourceProfiles.filter((r) => r.processId !== id);
+    // Dead references would silently shrink each risk's derived impact.
+    for (const risk of ws.risks) {
+      risk.processIds = risk.processIds.filter((pid) => pid !== id);
+    }
+    for (const suggestion of ws.riskSuggestions) {
+      suggestion.processIds = suggestion.processIds.filter((pid) => pid !== id);
+    }
+    // A pending request for a deleted process can never be fulfilled; the
+    // signed link is refused by the process-existence check anyway.
+    for (const request of ws.collectionRequests) {
+      if (request.processId === id && request.status === 'sent') {
+        request.status = 'revoked';
+      }
+    }
     for (const p of ws.processes) {
       p.upstreamProcessIds = p.upstreamProcessIds.filter((u) => u !== id);
     }
@@ -183,10 +208,10 @@ const assessmentSchema = z.object({
   mtpdOverride: z
     .object({
       value: z.enum(['h4', 'h24', 'd3', 'w1', 'm1', 'beyond']),
-      justification: z.string().trim().min(1),
+      justification: z.string().trim().min(1).max(PROSE),
     })
     .nullable(),
-  notes: z.string(),
+  notes: prose,
 });
 
 export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
@@ -267,7 +292,7 @@ const objectivesSchema = z.object({
   rtoAchievableHours: z.number().min(0).nullable(),
   rpoAchievableHours: z.number().min(0).nullable(),
   wrtHours: z.number().min(0).nullable(),
-  dataLossNotes: z.string(),
+  dataLossNotes: prose,
 });
 
 export async function saveObjectives(input: z.infer<typeof objectivesSchema>) {
@@ -286,8 +311,8 @@ export async function saveObjectives(input: z.infer<typeof objectivesSchema>) {
 const remediationSchema = z.object({
   processId: z.string().min(1),
   kind: z.enum(['rto', 'rpo']),
-  owner: z.string(),
-  action: z.string(),
+  owner: short,
+  action: prose,
   status: z.enum(['open', 'in_progress', 'resolved', 'accepted']),
   strategy: z
     .enum([
@@ -302,7 +327,7 @@ const remediationSchema = z.object({
     .nullable()
     .optional(),
   estimatedCost: z.number().min(0).nullable().optional(),
-  targetDate: z.string().nullable().optional(),
+  targetDate: z.string().max(40).nullable().optional(),
 });
 
 export async function saveRemediation(input: z.infer<typeof remediationSchema>) {
@@ -329,8 +354,8 @@ const resourceProfileSchema = z.object({
   staff: horizonNumbers,
   workstations: horizonNumbers,
   facilitySeats: horizonNumbers,
-  vitalRecords: z.array(z.string()),
-  notes: z.string(),
+  vitalRecords: z.array(short).max(LIST_ITEMS),
+  notes: prose,
 });
 
 export async function saveResourceProfile(
@@ -352,16 +377,16 @@ export async function saveResourceProfile(
 
 const stepSchema = z.object({
   id: z.string(),
-  description: z.string(),
-  team: z.string(),
+  description: z.string().max(1000),
+  team: short,
   durationHours: z.number().min(0),
   dependencies: depsSchema,
-  alternateStaff: z.array(z.string()),
+  alternateStaff: z.array(short).max(LIST_ITEMS),
 });
 
 const workflowSchema = z.object({
   processId: z.string().min(1),
-  steps: z.array(stepSchema),
+  steps: z.array(stepSchema).max(200),
 });
 
 export async function saveWorkflow(input: z.infer<typeof workflowSchema>) {
@@ -417,18 +442,27 @@ export async function importCsv(
 ): Promise<ImportResult> {
   const { parseCsvRecord } = await import('@/lib/domain/csv');
   const rows = records.map((r, i) => parseCsvRecord(r, i + 2));
+  const baseWarnings = rows.flatMap((r) => r.warnings);
   const result: ImportResult = {
     created: 0,
     updated: 0,
     assessments: 0,
     errors: rows.flatMap((r) => r.errors),
-    warnings: rows.flatMap((r) => r.warnings),
+    warnings: baseWarnings,
   };
   const valid = rows.filter((r) => r.errors.length === 0);
   if (valid.length === 0) return result;
 
   const now = new Date().toISOString();
+  // Counted per attempt and committed only after the save succeeds, so a
+  // concurrency replay does not report rows twice.
+  let created = 0;
+  let updated = 0;
+  let assessments = 0;
   await withWorkspace('process:write', (ws) => {
+    created = 0;
+    updated = 0;
+    assessments = 0;
     const byName = new Map(ws.processes.map((p) => [p.name.toLowerCase(), p]));
 
     for (const row of valid) {
@@ -446,19 +480,19 @@ export async function importCsv(
       if (existing) {
         Object.assign(existing, fields, { updatedAt: now });
         processId = existing.id;
-        result.updated++;
+        updated++;
       } else {
         processId = nanoid(10);
-        const created = {
+        const createdRow = {
           ...fields,
           id: processId,
           upstreamProcessIds: [],
           createdAt: now,
           updatedAt: now,
         };
-        ws.processes.push(created);
-        byName.set(row.name.toLowerCase(), created);
-        result.created++;
+        ws.processes.push(createdRow);
+        byName.set(row.name.toLowerCase(), createdRow);
+        created++;
       }
 
       if (row.hasAssessment) {
@@ -475,18 +509,19 @@ export async function importCsv(
         } else {
           ws.assessments.push({ id: nanoid(10), processId, ...payload });
         }
-        result.assessments++;
+        assessments++;
       }
     }
 
     // Resolve upstream references once every row exists.
+    const upstreamWarnings: string[] = [];
     for (const row of valid) {
       const process = byName.get(row.name.toLowerCase())!;
       const ids: string[] = [];
       for (const upstreamName of row.upstreamNames) {
         const target = byName.get(upstreamName.toLowerCase());
         if (!target) {
-          result.warnings.push(
+          upstreamWarnings.push(
             `"${row.name}": upstream process "${upstreamName}" not found; skipped`
           );
         } else if (target.id !== process.id) {
@@ -495,7 +530,12 @@ export async function importCsv(
       }
       if (row.upstreamNames.length > 0) process.upstreamProcessIds = ids;
     }
+    result.warnings = [...baseWarnings, ...upstreamWarnings];
   });
+
+  result.created = created;
+  result.updated = updated;
+  result.assessments = assessments;
 
   return result;
 }
@@ -539,6 +579,7 @@ export async function startAiExercise(
 
   const base = CATALOG.find((s) => s.id === scenarioId);
   if (!base) throw new Error('Unknown scenario');
+  focus = focus.trim().slice(0, 1000);
 
   // Checked before the call, not just before the save: a member who cannot
   // run exercises must not be able to spend the organization's allowance.
@@ -580,19 +621,23 @@ export async function startAiExercise(
   return { id };
 }
 
-const progressSchema = z.object({
-  sessionId: z.string().min(1),
-  currentPhase: z.number().int().min(0),
-  responses: z.record(z.string(), z.string()),
-  notes: z.array(
-    z.object({
-      id: z.string(),
-      text: z.string(),
-      phase: z.number().int().nullable(),
-      at: z.string(),
-    })
-  ),
-});
+const progressSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    currentPhase: z.number().int().min(0),
+    responses: z.record(z.string(), z.string().max(5000)),
+    notes: z.array(
+      z.object({
+        id: z.string(),
+        text: z.string().max(5000),
+        phase: z.number().int().nullable(),
+        at: z.string(),
+      })
+    ),
+  })
+  .refine((p) => Object.keys(p.responses).length <= 1000 && p.notes.length <= 500, {
+    message: 'Too much session content in one save',
+  });
 
 export async function saveExerciseProgress(input: z.infer<typeof progressSchema>) {
   const parsed = progressSchema.parse(input);
@@ -688,6 +733,9 @@ export async function draftWorkflowWithAi(
   if (!aiEnabled()) throw new Error('AI drafting requires ANTHROPIC_API_KEY to be configured.');
   const { generateWorkflowWithClaude } = await import('@/lib/ai/generate');
 
+  // The focus is free text headed straight into the prompt; a cap keeps it
+  // from inflating input tokens charged against the org's allowance.
+  focus = focus.trim().slice(0, 1000);
   const ws = await loadWorkspace();
   if (!ws.processes.some((p) => p.id === processId)) throw new Error('Process not found');
 
@@ -833,7 +881,7 @@ const suggestionSnapshotSchema = z.object({
   description: z.string(),
   processIds: z.array(z.string()),
   dependencies: z.array(z.string()),
-  basis: z.string(),
+  basis: prose,
 });
 
 /**
@@ -874,36 +922,36 @@ export async function acceptRiskSuggestion(input: z.infer<typeof suggestionSnaps
 
 const riskSchema = z.object({
   id: z.string().optional(),
-  title: z.string().trim().min(1),
-  category: z.string(),
-  description: z.string(),
-  processIds: z.array(z.string()),
-  dependencies: z.array(z.string()),
+  title: z.string().trim().min(1).max(SHORT),
+  category: z.string().max(100),
+  description: prose,
+  processIds: z.array(z.string()).max(500),
+  dependencies: z.array(short).max(LIST_ITEMS),
   likelihood: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
-  likelihoodRationale: z.string(),
-  existingControls: z.string(),
+  likelihoodRationale: prose,
+  existingControls: prose,
   treatment: z.enum(['avoid', 'reduce', 'transfer', 'accept']).nullable(),
-  treatmentAction: z.string(),
-  owner: z.string(),
-  targetDate: z.string().nullable(),
+  treatmentAction: prose,
+  owner: short,
+  targetDate: z.string().max(40).nullable(),
   status: z.enum(['open', 'treating', 'treated', 'accepted']),
 });
 
 export async function saveRisk(input: z.infer<typeof riskSchema>) {
   const parsed = riskSchema.parse(input);
   const now = new Date().toISOString();
-  let id = parsed.id;
+  // Minted up front so a concurrency retry reuses the same id; assigning
+  // inside the closure would turn a replay into a spurious "not found".
+  const id = parsed.id ?? nanoid(10);
   await withWorkspace('risk:write', (ws) => {
-    if (id) {
-      const existing = ws.risks.find((r) => r.id === id);
-      if (!existing) throw new Error('Risk not found');
+    const existing = ws.risks.find((r) => r.id === id);
+    if (existing) {
       Object.assign(existing, { ...parsed, id, updatedAt: now });
     } else {
-      id = nanoid(10);
       ws.risks.push({ ...parsed, id, updatedAt: now });
     }
   }, `${parsed.id ? 'Updated' : 'Registered'} risk "${parsed.title}"`);
-  return { id: id! };
+  return { id };
 }
 
 export async function deleteRisk(id: string) {
@@ -953,12 +1001,28 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
   });
 
   const { emailEnabled, APP_URL } = await import('@/lib/email/client');
-  const { assessmentRequestEmail } = await import('@/lib/email/templates');
   const link = `${APP_URL}/contribute/${token}`;
-  let emailed = false;
 
+  // Persist first: a crash or concurrency loss after the email is sent would
+  // leave the owner holding a link whose request was never recorded, and
+  // submission would come back "not found".
+  ws.collectionRequests.push({
+    id: requestId,
+    processId,
+    ownerName: process.owner,
+    email: address,
+    status: 'sent',
+    sentAt: now.toISOString(),
+    submittedAt: null,
+    emailed: false,
+  });
+  if (!(await store.save(ctx.organization.id, ws, version))) throw new ConcurrentEditError();
+  revalidatePath('/', 'layout');
+
+  let emailed = false;
   if (emailEnabled()) {
     const { getResend, EMAIL_FROM } = await import('@/lib/email/client');
+    const { assessmentRequestEmail } = await import('@/lib/email/templates');
     const content = assessmentRequestEmail({
       orgName: ws.org?.name ?? 'your organization',
       processName: process.name,
@@ -979,23 +1043,14 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
     } catch (e) {
       console.error('[email] assessment request threw:', e instanceof Error ? e.message : e);
     }
+    // Record whether delivery worked; the request already exists either way
+    // and the link is returned so the coordinator can pass it on by hand.
+    await withWorkspace('collection:manage', (w) => {
+      const stored = w.collectionRequests.find((r) => r.id === requestId);
+      if (stored) stored.emailed = emailed;
+    });
   }
 
-  ws.collectionRequests.push({
-    id: requestId,
-    processId,
-    ownerName: process.owner,
-    email: address,
-    status: 'sent',
-    sentAt: now.toISOString(),
-    submittedAt: null,
-    emailed,
-  });
-  if (!(await store.save(ctx.organization.id, ws, version))) throw new ConcurrentEditError();
-  revalidatePath('/', 'layout');
-
-  // The link is returned so the coordinator can pass it on themselves when
-  // email is not configured, or when the owner never received it.
   return { ok: true as const, link, emailed };
 }
 
@@ -1009,40 +1064,40 @@ export async function revokeAssessmentRequest(requestId: string) {
 // ---------------- Continuity plan (activation & comms) ----------------
 
 const planSchema = z.object({
-  declarationAuthority: z.string(),
-  standDownAuthority: z.string(),
-  commandLocation: z.string(),
-  bridgeDetails: z.string(),
+  declarationAuthority: short,
+  standDownAuthority: short,
+  commandLocation: short,
+  bridgeDetails: short,
   team: z.array(
     z.object({
       id: z.string(),
-      role: z.string(),
-      name: z.string(),
-      title: z.string(),
-      email: z.string(),
-      phone: z.string(),
-      deputy: z.string(),
-      deputyPhone: z.string(),
+      role: short,
+      name: short,
+      title: short,
+      email: short,
+      phone: z.string().max(40),
+      deputy: short,
+      deputyPhone: z.string().max(40),
     })
-  ),
+  ).max(50),
   triggers: z.array(
     z.object({
       id: z.string(),
       level: z.enum(['monitor', 'partial', 'full']),
-      condition: z.string(),
-      authority: z.string(),
+      condition: prose,
+      authority: short,
     })
-  ),
+  ).max(20),
   communications: z.array(
     z.object({
       id: z.string(),
-      audience: z.string(),
-      channel: z.string(),
-      timing: z.string(),
-      owner: z.string(),
-      keyMessage: z.string(),
+      audience: short,
+      channel: short,
+      timing: short,
+      owner: short,
+      keyMessage: prose,
     })
-  ),
+  ).max(30),
 });
 
 export async function savePlan(input: z.infer<typeof planSchema>) {
@@ -1084,6 +1139,9 @@ export async function resetWorkspace() {
 }
 
 export async function importWorkspace(json: string) {
+  // Capped before parsing: the workspace is one document read whole forever
+  // after, so a bloated import is a permanent tax on every action.
+  if (json.length > 20_000_000) throw new Error('That export is too large to import.');
   const parsed = JSON.parse(json) as Workspace;
   // Minimal shape check; detailed validation happens on next edit of each record.
   if (typeof parsed !== 'object' || parsed === null || !Array.isArray(parsed.processes)) {

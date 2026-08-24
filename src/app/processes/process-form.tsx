@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { saveProcess, deleteProcess } from '@/lib/actions';
 import type { BusinessProcess, DependencyMap, DependencyClass } from '@/lib/domain/types';
 import { DEPENDENCY_CLASSES, DEPENDENCY_LABELS } from '@/lib/domain/constants';
-import { Card, btn } from '@/components/ui';
+import { Card, btn, useUnloadGuard } from '@/components/ui';
 
 const emptyDeps = (): DependencyMap => ({
   people: [], applications: [], equipment: [], facilities: [], suppliers: [], data: [],
@@ -88,11 +88,19 @@ export function ProcessForm({
     upstreamProcessIds: initial?.upstreamProcessIds ?? [],
   });
 
-  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const [touched, setTouched] = useState(false);
 
-  const setDep = (cls: DependencyClass, v: string[]) =>
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
+    setTouched(true);
+    setForm((f) => ({ ...f, [k]: v }));
+  };
+
+  const setDep = (cls: DependencyClass, v: string[]) => {
+    setTouched(true);
     setForm((f) => ({ ...f, dependencies: { ...f.dependencies, [cls]: v } }));
+  };
+
+  useUnloadGuard(touched && !pending);
 
   const others = allProcesses.filter((p) => p.id !== initial?.id);
 
@@ -109,6 +117,7 @@ export function ProcessForm({
             setError(err instanceof Error ? err.message : 'Could not save the process.');
             return;
           }
+          setTouched(false);
           router.push('/processes');
           router.refresh();
         });

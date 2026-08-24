@@ -27,7 +27,12 @@ export function financialThresholds(org: OrgProfile): number[] {
   return FINANCIAL_BAND_FRACTIONS.map((f) => f * org.annualRevenue * scale);
 }
 
-export function financialSeverity(loss: number, org: OrgProfile): Severity {
+export function financialSeverity(loss: number, org: OrgProfile): Severity | null {
+  // A zero or negative revenue collapses every threshold to zero, which
+  // would score any loss - including zero - as Severe and drive the whole
+  // portfolio to Tier 1. Treat financial impact as unscoreable, exactly as
+  // when no organization profile exists at all.
+  if (!(org.annualRevenue > 0)) return null;
   const thresholds = financialThresholds(org);
   for (let i = 0; i < thresholds.length; i++) {
     if (loss < thresholds[i]) return i as Severity;
@@ -118,8 +123,10 @@ export function deriveProcess(
     const loss = assessment.financialLoss[h];
     if (loss != null && org) {
       const s = financialSeverity(loss, org);
-      finSev[h] = s;
-      if (s > peakFin) peakFin = s;
+      if (s != null) {
+        finSev[h] = s;
+        if (s > peakFin) peakFin = s;
+      }
     }
   }
 

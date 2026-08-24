@@ -28,7 +28,7 @@ import {
   enforceMonotonic,
   enforceMonotonicLoss,
 } from '@/lib/domain/scoring';
-import { Card, btn, SEVERITY_BG, TierBadge } from '@/components/ui';
+import { Card, btn, SEVERITY_BG, TierBadge, useUnloadGuard } from '@/components/ui';
 import { CostCurveChart } from '@/components/charts';
 import { formatCurrency } from '@/lib/format';
 
@@ -83,6 +83,7 @@ export function AssessmentForm({
   const [focusCat, setFocusCat] = useState<RatedCategory>('operational');
   const [approver, setApprover] = useState(process.owner || '');
   const [dirty, setDirty] = useState(false);
+  useUnloadGuard(dirty && !pending);
 
   const assessment: ImpactAssessment = useMemo(
     () => ({

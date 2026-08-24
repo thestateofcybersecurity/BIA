@@ -1,5 +1,25 @@
+'use client';
+
+import { useEffect } from 'react';
 import type { Severity, Tier } from '@/lib/domain/types';
 import { SEVERITY_LABELS, TIER_LABELS, TIER_SHORT } from '@/lib/domain/constants';
+
+/**
+ * Warn before an unload while `active`. Every editor wires this to its own
+ * unsaved-changes signal; without it a stray click on a sidebar link throws
+ * away minutes of typed content with no undo.
+ */
+export function useUnloadGuard(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [active]);
+}
 
 export function PageHeader({
   kicker,

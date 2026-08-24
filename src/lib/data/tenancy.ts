@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { OrgRole } from '@/lib/domain/authz';
-import { DEFAULT_JOIN_ROLE, ROLE_RANK } from '@/lib/domain/authz';
+import { DEFAULT_JOIN_ROLE, ROLE_LABELS, ROLE_RANK } from '@/lib/domain/authz';
 import {
   evaluateDomain,
   organizationNameFromDomain,
@@ -91,7 +91,7 @@ async function getSql() {
   }
   const sql = g._biaTenancySql;
   if (!g._biaTenancyReady) {
-    g._biaTenancyReady = (async () => {
+    const ready = (async () => {
       await sql`
         CREATE TABLE IF NOT EXISTS organizations (
           id text PRIMARY KEY,
@@ -192,6 +192,12 @@ async function getSql() {
       // legacy table is left in place so the previous release still reads.
       await migrateLegacyWorkspaces(sql);
     })();
+    // A failed bootstrap (Neon cold-start blip) must not poison the process:
+    // clear the cached promise so the next request retries.
+    g._biaTenancyReady = ready.catch((e: unknown) => {
+      g._biaTenancyReady = undefined;
+      throw e;
+    });
   }
   await g._biaTenancyReady;
   return sql;
@@ -481,6 +487,9 @@ export async function listMembers(orgId: string): Promise<Membership[]> {
 /**
  * Change a member's role. The last owner cannot be demoted, because an
  * organization with no owner cannot grant anyone access to it again.
+ * The owner-count guard rides inside the UPDATE's WHERE clause, so two
+ * concurrent demotions of a two-owner org cannot both succeed and strand
+ * the organization with none.
  */
 export async function setMemberRole(args: {
   orgId: string;
@@ -494,10 +503,15 @@ export async function setMemberRole(args: {
   if (!current) return { ok: false, reason: 'not_found' };
 
   if (current.role === 'owner' && args.role !== 'owner') {
-    const owners = (await sql`
-      SELECT count(*)::int AS n FROM memberships WHERE org_id = ${args.orgId} AND role = 'owner'
-    `) as { n: number }[];
-    if ((owners[0]?.n ?? 0) <= 1) return { ok: false, reason: 'last_owner' };
+    const demoted = (await sql`
+      UPDATE memberships
+      SET role = ${args.role},
+          scoped_process_ids = ${JSON.stringify(args.scopedProcessIds ?? current.scopedProcessIds)}::jsonb
+      WHERE org_id = ${args.orgId} AND user_id = ${args.targetUserId}
+        AND (SELECT count(*) FROM memberships WHERE org_id = ${args.orgId} AND role = 'owner') > 1
+      RETURNING user_id
+    `) as { user_id: string }[];
+    return demoted.length > 0 ? { ok: true } : { ok: false, reason: 'last_owner' };
   }
 
   await sql`
@@ -509,6 +523,7 @@ export async function setMemberRole(args: {
   return { ok: true };
 }
 
+/** Remove a member; the last owner is protected against the same race. */
 export async function removeMember(
   orgId: string,
   targetUserId: string
@@ -518,10 +533,13 @@ export async function removeMember(
   const current = await getMembership(orgId, targetUserId);
   if (!current) return { ok: false, reason: 'not_found' };
   if (current.role === 'owner') {
-    const owners = (await sql`
-      SELECT count(*)::int AS n FROM memberships WHERE org_id = ${orgId} AND role = 'owner'
-    `) as { n: number }[];
-    if ((owners[0]?.n ?? 0) <= 1) return { ok: false, reason: 'last_owner' };
+    const removed = (await sql`
+      DELETE FROM memberships
+      WHERE org_id = ${orgId} AND user_id = ${targetUserId}
+        AND (SELECT count(*) FROM memberships WHERE org_id = ${orgId} AND role = 'owner') > 1
+      RETURNING user_id
+    `) as { user_id: string }[];
+    return removed.length > 0 ? { ok: true } : { ok: false, reason: 'last_owner' };
   }
   await sql`DELETE FROM memberships WHERE org_id = ${orgId} AND user_id = ${targetUserId}`;
   return { ok: true };
@@ -835,6 +853,16 @@ export async function acceptInvitation(
     WHERE org_id = ${found.invitation.orgId} AND user_id = ${user.userId}
   `;
   await sql`UPDATE invitations SET accepted_at = now() WHERE id = ${found.invitation.id}`;
+  // This function also runs on the passive path (the invite cookie consumed
+  // during sign-in), which never reaches the accept action's own audit
+  // write, so the trail entry belongs here where both paths pass.
+  await recordAudit({
+    orgId: found.invitation.orgId,
+    actorUserId: user.userId,
+    actorEmail: user.email,
+    action: 'member:manage',
+    summary: `${user.email} accepted an invitation and joined as ${ROLE_LABELS[granted]}`,
+  });
   return { ok: true, orgId: found.invitation.orgId, role: granted };
 }
 
@@ -1019,5 +1047,56 @@ export async function recordAiUsage(entry: {
     INSERT INTO ai_usage (org_id, actor_user_id, feature, input_tokens, output_tokens)
     VALUES (${entry.orgId}, ${entry.actorUserId}, ${entry.feature},
             ${entry.inputTokens}, ${entry.outputTokens})
+  `;
+}
+
+/**
+ * Claim a count-limited slot (AI exercises) before the provider is spent.
+ * The count check and the ledger insert are one statement — the INSERT only
+ * proceeds while the running count is under the limit — so N concurrent
+ * starts cannot all pass against the same remaining-count. (The Neon HTTP
+ * driver has no multi-statement transactions; atomicity comes from the
+ * single INSERT..SELECT.) Returns the claimed row's id for the caller to
+ * settle with real usage, or null when no slot remains.
+ */
+export async function claimAiExerciseSlot(
+  orgId: string,
+  actorUserId: string,
+  limit: number | null
+): Promise<number | null> {
+  const sql = await getSql();
+  const rows = (await sql`
+    INSERT INTO ai_usage (org_id, actor_user_id, feature)
+    SELECT ${orgId}, ${actorUserId}, 'exercise'
+    WHERE ${limit === null} OR (
+      SELECT count(*) FROM ai_usage
+      WHERE org_id = ${orgId} AND feature = 'exercise'
+    ) < ${limit ?? 0}
+    RETURNING id
+  `) as { id: number }[];
+  return rows[0]?.id ?? null;
+}
+
+/** Fill in the actual token usage once the claimed generation succeeds. */
+export async function settleAiUsage(
+  id: number,
+  inputTokens: number,
+  outputTokens: number
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    UPDATE ai_usage SET input_tokens = ${inputTokens}, output_tokens = ${outputTokens}
+    WHERE id = ${id}
+  `;
+}
+
+/**
+ * Return a claimed slot when its generation failed: it was never used, so
+ * it must not count against the plan. Only untouched rows are removed.
+ */
+export async function refundAiUsage(id: number): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    DELETE FROM ai_usage WHERE id = ${id} AND input_tokens = 0 AND output_tokens = 0
   `;
 }
