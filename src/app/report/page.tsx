@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { loadWorkspace } from '@/lib/actions';
+import { getAuthContext } from '@/lib/auth';
+import { can } from '@/lib/domain/authz';
 import { deriveAll, computeGaps, gapExposure, type GapInfo } from '@/lib/domain/scoring';
 import { scoreMaturity, MATURITY_DOMAINS } from '@/lib/domain/maturity';
 import { CATALOG } from '@/lib/domain/scenarios';
@@ -56,6 +58,7 @@ const td = 'border-b border-line/60 py-2 pr-4 align-top';
 
 export default async function ReportPage() {
   const ws = await loadWorkspace();
+  const canExport = can((await getAuthContext()).role, 'report:export');
 
   if (!ws.org || ws.processes.length === 0) {
     return (
@@ -124,12 +127,14 @@ export default async function ReportPage() {
           title="Business continuity plan"
           intro="Preview below; the download produces the official PDF document with cover page, document control, approvals, and running headers."
           actions={
-            <>
-              <a href="/api/report/pdf" className={btn.primary} download>
-                Download official PDF
-              </a>
-              <PrintButton label="Browser print" />
-            </>
+            canExport ? (
+              <>
+                <a href="/api/report/pdf" className={btn.primary} download>
+                  Download official PDF
+                </a>
+                <PrintButton label="Browser print" />
+              </>
+            ) : null
           }
         />
       </div>

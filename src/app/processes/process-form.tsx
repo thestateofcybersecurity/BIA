@@ -74,6 +74,7 @@ export function ProcessForm({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
@@ -100,8 +101,14 @@ export function ProcessForm({
       className="flex flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
+        setError(null);
         start(async () => {
-          await saveProcess({ id: initial?.id, ...form });
+          try {
+            await saveProcess({ id: initial?.id, ...form });
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Could not save the process.');
+            return;
+          }
           router.push('/processes');
           router.refresh();
         });
@@ -240,19 +247,26 @@ export function ProcessForm({
         <button type="submit" className={btn.primary} disabled={pending}>
           {pending ? 'Saving…' : initial ? 'Save changes' : 'Create process'}
         </button>
+        {error && <span className="text-xs text-bad">{error}</span>}
         {initial && (
           <button
             type="button"
             className={btn.danger}
             disabled={pending}
-            onClick={() => {
-              if (!confirm(`Delete "${initial.name}" and all of its assessment data?`)) return;
-              start(async () => {
-                await deleteProcess(initial.id);
-                router.push('/processes');
-                router.refresh();
-              });
-            }}
+              onClick={() => {
+                if (!confirm(`Delete "${initial.name}" and all of its assessment data?`)) return;
+                setError(null);
+                start(async () => {
+                  try {
+                    await deleteProcess(initial.id);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Could not delete the process.');
+                    return;
+                  }
+                  router.push('/processes');
+                  router.refresh();
+                });
+              }}
           >
             Delete
           </button>

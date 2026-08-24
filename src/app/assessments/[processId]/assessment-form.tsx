@@ -397,7 +397,13 @@ export function AssessmentForm({
                   disabled={pending || dirty || !approver.trim() || !initial || !derived.assessmentComplete}
                   onClick={() =>
                     start(async () => {
-                      await approveAssessment(process.id, approver);
+                      try {
+                        await approveAssessment(process.id, approver);
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'Approval failed.');
+                        return;
+                      }
+                      setError(null);
                       router.refresh();
                     })
                   }
@@ -419,22 +425,27 @@ export function AssessmentForm({
             disabled={pending || (override != null && override.justification.trim() === '')}
             onClick={() =>
               start(async () => {
-                if (submit) {
-                  const result = await submit({ financialLoss: losses, ratings, notes });
-                  if (!result.ok) {
-                    setError(result.message ?? 'Submission failed.');
-                    return;
+                try {
+                  if (submit) {
+                    const result = await submit({ financialLoss: losses, ratings, notes });
+                    if (!result.ok) {
+                      setError(result.message ?? 'Submission failed.');
+                      return;
+                    }
+                  } else {
+                    await saveAssessment({
+                      processId: process.id,
+                      financialLoss: losses,
+                      ratings,
+                      mtpdOverride: override,
+                      notes,
+                    });
                   }
-                  setError(null);
-                } else {
-                  await saveAssessment({
-                    processId: process.id,
-                    financialLoss: losses,
-                    ratings,
-                    mtpdOverride: override,
-                    notes,
-                  });
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'Save failed.');
+                  return;
                 }
+                setError(null);
                 setSaved(true);
                 setDirty(false);
                 router.refresh();

@@ -41,6 +41,7 @@ export function WorkflowEditor({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [steps, setSteps] = useState<RecoveryStep[]>(initial?.steps ?? []);
   const [open, setOpen] = useState<string | null>(null);
   const [drafting, startDraft] = useTransition();
@@ -279,7 +280,13 @@ export function WorkflowEditor({
           disabled={pending}
           onClick={() =>
             start(async () => {
-              await saveWorkflow({ processId, steps });
+              try {
+                await saveWorkflow({ processId, steps });
+              } catch (e) {
+                setSaveError(e instanceof Error ? e.message : 'Save failed.');
+                return;
+              }
+              setSaveError(null);
               setSaved(true);
               router.refresh();
             })
@@ -288,6 +295,7 @@ export function WorkflowEditor({
           {pending ? 'Saving…' : 'Save workflow'}
         </button>
         {saved && !pending && <span className="text-sm text-ok">Saved.</span>}
+        {saveError && <span className="text-sm text-bad">{saveError}</span>}
       </div>
     </div>
   );

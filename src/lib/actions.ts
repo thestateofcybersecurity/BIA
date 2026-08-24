@@ -380,12 +380,18 @@ export async function saveWorkflow(input: z.infer<typeof workflowSchema>) {
 
 // ---------------- Maturity ----------------
 
+/** Question ids are short slugs; levels are the anchored 0-5 scale or null. */
+const maturityAnswersSchema = z
+  .record(z.string().max(64), z.number().int().min(0).max(5).nullable())
+  .refine((a) => Object.keys(a).length <= 200, { message: 'Too many answers in one save' });
+
 export async function saveMaturityAnswers(
-  answers: Record<string, MaturityLevel | null>
+  input: Record<string, MaturityLevel | null>
 ) {
+  const parsed = maturityAnswersSchema.parse(input) as Record<string, MaturityLevel | null>;
   await withWorkspace('maturity:write', (ws) => {
     ws.maturity = {
-      answers: { ...(ws.maturity?.answers ?? {}), ...answers },
+      answers: { ...(ws.maturity?.answers ?? {}), ...parsed },
       updatedAt: new Date().toISOString(),
     };
   });
@@ -593,6 +599,9 @@ export async function saveExerciseProgress(input: z.infer<typeof progressSchema>
   await withWorkspace('exercise:run', (ws) => {
     const session = ws.exercises.find((e) => e.id === parsed.sessionId);
     if (!session) throw new Error('Session not found');
+    if (session.status !== 'in_progress') {
+      throw new Error('This exercise is complete; its recorded responses are locked.');
+    }
     session.currentPhase = parsed.currentPhase;
     session.responses = parsed.responses;
     session.notes = parsed.notes;

@@ -13,6 +13,28 @@ const ACCENT = '#bc4a1b';
 const PAPER = '#f5f2ea';
 const SOFT = '#3d4756';
 
+/**
+ * Process names, organization names, owner names, and AI-generated exercise
+ * titles are all attacker-influencable free text; they must never reach an
+ * HTML body unescaped. Developer-owned constants (APP_URL, counts) stay raw.
+ */
+function esc(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      default:
+        return '&#39;';
+    }
+  });
+}
+
 function shell(title: string, bodyHtml: string, cta?: { label: string; href: string }): string {
   const button = cta
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px"><tr><td style="background:${INK};border-radius:6px"><a href="${cta.href}" style="display:inline-block;padding:10px 18px;color:#ffffff;font-size:14px;text-decoration:none;font-family:Helvetica,Arial,sans-serif">${cta.label}</a></td></tr></table>`
@@ -47,7 +69,7 @@ export function signOffRequestEmail(args: {
   owner: string;
 }): EmailContent {
   const title = 'Assessment ready for sign-off';
-  const body = `The impact assessment for <strong>${args.processName}</strong> is complete and awaiting owner approval${args.owner ? ` from <strong>${args.owner}</strong>` : ''}. Sign-off locks in the MTPD and tier this assessment derived, and the BC plan lists unapproved assessments as pending.`;
+  const body = `The impact assessment for <strong>${esc(args.processName)}</strong> is complete and awaiting owner approval${args.owner ? ` from <strong>${esc(args.owner)}</strong>` : ''}. Sign-off locks in the MTPD and tier this assessment derived, and the BC plan lists unapproved assessments as pending.`;
   return {
     subject: `Sign-off needed: ${args.processName}`,
     html: shell(title, `<p style="margin:0">${body}</p>`, {
@@ -66,7 +88,7 @@ export function assessmentRequestEmail(args: {
   expiresInDays: number;
 }): EmailContent {
   const title = 'Your input is needed for the continuity plan';
-  const body = `${args.ownerName ? `${args.ownerName}, you` : 'You'} are recorded as the owner of <strong>${args.processName}</strong> in ${args.orgName}'s business impact assessment.<br><br>
+  const body = `${args.ownerName ? `${esc(args.ownerName)}, you` : 'You'} are recorded as the owner of <strong>${esc(args.processName)}</strong> in ${esc(args.orgName)}'s business impact assessment.<br><br>
     The link below opens a short form asking one question five times over: how bad would it be if this process stopped for 4 hours, 24 hours, 3 days, 1 week, and 1 month? Estimate the financial loss and rate the operational, customer, legal, and safety impact at each point. It usually takes about fifteen minutes, and your answers derive how quickly the organization commits to recovering your process.<br><br>
     The link is personal to you and this one process, and it expires in ${args.expiresInDays} days.`;
   return {
@@ -87,7 +109,7 @@ export function invitationEmail(args: {
   expiresInDays: number;
 }): EmailContent {
   const title = `You have been invited to ${args.orgName}`;
-  const body = `${args.inviterName ? `${args.inviterName} has` : 'You have been'} invited you to join <strong>${args.orgName}</strong>'s business continuity workspace as <strong>${args.roleLabel}</strong>.<br><br>
+  const body = `${args.inviterName ? `${esc(args.inviterName)} has` : 'You have been'} invited you to join <strong>${esc(args.orgName)}</strong>'s business continuity workspace as <strong>${esc(args.roleLabel)}</strong>.<br><br>
     The workspace holds the organization's impact assessments, recovery objectives, and continuity plan. Your role decides what you can see and change.<br><br>
     This invitation is tied to this email address and expires in ${args.expiresInDays} days. Sign in with this address to accept it.`;
   return {
@@ -107,7 +129,7 @@ export function aarReadyEmail(args: {
   highPriorityCount: number;
 }): EmailContent {
   const title = 'After-action report ready';
-  const body = `The after-action report for <strong>${args.exerciseTitle}</strong> has been generated: ${args.recommendationCount} recommendation${args.recommendationCount === 1 ? '' : 's'}${args.highPriorityCount > 0 ? `, <strong style="color:#a3271c">${args.highPriorityCount} high priority</strong>` : ''}. The report includes maturity signals to fold into your next self-assessment update.`;
+  const body = `The after-action report for <strong>${esc(args.exerciseTitle)}</strong> has been generated: ${args.recommendationCount} recommendation${args.recommendationCount === 1 ? '' : 's'}${args.highPriorityCount > 0 ? `, <strong style="color:#a3271c">${args.highPriorityCount} high priority</strong>` : ''}. The report includes maturity signals to fold into your next self-assessment update.`;
   return {
     subject: `After-action report: ${args.exerciseTitle}`,
     html: shell(title, `<p style="margin:0">${body}</p>`, {
@@ -131,9 +153,9 @@ export function reviewReminderEmail(args: {
           .map((i) => `<li style="margin-bottom:3px">${i}</li>`)
           .join('')}</ul>`;
   const html =
-    `<p style="margin:0">A quick status check on <strong>${args.orgName}</strong>'s business impact analysis:</p>` +
-    section('Assessments due for annual review', args.reviewDue) +
-    section('Complete but awaiting owner sign-off', args.awaitingSignOff);
+    `<p style="margin:0">A quick status check on <strong>${esc(args.orgName)}</strong>'s business impact analysis:</p>` +
+    section('Assessments due for annual review', args.reviewDue.map(esc)) +
+    section('Complete but awaiting owner sign-off', args.awaitingSignOff.map(esc));
   const text = [
     `${title}\n`,
     args.reviewDue.length

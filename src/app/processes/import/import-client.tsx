@@ -199,9 +199,15 @@ export function ImportClient() {
               disabled={pending || importable === 0}
               onClick={() =>
                 start(async () => {
-                  const res = await importCsv(records);
-                  setResult(res);
-                  router.refresh();
+                  try {
+                    const res = await importCsv(records);
+                    setResult(res);
+                    router.refresh();
+                  } catch (e) {
+                    setParseError(
+                      e instanceof Error ? e.message : 'The import failed. Nothing was changed.'
+                    );
+                  }
                 })
               }
             >
@@ -215,6 +221,10 @@ export function ImportClient() {
               </span>
             )}
           </div>
+
+          {parseError && (
+            <p className="mt-3 rounded bg-bad/10 px-3 py-2 text-xs text-bad">{parseError}</p>
+          )}
 
           {result && (
             <div className="mt-4 rounded-md border border-line bg-paper/60 p-4 text-sm">

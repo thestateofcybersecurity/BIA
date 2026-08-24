@@ -198,6 +198,8 @@ export function redactWorkspaceFor<
     exercises: unknown[];
     collectionRequests: unknown[];
     remediations: unknown[];
+    workflows: unknown[];
+    resourceProfiles: unknown[];
     processes: { ownerEmail?: string; ownerPhone?: string }[];
   },
 >(ws: T, role: OrgRole): T {
@@ -208,6 +210,12 @@ export function redactWorkspaceFor<
   // ones name weaknesses nobody has treated yet.
   if (!can(role, 'risk:write')) out.riskSuggestions = [];
   if (!can(role, 'exercise:read')) out.exercises = [];
+  // The recovery playbook (teams, deputies, step sequencing) and the vital
+  // records profile are response material, coordinator eyes only.
+  if (!can(role, 'workflow:read')) {
+    out.workflows = [];
+    out.resourceProfiles = [];
+  }
   if (!can(role, 'plan:read')) {
     out.plan = null;
     // Owner contact details are part of the response playbook, not the

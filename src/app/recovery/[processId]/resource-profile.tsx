@@ -27,6 +27,7 @@ export function ResourceProfileEditor({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [grid, setGrid] = useState({
     staff: initial?.staff ?? emptyHorizons(),
     workstations: initial?.workstations ?? emptyHorizons(),
@@ -113,12 +114,18 @@ export function ResourceProfileEditor({
           disabled={pending}
           onClick={() =>
             start(async () => {
-              await saveResourceProfile({
-                processId,
-                ...grid,
-                vitalRecords: vitalRecords.split(',').map((s) => s.trim()).filter(Boolean),
-                notes,
-              });
+              try {
+                await saveResourceProfile({
+                  processId,
+                  ...grid,
+                  vitalRecords: vitalRecords.split(',').map((s) => s.trim()).filter(Boolean),
+                  notes,
+                });
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Save failed.');
+                return;
+              }
+              setError(null);
               setSaved(true);
               router.refresh();
             })
@@ -127,6 +134,7 @@ export function ResourceProfileEditor({
           {pending ? 'Saving…' : 'Save resource profile'}
         </button>
         {saved && !pending && <span className="text-sm text-ok">Saved.</span>}
+        {error && <span className="text-sm text-bad">{error}</span>}
       </div>
     </Card>
   );

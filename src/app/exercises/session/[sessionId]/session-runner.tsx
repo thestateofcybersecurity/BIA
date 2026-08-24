@@ -38,6 +38,7 @@ export function SessionRunner({
   const completed = session.status === 'completed';
 
   const persist = (nextPhase: number, onDone?: () => void) => {
+    if (completed) return;
     start(async () => {
       try {
         await saveExerciseProgress({
@@ -196,13 +197,15 @@ export function SessionRunner({
               {answeredCount}/{current.discussion.length} questions answered in this phase
             </span>
           )}
-          <button
-            className={btn.small}
-            disabled={pending}
-            onClick={() => { setBusy('save'); persist(phase); }}
-          >
-            {busy === 'save' && pending ? 'Saving…' : 'Save progress'}
-          </button>
+          {!completed && (
+            <button
+              className={btn.small}
+              disabled={pending}
+              onClick={() => { setBusy('save'); persist(phase); }}
+            >
+              {busy === 'save' && pending ? 'Saving…' : 'Save progress'}
+            </button>
+          )}
         </div>
 
         {completed && (
@@ -313,7 +316,12 @@ export function SessionRunner({
           onClick={() => {
             if (!confirm('Delete this session and its recorded responses?')) return;
             start(async () => {
-              await deleteExercise(session.id);
+              try {
+                await deleteExercise(session.id);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Could not delete the session.');
+                return;
+              }
               router.push('/exercises');
               router.refresh();
             });

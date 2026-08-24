@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { authEnabled, getAuth } from '@/lib/neon-auth';
+import { authEnabled, demoModeAllowed, getAuth } from '@/lib/neon-auth';
 import {
   resolveOrgForUser,
   getMembership,
@@ -40,7 +40,31 @@ interface SessionUser {
   emailVerified: boolean;
 }
 
+/**
+ * A production deployment without auth, or with auth but no database, would
+ * silently collapse every visitor into one shared owner workspace. Fail
+ * closed instead: the misconfiguration must be fixed (or demo mode must be
+ * opted into explicitly) before the app serves any session-scoped request.
+ * Skipped during `next build` static generation, where no deployment
+ * environment exists yet; the check binds on every real request.
+ */
+function assertDeploymentConfigured(): void {
+  if (process.env.NEXT_PHASE === 'phase-production-build') return;
+  if (demoModeAllowed()) return;
+  if (!authEnabled()) {
+    throw new Error(
+      'BIA is deployed without authentication configured. Set NEON_AUTH_BASE_URL and NEON_AUTH_COOKIE_SECRET, or set BIA_DEMO_MODE=1 to intentionally run in single-workspace demo mode.'
+    );
+  }
+  if (!tenancyEnabled()) {
+    throw new Error(
+      'BIA is deployed with authentication but no DATABASE_URL, which would give every account access to one shared workspace. Configure the Neon integration, or set BIA_DEMO_MODE=1 to accept a single shared workspace.'
+    );
+  }
+}
+
 async function currentUser(): Promise<SessionUser> {
+  assertDeploymentConfigured();
   if (!authEnabled()) {
     // cookies() keeps demo mode dynamic (never statically cached).
     await cookies();
