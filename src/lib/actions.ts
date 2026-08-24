@@ -1132,6 +1132,26 @@ export async function saveNotificationPrefs(
   });
 }
 
+/**
+ * A member's personal mutes, on top of the organization defaults. Stored
+ * per user id inside the workspace document; an absent entry means the
+ * category simply follows the org toggle.
+ */
+export async function saveMyNotificationPrefs(
+  input: z.infer<typeof notificationPrefsSchema>
+) {
+  const parsed = notificationPrefsSchema.parse(input);
+  const userId = await getUserId();
+  await withWorkspace(
+    'notifications:self',
+    (ws) => {
+      const all = ws.emailOptOuts ?? (ws.emailOptOuts = {});
+      all[userId] = { ...all[userId], ...parsed };
+    },
+    'Updated personal email notification preferences'
+  );
+}
+
 // ---------------- Workspace utilities ----------------
 
 export async function loadSampleData() {

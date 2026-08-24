@@ -2,34 +2,34 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveNotificationPrefs } from '@/lib/actions';
-import type { Workspace } from '@/lib/domain/types';
+import { saveMyNotificationPrefs } from '@/lib/actions';
+import type { NotificationKind } from '@/lib/domain/types';
 import { Card, btn } from '@/components/ui';
+import { NOTIFICATION_OPTIONS } from './notification-settings';
 
-export const NOTIFICATION_OPTIONS = [
-  ['signOffRequests', 'Sign-off requests', 'When an assessment becomes complete and needs owner approval'],
-  ['aarReady', 'After-action reports', 'When Claude finishes an exercise report'],
-  ['reviewReminders', 'Weekly review reminders', 'Mondays: assessments past the annual review cadence or awaiting sign-off'],
-] as const;
-
-export function NotificationSettings({
+/**
+ * Personal email mutes, layered over the organization defaults any admin
+ * sets. Everything defaults to on; unchecking writes a per-user opt-out
+ * that notifyWorkspaceUser honors before a single send is attempted.
+ */
+export function MyEmailSettings({
   initial,
   emailEnabled,
 }: {
-  initial: Workspace['notifications'];
+  initial: Record<NotificationKind, boolean>;
   emailEnabled: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
-  const [prefs, setPrefs] = useState({
-    signOffRequests: initial?.signOffRequests !== false,
-    aarReady: initial?.aarReady !== false,
-    reviewReminders: initial?.reviewReminders !== false,
-  });
+  const [error, setError] = useState<string | null>(null);
+  const [prefs, setPrefs] = useState(initial);
 
   return (
-    <Card title="Email notifications" subtitle="Sent to your account email">
+    <Card
+      title="Your email preferences"
+      subtitle="Choose what this workspace may send to your account email"
+    >
       {!emailEnabled && (
         <p className="mb-3 rounded bg-s0 px-3 py-2 text-xs text-ink-muted">
           Set RESEND_API_KEY in the environment to enable notification emails.
@@ -60,15 +60,22 @@ export function NotificationSettings({
           disabled={pending}
           onClick={() =>
             start(async () => {
-              await saveNotificationPrefs(prefs);
+              try {
+                await saveMyNotificationPrefs(prefs);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Could not save your preferences.');
+                return;
+              }
+              setError(null);
               setSaved(true);
               router.refresh();
             })
           }
         >
-          {pending ? 'Saving…' : 'Save preferences'}
+          {pending ? 'Saving…' : 'Save my preferences'}
         </button>
         {saved && !pending && <span className="text-sm text-ok">Saved.</span>}
+        {error && <span className="text-sm text-bad">{error}</span>}
       </div>
     </Card>
   );

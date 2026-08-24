@@ -55,6 +55,7 @@ export type Capability =
   | 'member:view'
   | 'workspace:destroy'
   | 'notifications:manage'
+  | 'notifications:self'
   // Analysis, readable by any member
   | 'dashboard:view'
   | 'process:read'
@@ -91,6 +92,8 @@ export const CAPABILITY_MINIMUM: Record<Capability, OrgRole> = {
   'member:manage': 'admin',
   'workspace:destroy': 'admin',
   'notifications:manage': 'admin',
+  // Any member may mute notification categories for their own address.
+  'notifications:self': 'viewer',
 
   'member:view': 'coordinator',
   'profile:write': 'coordinator',
@@ -130,6 +133,7 @@ export const AUDIT_LABELS: Record<Capability, string> = {
   'member:view': 'Viewed members',
   'workspace:destroy': 'Replaced the whole workspace',
   'notifications:manage': 'Changed notification preferences',
+  'notifications:self': 'Changed personal notification preferences',
   'dashboard:view': 'Viewed the dashboard',
   'process:read': 'Viewed processes',
   'assessment:read': 'Viewed assessments',

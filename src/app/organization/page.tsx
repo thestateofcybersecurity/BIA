@@ -1,9 +1,12 @@
 import { loadWorkspace } from '@/lib/actions';
+import { getAuthContext } from '@/lib/auth';
+import { can } from '@/lib/domain/authz';
 import { emailEnabled } from '@/lib/email/client';
 import { PageHeader, Card } from '@/components/ui';
 import { HelpBox } from '@/components/help';
 import { OrgForm } from './org-form';
 import { NotificationSettings } from './notification-settings';
+import { MyEmailSettings } from './my-email-settings';
 import {
   LoadSampleButton,
   ResetButton,
@@ -15,6 +18,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function OrganizationPage() {
   const ws = await loadWorkspace();
+  const ctx = await getAuthContext();
+  const isAdmin = can(ctx.role, 'notifications:manage');
+  const mine = {
+    signOffRequests: ws.emailOptOuts?.[ctx.userId]?.signOffRequests !== false,
+    aarReady: ws.emailOptOuts?.[ctx.userId]?.aarReady !== false,
+    reviewReminders: ws.emailOptOuts?.[ctx.userId]?.reviewReminders !== false,
+  };
 
   return (
     <>
@@ -54,10 +64,13 @@ export default async function OrganizationPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <NotificationSettings
-            initial={ws.notifications}
-            emailEnabled={emailEnabled()}
-          />
+          {isAdmin && (
+            <NotificationSettings
+              initial={ws.notifications}
+              emailEnabled={emailEnabled()}
+            />
+          )}
+          <MyEmailSettings initial={mine} emailEnabled={emailEnabled()} />
           <Card
             title="Workspace data"
             subtitle="Everything lives in one workspace document"
