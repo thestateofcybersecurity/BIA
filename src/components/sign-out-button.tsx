@@ -7,7 +7,11 @@ export function SignOutButton() {
     <button
       className="font-mono text-[10px] uppercase tracking-wider text-ink-muted hover:text-accent"
       onClick={async () => {
-        await authClient.signOut();
+        try {
+          await authClient.signOut();
+        } catch (e) {
+          console.error(e);
+        }
         window.location.href = '/auth/sign-in';
       }}
     >

@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'crypto';
 import { getStore } from '@/lib/data/store';
 import { isAssessmentComplete, isReviewDue } from '@/lib/domain/scoring';
 import { emailEnabled } from '@/lib/email/client';
@@ -14,9 +15,18 @@ export const maxDuration = 300;
  * assessments past the 12-month review cadence plus complete-but-unsigned
  * assessments. Fails closed without CRON_SECRET.
  */
+function authorized(req: Request, secret: string): boolean {
+  const presented = req.headers.get('authorization') ?? '';
+  const expected = `Bearer ${secret}`;
+  // Constant-time comparison of fixed-length digests.
+  const a = createHash('sha256').update(presented).digest();
+  const b = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
+  if (!secret || !authorized(req, secret)) {
     return new Response('Unauthorized', { status: 401 });
   }
   if (!emailEnabled()) {

@@ -30,19 +30,24 @@ export function RequestButton({
 
   const send = () =>
     start(async () => {
-      const result = await requestAssessmentFromOwner(processId);
-      if (!result.ok) {
-        setNote(FAILURES[result.reason] ?? 'Could not create the request.');
+      try {
+        const result = await requestAssessmentFromOwner(processId);
+        if (!result.ok) {
+          setNote(FAILURES[result.reason] ?? 'Could not create the request.');
+          setLink(null);
+          return;
+        }
+        setLink(result.link);
+        setNote(
+          result.emailed
+            ? `Sent to ${ownerEmail}.`
+            : 'Email is not configured, so nothing was sent. Copy the link below and pass it on yourself.'
+        );
+        router.refresh();
+      } catch (e) {
         setLink(null);
-        return;
+        setNote(e instanceof Error ? e.message : 'Could not create the request.');
       }
-      setLink(result.link);
-      setNote(
-        result.emailed
-          ? `Sent to ${ownerEmail}.`
-          : 'Email is not configured, so nothing was sent. Copy the link below and pass it on yourself.'
-      );
-      router.refresh();
     });
 
   return (
@@ -62,7 +67,12 @@ export function RequestButton({
             disabled={pending}
             onClick={() =>
               start(async () => {
-                await revokeAssessmentRequest(request.id);
+                try {
+                  await revokeAssessmentRequest(request.id);
+                } catch (e) {
+                  setNote(e instanceof Error ? e.message : 'Could not revoke the link.');
+                  return;
+                }
                 setLink(null);
                 setNote('Link revoked.');
                 router.refresh();
@@ -80,9 +90,13 @@ export function RequestButton({
           <button
             type="button"
             className={btn.small}
-            onClick={() => {
-              navigator.clipboard?.writeText(link);
-              setCopied(true);
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(link);
+                setCopied(true);
+              } catch {
+                setCopied(false);
+              }
             }}
           >
             {copied ? 'Copied' : 'Copy'}

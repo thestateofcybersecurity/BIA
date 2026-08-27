@@ -11,6 +11,17 @@ export function authEnabled(): boolean {
   return Boolean(process.env.NEON_AUTH_BASE_URL && process.env.NEON_AUTH_COOKIE_SECRET);
 }
 
+/**
+ * Demo mode must never activate implicitly in a production deployment: a
+ * lost environment variable would otherwise hand anonymous visitors an
+ * owner role over one shared workspace. It stays available outside
+ * production (local development), or explicitly via BIA_DEMO_MODE=1 where
+ * an unauthenticated deployment is genuinely intended.
+ */
+export function demoModeAllowed(): boolean {
+  return process.env.NODE_ENV !== 'production' || process.env.BIA_DEMO_MODE === '1';
+}
+
 type NeonAuth = ReturnType<typeof createNeonAuth>;
 
 declare global {

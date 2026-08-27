@@ -1,4 +1,11 @@
-import { aiUsage, recordAiUsage, tenancyEnabled } from '@/lib/data/tenancy';
+import {
+  aiUsage,
+  recordAiUsage,
+  claimAiExerciseSlot,
+  settleAiUsage,
+  refundAiUsage,
+  tenancyEnabled,
+} from '@/lib/data/tenancy';
 import {
   planOf,
   limitsFor,
@@ -18,10 +25,12 @@ import {
  * mode worth designing out.
  *
  * The check runs before the call and the charge is recorded after it, so a
- * single generation can overshoot the monthly budget by its own size. That is
- * deliberate: refusing to start work that might exceed the cap would mean
- * predicting the token count of a response nobody has generated yet, and the
- * overshoot is bounded by one call.
+ * single generation can overshoot the monthly token budget by its own size.
+ * That is deliberate: refusing to start work that might exceed the cap would
+ * mean predicting the token count of a response nobody has generated yet.
+ * Under concurrency the token overshoot is bounded by parallel calls, not
+ * one; the count-based exercise limit has no such window, because its slot
+ * is claimed atomically before any provider spend (see below).
  */
 
 export interface TokenUsage {
@@ -126,6 +135,10 @@ export function blockedReason(a: AiAllowance, feature: AiFeature): string | null
  * Run a metered generation. Throws before spending anything if the plan does
  * not allow it, and records the spend once the call succeeds. A failed
  * generation is not charged, since no usable output was produced.
+ *
+ * Count-limited features claim their slot first, under a per-organization
+ * advisory lock: without that, several simultaneous starts would each see
+ * the same "one remaining" and all proceed.
  */
 export async function withAiQuota<T>(
   ctx: { orgId: string; userId: string },
@@ -136,19 +149,42 @@ export async function withAiQuota<T>(
   const blocked = blockedReason(allowance, feature);
   if (blocked) throw new QuotaExceededError(blocked, feature, allowance.plan);
 
-  const { value, usage } = await run();
+  let claimId: number | null = null;
+  if (tenancyEnabled() && feature === 'exercise') {
+    claimId = await claimAiExerciseSlot(ctx.orgId, ctx.userId, allowance.exercisesLimit);
+    if (claimId == null) {
+      const fresh = await allowanceFor(ctx.orgId);
+      throw new QuotaExceededError(
+        blockedReason(fresh, feature) ?? 'The AI exercise limit for this plan has been reached.',
+        feature,
+        fresh.plan
+      );
+    }
+  }
 
-  if (!tenancyEnabled()) return value;
+  try {
+    const { value, usage } = await run();
 
-  await recordAiUsage({
-    orgId: ctx.orgId,
-    actorUserId: ctx.userId,
-    feature,
-    inputTokens: usage.input,
-    outputTokens: usage.output,
-  });
+    if (!tenancyEnabled()) return value;
 
-  return value;
+    if (claimId != null) {
+      // The claimed ledger row becomes the usage record; no second row.
+      await settleAiUsage(claimId, usage.input, usage.output);
+    } else {
+      await recordAiUsage({
+        orgId: ctx.orgId,
+        actorUserId: ctx.userId,
+        feature,
+        inputTokens: usage.input,
+        outputTokens: usage.output,
+      });
+    }
+
+    return value;
+  } catch (e) {
+    if (claimId != null) await refundAiUsage(claimId).catch(() => {});
+    throw e;
+  }
 }
 
 /** What a page needs to render an AI control honestly. */

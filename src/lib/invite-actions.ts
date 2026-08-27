@@ -4,8 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAuthContext, ACTIVE_ORG_COOKIE, INVITE_COOKIE } from '@/lib/auth';
-import { acceptInvitation, recordAudit } from '@/lib/data/tenancy';
-import { ROLE_LABELS } from '@/lib/domain/authz';
+import { acceptInvitation } from '@/lib/data/tenancy';
 
 /**
  * Remember the invitation, then send the visitor to sign in. Creating an
@@ -50,13 +49,8 @@ export async function acceptOrgInvitation(
     return { ok: false, message: messages[result.reason] };
   }
 
-  await recordAudit({
-    orgId: result.orgId,
-    actorUserId: ctx.userId,
-    actorEmail: ctx.email,
-    action: 'member:manage',
-    summary: `${ctx.email} accepted an invitation and joined as ${ROLE_LABELS[result.role]}`,
-  });
+  // The audit entry is written inside acceptInvitation, which also covers
+  // the passive path where the invite cookie is consumed during sign-in.
 
   // Land them in the organization they just joined rather than whichever one
   // they happened to be looking at.

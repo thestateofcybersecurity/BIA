@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { saveResourceProfile } from '@/lib/actions';
 import type { RecoveryResourceProfile, Horizon } from '@/lib/domain/types';
 import { HORIZONS, HORIZON_LABELS } from '@/lib/domain/constants';
-import { Card, btn } from '@/components/ui';
+import { Card, btn, useUnloadGuard } from '@/components/ui';
 
 const emptyHorizons = (): Record<Horizon, number | null> => ({
   h4: null, h24: null, d3: null, w1: null, m1: null,
@@ -27,6 +27,7 @@ export function ResourceProfileEditor({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [grid, setGrid] = useState({
     staff: initial?.staff ?? emptyHorizons(),
     workstations: initial?.workstations ?? emptyHorizons(),
@@ -36,12 +37,16 @@ export function ResourceProfileEditor({
     (initial?.vitalRecords ?? []).join(', ')
   );
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [touched, setTouched] = useState(false);
 
   const set = (row: (typeof ROWS)[number][0], h: Horizon, raw: string) => {
     setSaved(false);
+    setTouched(true);
     const v = raw === '' ? null : Math.max(0, Math.round(Number(raw)));
     setGrid((g) => ({ ...g, [row]: { ...g[row], [h]: v } }));
   };
+
+  useUnloadGuard(touched && !pending);
 
   return (
     <Card
@@ -93,7 +98,7 @@ export function ResourceProfileEditor({
             className="text-sm"
             value={vitalRecords}
             placeholder="Claims files, policy master records"
-            onChange={(e) => { setVitalRecords(e.target.value); setSaved(false); }}
+            onChange={(e) => { setVitalRecords(e.target.value); setSaved(false); setTouched(true); }}
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -102,7 +107,7 @@ export function ResourceProfileEditor({
             className="text-sm"
             value={notes}
             placeholder="Assumptions, surge arrangements, alternate site details"
-            onChange={(e) => { setNotes(e.target.value); setSaved(false); }}
+            onChange={(e) => { setNotes(e.target.value); setSaved(false); setTouched(true); }}
           />
         </div>
       </div>
@@ -113,13 +118,20 @@ export function ResourceProfileEditor({
           disabled={pending}
           onClick={() =>
             start(async () => {
-              await saveResourceProfile({
-                processId,
-                ...grid,
-                vitalRecords: vitalRecords.split(',').map((s) => s.trim()).filter(Boolean),
-                notes,
-              });
+              try {
+                await saveResourceProfile({
+                  processId,
+                  ...grid,
+                  vitalRecords: vitalRecords.split(',').map((s) => s.trim()).filter(Boolean),
+                  notes,
+                });
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Save failed.');
+                return;
+              }
+              setError(null);
               setSaved(true);
+              setTouched(false);
               router.refresh();
             })
           }
@@ -127,6 +139,7 @@ export function ResourceProfileEditor({
           {pending ? 'Saving…' : 'Save resource profile'}
         </button>
         {saved && !pending && <span className="text-sm text-ok">Saved.</span>}
+        {error && <span className="text-sm text-bad">{error}</span>}
       </div>
     </Card>
   );

@@ -19,7 +19,10 @@ declare global {
 
 export function getAnthropic(): Anthropic {
   if (!globalThis._biaAnthropic) {
-    globalThis._biaAnthropic = new Anthropic();
+    // A bounded timeout keeps a hung generation from pinning a server-action
+    // invocation for the SDK's ~10 minute default; two retries ride through
+    // transient provider errors without an app-level retry loop.
+    globalThis._biaAnthropic = new Anthropic({ timeout: 90_000, maxRetries: 2 });
   }
   return globalThis._biaAnthropic;
 }

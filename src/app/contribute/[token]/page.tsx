@@ -133,9 +133,26 @@ export default async function ContributePage({
       <div className="mt-6">
         <ContributeForm
           token={decodeURIComponent(token)}
-          process={process}
+          process={{
+            id: process.id,
+            name: process.name,
+            description: process.description,
+            owner: '',
+          }}
           initial={assessment}
-          org={ws.org}
+          org={
+            ws.org && {
+              name: ws.org.name,
+              currency: ws.org.currency,
+              // Revenue and appetite stay because the severity bands are
+              // derived live in the browser as the contributor types losses;
+              // anyone probing the bands can infer the scale anyway. Owner
+              // contacts, department, and usage details do not need to be
+              // here at all, so they are stripped.
+              annualRevenue: ws.org.annualRevenue,
+              riskAppetite: ws.org.riskAppetite,
+            }
+          }
         />
       </div>
 

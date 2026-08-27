@@ -55,6 +55,7 @@ export type Capability =
   | 'member:view'
   | 'workspace:destroy'
   | 'notifications:manage'
+  | 'notifications:self'
   // Analysis, readable by any member
   | 'dashboard:view'
   | 'process:read'
@@ -91,6 +92,8 @@ export const CAPABILITY_MINIMUM: Record<Capability, OrgRole> = {
   'member:manage': 'admin',
   'workspace:destroy': 'admin',
   'notifications:manage': 'admin',
+  // Any member may mute notification categories for their own address.
+  'notifications:self': 'viewer',
 
   'member:view': 'coordinator',
   'profile:write': 'coordinator',
@@ -130,6 +133,7 @@ export const AUDIT_LABELS: Record<Capability, string> = {
   'member:view': 'Viewed members',
   'workspace:destroy': 'Replaced the whole workspace',
   'notifications:manage': 'Changed notification preferences',
+  'notifications:self': 'Changed personal notification preferences',
   'dashboard:view': 'Viewed the dashboard',
   'process:read': 'Viewed processes',
   'assessment:read': 'Viewed assessments',
@@ -198,6 +202,8 @@ export function redactWorkspaceFor<
     exercises: unknown[];
     collectionRequests: unknown[];
     remediations: unknown[];
+    workflows: unknown[];
+    resourceProfiles: unknown[];
     processes: { ownerEmail?: string; ownerPhone?: string }[];
   },
 >(ws: T, role: OrgRole): T {
@@ -208,6 +214,12 @@ export function redactWorkspaceFor<
   // ones name weaknesses nobody has treated yet.
   if (!can(role, 'risk:write')) out.riskSuggestions = [];
   if (!can(role, 'exercise:read')) out.exercises = [];
+  // The recovery playbook (teams, deputies, step sequencing) and the vital
+  // records profile are response material, coordinator eyes only.
+  if (!can(role, 'workflow:read')) {
+    out.workflows = [];
+    out.resourceProfiles = [];
+  }
   if (!can(role, 'plan:read')) {
     out.plan = null;
     // Owner contact details are part of the response playbook, not the

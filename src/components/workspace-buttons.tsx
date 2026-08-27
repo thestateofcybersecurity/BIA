@@ -12,7 +12,16 @@ export function LoadSampleButton({ variant = 'primary' }: { variant?: 'primary' 
     <button
       className={btn[variant]}
       disabled={pending}
-      onClick={() => start(async () => { await loadSampleData(); router.refresh(); })}
+      onClick={() =>
+        start(async () => {
+          try {
+            await loadSampleData();
+            router.refresh();
+          } catch (e) {
+            alert(e instanceof Error ? e.message : 'Could not load the sample data.');
+          }
+        })
+      }
     >
       {pending ? 'Loading…' : 'Load sample data'}
     </button>
@@ -28,7 +37,14 @@ export function ResetButton() {
       disabled={pending}
       onClick={() => {
         if (!confirm('Erase everything in this workspace? This cannot be undone.')) return;
-        start(async () => { await resetWorkspace(); router.refresh(); });
+        start(async () => {
+          try {
+            await resetWorkspace();
+            router.refresh();
+          } catch (e) {
+            alert(e instanceof Error ? e.message : 'Could not reset the workspace.');
+          }
+        });
       }}
     >
       {pending ? 'Resetting…' : 'Reset workspace'}
@@ -37,21 +53,29 @@ export function ResetButton() {
 }
 
 export function ExportButton() {
+  const [pending, start] = useTransition();
   return (
     <button
       className={btn.secondary}
-      onClick={async () => {
-        const ws = await loadWorkspace();
-        const blob = new Blob([JSON.stringify(ws, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `bia-workspace-${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }}
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          try {
+            const ws = await loadWorkspace();
+            const blob = new Blob([JSON.stringify(ws, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bia-workspace-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            alert(e instanceof Error ? e.message : 'Could not export the workspace.');
+          }
+        })
+      }
     >
-      Export JSON
+      {pending ? 'Exporting…' : 'Export JSON'}
     </button>
   );
 }

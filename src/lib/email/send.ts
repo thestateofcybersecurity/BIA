@@ -1,12 +1,17 @@
-import type { Workspace } from '@/lib/domain/types';
+import type { NotificationKind, Workspace } from '@/lib/domain/types';
 import { emailEnabled, getResend, EMAIL_FROM } from './client';
 import { getUserContact } from './recipients';
 import type { EmailContent } from './templates';
 
-export type NotificationKind = 'signOffRequests' | 'aarReady' | 'reviewReminders';
+export type { NotificationKind };
 
 export function notificationsAllowed(ws: Workspace, kind: NotificationKind): boolean {
   return ws.notifications?.[kind] !== false;
+}
+
+/** The individual recipient has not muted this category for themselves. */
+function userAllows(ws: Workspace, userId: string, kind: NotificationKind): boolean {
+  return ws.emailOptOuts?.[userId]?.[kind] !== false;
 }
 
 /**
@@ -20,7 +25,9 @@ export async function notifyWorkspaceUser(
   kind: NotificationKind,
   content: EmailContent
 ): Promise<boolean> {
-  if (!emailEnabled() || !notificationsAllowed(ws, kind)) return false;
+  if (!emailEnabled() || !notificationsAllowed(ws, kind) || !userAllows(ws, userId, kind)) {
+    return false;
+  }
   try {
     const contact = await getUserContact(userId);
     if (!contact) return false;

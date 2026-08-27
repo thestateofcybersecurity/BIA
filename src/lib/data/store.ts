@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import type { Workspace } from '@/lib/domain/types';
 
@@ -56,6 +57,25 @@ interface Store {
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
+/**
+ * Serialize check-then-rename per organization within this process. The
+ * version compare and the rename are two separate awaits; without the lock,
+ * two interleaved saves can both pass the check and the last rename wins,
+ * silently dropping one side's mutation.
+ */
+const orgLocks = new Map<string, Promise<unknown>>();
+
+async function withOrgLock<T>(orgId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = orgLocks.get(orgId) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  orgLocks.set(orgId, next);
+  try {
+    return await next;
+  } finally {
+    if (orgLocks.get(orgId) === next) orgLocks.delete(orgId);
+  }
+}
+
 const fileStore: Store = {
   async load(orgId) {
     return (await fileStore.loadForUpdate(orgId)).workspace;
@@ -72,18 +92,27 @@ const fileStore: Store = {
     }
   },
   async save(orgId, ws, expectedVersion) {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    const current = await fileStore.loadForUpdate(orgId);
-    if (current.version !== expectedVersion) return false;
-    const file = path.join(DATA_DIR, `${orgId}.json`);
-    const tmp = `${file}.tmp`;
-    await fs.writeFile(
-      tmp,
-      JSON.stringify({ ...ws, __version: expectedVersion + 1 }, null, 2),
-      'utf8'
-    );
-    await fs.rename(tmp, file);
-    return true;
+    return withOrgLock(orgId, async () => {
+      await fs.mkdir(DATA_DIR, { recursive: true });
+      const current = await fileStore.loadForUpdate(orgId);
+      if (current.version !== expectedVersion) return false;
+      const file = path.join(DATA_DIR, `${orgId}.json`);
+      // A unique temp name per write: two processes sharing one tmp path
+      // could rename each other's bytes into place.
+      const tmp = `${file}.${randomUUID()}.tmp`;
+      try {
+        await fs.writeFile(
+          tmp,
+          JSON.stringify({ ...ws, __version: expectedVersion + 1 }, null, 2),
+          'utf8'
+        );
+        await fs.rename(tmp, file);
+      } catch (e) {
+        await fs.unlink(tmp).catch(() => {});
+        throw e;
+      }
+      return true;
+    });
   },
   async listOrgIds() {
     try {
@@ -110,13 +139,18 @@ function neonStore(url: string): Store {
     if (!g._biaTableReady) {
       // Tenancy owns org_workspaces; ensuring it here too keeps the store
       // usable on its own (scripts, the cron job) without ordering games.
+      // A failed attempt clears itself: a transient Neon cold-start error
+      // must not poison every subsequent request in this process.
       g._biaTableReady = g._biaSql`
         CREATE TABLE IF NOT EXISTS org_workspaces (
           org_id text PRIMARY KEY,
           data jsonb NOT NULL,
           version integer NOT NULL DEFAULT 1,
           updated_at timestamptz NOT NULL DEFAULT now()
-        )`;
+        )`.catch((e) => {
+        g._biaTableReady = undefined;
+        throw e;
+      });
     }
     await g._biaTableReady;
     return g._biaSql;

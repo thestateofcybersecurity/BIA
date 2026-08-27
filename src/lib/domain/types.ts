@@ -366,11 +366,22 @@ export interface Workspace {
   risks: RiskEntry[];
   riskSuggestions: RiskSuggestionRecord[];
   /** Email notification toggles; a missing key means enabled. */
-  notifications?: {
-    signOffRequests?: boolean;
-    aarReady?: boolean;
-    reviewReminders?: boolean;
-  };
+  notifications?: NotificationPrefs;
+  /**
+   * Per-user mutes layered over the organization toggles: a member who
+   * turns a category off for themselves keeps it off even while it stays
+   * on for everyone else. Absent entry means follow the org default.
+   */
+  emailOptOuts?: Record<string, NotificationPrefs>;
+}
+
+export type NotificationKind = 'signOffRequests' | 'aarReady' | 'reviewReminders';
+
+/** A set of notification switches; a missing key means enabled. */
+export interface NotificationPrefs {
+  signOffRequests?: boolean;
+  aarReady?: boolean;
+  reviewReminders?: boolean;
 }
 
 export type Tier = 1 | 2 | 3 | 4;

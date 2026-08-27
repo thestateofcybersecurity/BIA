@@ -10,7 +10,7 @@ import {
   deleteExercise,
 } from '@/lib/actions';
 import type { ExerciseSession, ExerciseNote } from '@/lib/domain/types';
-import { Card, btn } from '@/components/ui';
+import { Card, btn, useUnloadGuard } from '@/components/ui';
 
 export function SessionRunner({
   session,
@@ -32,12 +32,23 @@ export function SessionRunner({
   const [noteDraft, setNoteDraft] = useState('');
   const [busy, setBusy] = useState<'save' | 'complete' | 'report' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Snapshot of what the server last accepted, so the unload warning only
+  // fires for answers and notes that have not actually been persisted.
+  const [savedSnapshot, setSavedSnapshot] = useState(
+    () => JSON.stringify({ responses: session.responses, notes: session.notes })
+  );
 
   const phases = session.scenario.phases;
   const current = phases[phase];
   const completed = session.status === 'completed';
 
+  const dirty =
+    !completed && JSON.stringify({ responses, notes }) !== savedSnapshot;
+
+  useUnloadGuard(dirty && busy === null);
+
   const persist = (nextPhase: number, onDone?: () => void) => {
+    if (completed) return;
     start(async () => {
       try {
         await saveExerciseProgress({
@@ -46,6 +57,7 @@ export function SessionRunner({
           responses,
           notes,
         });
+        setSavedSnapshot(JSON.stringify({ responses, notes }));
         onDone?.();
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Save failed.');
@@ -196,13 +208,15 @@ export function SessionRunner({
               {answeredCount}/{current.discussion.length} questions answered in this phase
             </span>
           )}
-          <button
-            className={btn.small}
-            disabled={pending}
-            onClick={() => { setBusy('save'); persist(phase); }}
-          >
-            {busy === 'save' && pending ? 'Saving…' : 'Save progress'}
-          </button>
+          {!completed && (
+            <button
+              className={btn.small}
+              disabled={pending}
+              onClick={() => { setBusy('save'); persist(phase); }}
+            >
+              {busy === 'save' && pending ? 'Saving…' : 'Save progress'}
+            </button>
+          )}
         </div>
 
         {completed && (
@@ -313,7 +327,12 @@ export function SessionRunner({
           onClick={() => {
             if (!confirm('Delete this session and its recorded responses?')) return;
             start(async () => {
-              await deleteExercise(session.id);
+              try {
+                await deleteExercise(session.id);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Could not delete the session.');
+                return;
+              }
               router.push('/exercises');
               router.refresh();
             });
