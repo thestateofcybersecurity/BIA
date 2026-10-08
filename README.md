@@ -48,6 +48,14 @@ Notification emails go to each user's Neon Auth account email and respect the pe
 
 `DATABASE_URL` and `NEON_AUTH_BASE_URL` come from the Neon integration; add `NEON_AUTH_COOKIE_SECRET` yourself. With both auth variables set, users sign in via `/auth/sign-in` (email and password through Neon Auth) and each user gets an isolated workspace; without them, the app runs in single-workspace demo mode.
 
+### Neon Auth settings that the code relies on
+
+Neon Auth is managed Better Auth, so these live in the Neon console (project > Auth > Settings), not in the repo:
+
+- **Verify at sign-up: on.** Email verification is off by default in Neon Auth. The app refuses to let an unverified account accept an invitation, consume a remembered invitation after sign-up, claim a work domain, act as the owner of a process by email match, invite people, or send any email, so with verification off those features are unavailable to new accounts. Turning it on means a session is only issued once the address is confirmed. Accounts created before the switch keep `emailVerified = false` until they verify; Neon's "send verification email" flow covers them.
+- **Sign-up rate limiting.** Public sign-up is open and the app has no CAPTCHA, so enable Neon's rate limits on the sign-up and sign-in endpoints (or put Cloudflare Turnstile in front of `/auth/sign-in`) to blunt account flooding.
+- **Trusted origins** should list only `https://bia.cybersecurityalphabetsoup.com`.
+
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS · Recharts · Neon Postgres + Neon Auth (`@neondatabase/auth`) · server actions with a pluggable JSON-file/Postgres store · Zod validation.

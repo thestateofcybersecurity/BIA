@@ -76,7 +76,7 @@ async function withWorkspace(
 export async function loadWorkspace(): Promise<Workspace> {
   const ctx = await getAuthContext();
   const ws = await getStore().load(ctx.organization.id);
-  return redactWorkspaceFor(ws, ctx.role);
+  return redactWorkspaceFor(ws, ctx.member);
 }
 
 /** Unredacted read for server-side work that has already checked its own access. */
@@ -223,9 +223,13 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
   let snapshot: Workspace | null = null;
   const ctx = await getAuthContext();
   await withWorkspace('assessment:writeOwn', (ws) => {
-    // Coordinators write any assessment; a contributor only their own.
+    // Coordinators write any assessment; a contributor only their own. An
+    // assessment for a process that does not exist is refused outright:
+    // there is nothing to scope it to, and an orphan record would otherwise
+    // let a contributor write into the shared document unchecked.
     const target = ws.processes.find((p) => p.id === parsed.processId);
-    if (target) assertCanWriteAssessment(ctx.member, target);
+    if (!target) throw new Error('Process not found');
+    assertCanWriteAssessment(ctx.member, target);
     const existing = ws.assessments.find((a) => a.processId === parsed.processId);
     const wasCompleteAndUnapproved =
       existing != null && isAssessmentComplete(existing) && !existing.approvedBy;

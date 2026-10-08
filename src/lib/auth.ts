@@ -27,6 +27,12 @@ export const INVITE_COOKIE = 'bia_invite';
 export interface AuthContext {
   userId: string;
   email: string;
+  /**
+   * Whether the identity provider has confirmed the address. Anything that
+   * grants access on the strength of an email address (invitations, the
+   * owner-email contributor match, outbound mail) requires this to be true.
+   */
+  emailVerified: boolean;
   organization: Organization;
   membership: Membership;
   /** Shorthand for the permission helpers in domain/authz. */
@@ -112,8 +118,12 @@ export async function getAuthContext(): Promise<AuthContext> {
     // so that creating an account lands them in the organization that
     // invited them, rather than in a private workspace of their own with
     // the invitation left pending.
+    // An unverified account never consumes the invitation: until the
+    // provider confirms the address, the match between the invited email and
+    // the signed-in one proves nothing. The cookie stays put, so the same
+    // sign-in picks it up as soon as verification completes.
     const jar = await cookies();
-    const inviteToken = jar.get(INVITE_COOKIE)?.value ?? null;
+    const inviteToken = user.emailVerified ? (jar.get(INVITE_COOKIE)?.value ?? null) : null;
     const resolved = await resolveOrgForUser(user, inviteToken);
     organization = resolved.organization;
     membership = resolved.membership;
@@ -122,12 +132,14 @@ export async function getAuthContext(): Promise<AuthContext> {
   return {
     userId: user.userId,
     email: user.email,
+    emailVerified: user.emailVerified,
     organization,
     membership,
     role: membership.role,
     member: {
       userId: user.userId,
       email: user.email,
+      emailVerified: user.emailVerified,
       role: membership.role,
       scopedProcessIds: membership.scopedProcessIds,
     },

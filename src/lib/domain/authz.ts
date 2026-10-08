@@ -204,10 +204,21 @@ export function redactWorkspaceFor<
     remediations: unknown[];
     workflows: unknown[];
     resourceProfiles: unknown[];
-    processes: { ownerEmail?: string; ownerPhone?: string }[];
+    assessments: { processId: string }[];
+    processes: { id: string; ownerEmail?: string; ownerPhone?: string }[];
   },
->(ws: T, role: OrgRole): T {
+>(ws: T, member: MemberContext): T {
+  const role = member.role;
   const out: T = { ...ws };
+
+  // A contributor sees the inventory but only the assessment detail (loss
+  // curves, notes, MTPD justification) for the processes they own; the rest
+  // of the register is the coordinator's. Viewers hold assessment:read and
+  // keep the full read-only view their role description promises.
+  if (role === 'contributor') {
+    const visible = new Set(visibleProcessIds(member, ws.processes));
+    out.assessments = ws.assessments.filter((a) => visible.has(a.processId)) as T['assessments'];
+  }
 
   if (!can(role, 'risk:read')) out.risks = [];
   // Suggestions describe the same threats the register does, and unregistered
@@ -244,6 +255,8 @@ export function redactWorkspaceFor<
 export interface MemberContext {
   userId: string;
   email: string;
+  /** Confirmed by the identity provider; ownership by email means nothing without it. */
+  emailVerified: boolean;
   role: OrgRole;
   /** Explicit process assignments; empty means fall back to owner-email match. */
   scopedProcessIds: string[];
@@ -253,12 +266,15 @@ export interface MemberContext {
  * A contributor may only touch the processes they own. Assignment is explicit
  * where an admin has set it, and otherwise falls back to matching the
  * process's recorded owner email, which is what the delegated collection
- * links already key on.
+ * links already key on. Either way the account's address must be verified:
+ * an unverified sign-up at the owner's address is exactly the identity this
+ * check exists to resist.
  */
 export function ownsProcess(
   member: MemberContext,
   process: { id: string; ownerEmail?: string }
 ): boolean {
+  if (!member.emailVerified) return false;
   if (member.scopedProcessIds.length > 0) return member.scopedProcessIds.includes(process.id);
   const owner = process.ownerEmail?.trim().toLowerCase();
   return owner != null && owner !== '' && owner === member.email.trim().toLowerCase();
@@ -283,14 +299,15 @@ export function assertCanWriteAssessment(
 }
 
 /**
- * Processes a member may see in full. Coordinators and above see everything;
- * a contributor sees the inventory but only their own assessment detail.
+ * Processes whose assessment detail a member may read. Coordinators and
+ * above see everything, as do viewers (read-only by role); a contributor
+ * sees only the processes they own. redactWorkspaceFor applies this before
+ * a workspace leaves the server.
  */
 export function visibleProcessIds<T extends { id: string; ownerEmail?: string }>(
   member: MemberContext,
   processes: T[]
 ): string[] {
-  if (can(member.role, 'assessment:write')) return processes.map((p) => p.id);
-  if (member.role !== 'contributor') return [];
+  if (member.role !== 'contributor') return processes.map((p) => p.id);
   return processes.filter((p) => ownsProcess(member, p)).map((p) => p.id);
 }
