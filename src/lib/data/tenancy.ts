@@ -820,21 +820,27 @@ export async function lookupInvitation(token: string): Promise<InviteLookup> {
 
 export type AcceptResult =
   | { ok: true; orgId: string; role: OrgRole }
-  | { ok: false; reason: 'not_found' | 'revoked' | 'expired' | 'accepted' | 'wrong_email' };
+  | {
+      ok: false;
+      reason: 'not_found' | 'revoked' | 'expired' | 'accepted' | 'wrong_email' | 'unverified';
+    };
 
 /**
- * Accept an invitation. The signed-in address must be the one invited:
- * otherwise a forwarded link would hand access to whoever opened it.
+ * Accept an invitation. The signed-in address must be the one invited, and
+ * the identity provider must have verified it: otherwise a forwarded link
+ * would hand access to whoever registered the invited address first, since
+ * registering an address proves nothing about owning the mailbox.
  */
 export async function acceptInvitation(
   token: string,
-  user: { userId: string; email: string }
+  user: { userId: string; email: string; emailVerified: boolean }
 ): Promise<AcceptResult> {
   const found = await lookupInvitation(token);
   if (!found.ok) return { ok: false, reason: found.reason };
   if (found.invitation.email !== user.email.trim().toLowerCase()) {
     return { ok: false, reason: 'wrong_email' };
   }
+  if (!user.emailVerified) return { ok: false, reason: 'unverified' };
   const sql = await getSql();
   const existing = await getMembership(found.invitation.orgId, user.userId);
 

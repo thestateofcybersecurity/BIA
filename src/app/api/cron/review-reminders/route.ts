@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from 'crypto';
 import { getStore } from '@/lib/data/store';
 import { isAssessmentComplete, isReviewDue } from '@/lib/domain/scoring';
 import { emailEnabled } from '@/lib/email/client';
@@ -6,6 +5,7 @@ import { listMembers } from '@/lib/data/tenancy';
 import { can } from '@/lib/domain/authz';
 import { notifyWorkspaceUser, notificationsAllowed } from '@/lib/email/send';
 import { reviewReminderEmail } from '@/lib/email/templates';
+import { bearerMatches } from '@/lib/bearer';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -15,18 +15,9 @@ export const maxDuration = 300;
  * assessments past the 12-month review cadence plus complete-but-unsigned
  * assessments. Fails closed without CRON_SECRET.
  */
-function authorized(req: Request, secret: string): boolean {
-  const presented = req.headers.get('authorization') ?? '';
-  const expected = `Bearer ${secret}`;
-  // Constant-time comparison of fixed-length digests.
-  const a = createHash('sha256').update(presented).digest();
-  const b = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(a, b);
-}
-
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || !authorized(req, secret)) {
+  if (!secret || !bearerMatches(req, secret)) {
     return new Response('Unauthorized', { status: 401 });
   }
   if (!emailEnabled()) {
@@ -68,9 +59,15 @@ export async function GET(req: Request) {
     });
     let delivered = 0;
     for (const member of recipients) {
-      if (await notifyWorkspaceUser(ws, member.userId, 'reviewReminders', content)) {
-        delivered++;
-      }
+      const sent = await notifyWorkspaceUser({
+        orgId,
+        ws,
+        userId: member.userId,
+        kind: 'reviewReminders',
+        content,
+        sender: 'system',
+      });
+      if (sent) delivered++;
     }
     if (delivered > 0) sent++;
     else noContact++;

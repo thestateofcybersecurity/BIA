@@ -3,6 +3,7 @@ import { lookupInvitation } from '@/lib/data/tenancy';
 import { getAuthContextOptional } from '@/lib/auth';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '@/lib/domain/authz';
 import { btn } from '@/components/ui';
+import { VERIFY_FIRST_MESSAGE } from '@/lib/invite-messages';
 import { AcceptInvite } from './accept-invite';
 import { SignInToAccept } from './sign-in-to-accept';
 
@@ -100,6 +101,24 @@ export default async function InvitePage({
           Sign out and sign back in with the invited address, or ask for an invitation to the
           account you actually use.
         </p>
+        <div>
+          <Link href="/" className={btn.secondary}>
+            Back to your workspace
+          </Link>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (!ctx.emailVerified) {
+    return (
+      <Shell title="Verify your email address first">
+        <p>
+          This invitation to <strong className="text-ink">{invitedTo}</strong> is tied to{' '}
+          <strong className="text-ink">{found.invitation.email}</strong>, and that address has
+          not been verified yet.
+        </p>
+        <p>{VERIFY_FIRST_MESSAGE}</p>
         <div>
           <Link href="/" className={btn.secondary}>
             Back to your workspace

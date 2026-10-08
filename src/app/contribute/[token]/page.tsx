@@ -1,5 +1,5 @@
 import { getStore } from '@/lib/data/store';
-import { verifyContributionToken } from '@/lib/contribution/token';
+import { tokenIssuedTo, verifyContributionToken } from '@/lib/contribution/token';
 import { DEPENDENCY_CLASSES, DEPENDENCY_LABELS } from '@/lib/domain/constants';
 import { ContributeForm } from './contribute-form';
 
@@ -55,6 +55,17 @@ export default async function ContributePage({
         <p>
           The process this link refers to may have been removed. Ask the continuity coordinator
           who sent it to confirm.
+        </p>
+      </Shell>
+    );
+  }
+
+  if (!tokenIssuedTo(verified.claims, request.email)) {
+    return (
+      <Shell title="This link is not valid">
+        <p>
+          This link was issued to a different recipient than the current request names. Ask the
+          continuity coordinator who sent it to issue a new one.
         </p>
       </Shell>
     );

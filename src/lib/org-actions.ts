@@ -230,9 +230,18 @@ export async function listOrgInvitations(): Promise<InvitationView[]> {
 export async function inviteMember(
   email: string,
   role: OrgRole
-): Promise<MemberActionResult & { link?: string }> {
+): Promise<MemberActionResult & { link?: string; note?: string }> {
   const ctx = await getAuthContext();
   assertCan(ctx.role, 'member:manage');
+  // Granting access on the strength of an address needs the grantor's own
+  // address confirmed first; it is also the gate on sending any email.
+  if (!ctx.emailVerified) {
+    return {
+      ok: false,
+      message:
+        'Verify your own email address before inviting people. Open the verification email sent when you created the account, then try again.',
+    };
+  }
   const address = email.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) {
     return { ok: false, message: 'That does not look like an email address.' };
@@ -270,13 +279,15 @@ export async function inviteMember(
     invitedBy: ctx.userId,
   });
 
-  const { emailEnabled, APP_URL } = await import('@/lib/email/client');
+  const { APP_URL } = await import('@/lib/email/client');
+  const { sendOrgEmail } = await import('@/lib/email/send');
+  const { SEND_FAILURE_MESSAGES } = await import('@/lib/email/policy');
+  const { invitationEmail } = await import('@/lib/email/templates');
   const link = `${APP_URL}/invite/${token}`;
-  let emailed = false;
-  if (emailEnabled()) {
-    const { getResend, EMAIL_FROM } = await import('@/lib/email/client');
-    const { invitationEmail } = await import('@/lib/email/templates');
-    const content = invitationEmail({
+  const sent = await sendOrgEmail({
+    orgId: ctx.organization.id,
+    to: address,
+    content: invitationEmail({
       orgName: ctx.organization.name,
       roleLabel: ROLE_LABELS[role],
       inviterName: ctx.email,
@@ -285,33 +296,21 @@ export async function inviteMember(
         1,
         Math.round((new Date(invitation.expiresAt).getTime() - Date.now()) / 86_400_000)
       ),
-    });
-    try {
-      const { error } = await getResend().emails.send({
-        from: EMAIL_FROM,
-        to: address,
-        subject: content.subject,
-        html: content.html,
-        text: content.text,
-      });
-      if (error) console.error('[email] invitation failed:', error.message ?? error);
-      else emailed = true;
-    } catch (e) {
-      console.error('[email] invitation threw:', e instanceof Error ? e.message : e);
-    }
-  }
+    }),
+    sender: { emailVerified: ctx.emailVerified },
+  });
 
   await recordAudit({
     orgId: ctx.organization.id,
     actorUserId: ctx.userId,
     actorEmail: ctx.email,
     action: 'member:manage',
-    summary: `Invited ${address} as ${ROLE_LABELS[role]}${emailed ? '' : ' (email not sent)'}`,
+    summary: `Invited ${address} as ${ROLE_LABELS[role]}${sent.ok ? '' : ` (email not sent: ${sent.reason})`}`,
   });
   revalidatePath('/', 'layout');
   // The link comes back so it can be passed on by hand when email is not
   // configured, or when the invitation never arrives.
-  return { ok: true, link };
+  return { ok: true, link, note: sent.ok ? undefined : SEND_FAILURE_MESSAGES[sent.reason] };
 }
 
 export async function revokeOrgInvitation(id: string): Promise<MemberActionResult> {

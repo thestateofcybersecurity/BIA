@@ -1,0 +1,9 @@
+# Security contact for the BIA app (bia.cybersecurityalphabetsoup.com),
+# part of the Cybersecurity Alphabet Soup ecosystem. See the disclosure
+# page for scope, safe-harbor terms, and what to include in a report.
+Contact: mailto:parker@cybersecurityalphabetsoup.com
+Contact: https://www.cybersecurityalphabetsoup.com/disclosure/
+Policy: https://www.cybersecurityalphabetsoup.com/disclosure/
+Canonical: https://bia.cybersecurityalphabetsoup.com/.well-known/security.txt
+Preferred-Languages: en
+Expires: 2027-10-08T00:00:00.000Z
