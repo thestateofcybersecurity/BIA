@@ -57,6 +57,11 @@ interface Store {
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
+const isPathInside = (baseDir: string, targetPath: string): boolean => {
+  const rel = path.relative(path.resolve(baseDir), path.resolve(targetPath));
+  return !(rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel));
+};
+
 /**
  * Serialize check-then-rename per organization within this process. The
  * version compare and the rename are two separate awaits; without the lock,
@@ -81,8 +86,12 @@ const fileStore: Store = {
     return (await fileStore.loadForUpdate(orgId)).workspace;
   },
   async loadForUpdate(orgId) {
+    const target = path.join(DATA_DIR, `${orgId}.json`);
+    if (!isPathInside(DATA_DIR, target)) {
+      throw new Error('Invalid file path');
+    }
     try {
-      const raw = await fs.readFile(path.join(DATA_DIR, `${orgId}.json`), 'utf8');
+      const raw = await fs.readFile(target, 'utf8');
       const parsed = JSON.parse(raw) as Workspace & { __version?: number };
       const version = parsed.__version ?? 1;
       delete parsed.__version;
@@ -97,6 +106,9 @@ const fileStore: Store = {
       const current = await fileStore.loadForUpdate(orgId);
       if (current.version !== expectedVersion) return false;
       const file = path.join(DATA_DIR, `${orgId}.json`);
+      if (!isPathInside(DATA_DIR, file)) {
+        throw new Error('Invalid file path');
+      }
       // A unique temp name per write: two processes sharing one tmp path
       // could rename each other's bytes into place.
       const tmp = `${file}.${randomUUID()}.tmp`;
