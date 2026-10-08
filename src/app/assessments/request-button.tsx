@@ -11,6 +11,18 @@ const FAILURES: Record<string, string> = {
     'Contribution links need CONTRIBUTION_SECRET (or NEON_AUTH_COOKIE_SECRET) in the environment.',
   no_email: 'Add an email address for this process owner first.',
   not_found: 'Process not found.',
+  unverified: 'Verify your own email address before requesting assessments by email.',
+  not_allowed:
+    'Requests can only be redirected to a current member or the owner on record for this process.',
+};
+
+const NOT_SENT: Record<string, string> = {
+  disabled:
+    'Email is not configured, so nothing was sent. Copy the link below and pass it on yourself.',
+  capped:
+    'This organization has reached its daily email limit, so nothing was sent. Copy the link below and pass it on yourself.',
+  failed: 'The email could not be delivered. Copy the link below and pass it on yourself.',
+  unverified: 'Verify your own email address to send by email. Copy the link below and pass it on yourself.',
 };
 
 export function RequestButton({
@@ -41,7 +53,7 @@ export function RequestButton({
         setNote(
           result.emailed
             ? `Sent to ${ownerEmail}.`
-            : 'Email is not configured, so nothing was sent. Copy the link below and pass it on yourself.'
+            : NOT_SENT[result.emailFailure ?? 'disabled'] ?? NOT_SENT.failed
         );
         router.refresh();
       } catch (e) {

@@ -59,9 +59,15 @@ export async function GET(req: Request) {
     });
     let delivered = 0;
     for (const member of recipients) {
-      if (await notifyWorkspaceUser(ws, member.userId, 'reviewReminders', content)) {
-        delivered++;
-      }
+      const sent = await notifyWorkspaceUser({
+        orgId,
+        ws,
+        userId: member.userId,
+        kind: 'reviewReminders',
+        content,
+        sender: 'system',
+      });
+      if (sent) delivered++;
     }
     if (delivered > 0) sent++;
     else noContact++;

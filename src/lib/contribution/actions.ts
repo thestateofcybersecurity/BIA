@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { getStore } from '@/lib/data/store';
 import { isAssessmentComplete } from '@/lib/domain/scoring';
-import { verifyContributionToken } from './token';
+import { tokenIssuedTo, verifyContributionToken } from './token';
 import type { ImpactAssessment } from '@/lib/domain/types';
 
 /**
@@ -45,6 +45,8 @@ export async function submitContribution(
   const { workspace: ws, version } = await store.loadForUpdate(orgId);
   const request = ws.collectionRequests.find((r) => r.id === requestId);
   if (!request || request.processId !== processId) return { ok: false, reason: 'not_found' };
+  // The link must have been minted for the address this request names.
+  if (!tokenIssuedTo(verified.claims, request.email)) return { ok: false, reason: 'invalid' };
   if (request.status === 'revoked') return { ok: false, reason: 'revoked' };
   if (!ws.processes.some((p) => p.id === processId)) return { ok: false, reason: 'not_found' };
 

@@ -13,7 +13,8 @@ import {
   AUDIT_LABELS,
   type Capability,
 } from '@/lib/domain/authz';
-import { recordAudit } from '@/lib/data/tenancy';
+import { recordAudit, listMembers } from '@/lib/data/tenancy';
+import { claimSlot } from '@/lib/data/rate-limit';
 import { withAiQuota } from '@/lib/ai/quota';
 import type { AiStatus, AiAllowance } from '@/lib/ai/quota';
 import type { AiFeature } from '@/lib/domain/plans';
@@ -264,12 +265,14 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
   if (becameAwaitingSignOff && snapshot) {
     const { notifyWorkspaceUser } = await import('@/lib/email/send');
     const { signOffRequestEmail } = await import('@/lib/email/templates');
-    await notifyWorkspaceUser(
-      snapshot,
-      await getUserId(),
-      'signOffRequests',
-      signOffRequestEmail({ processName, owner: processOwner })
-    );
+    await notifyWorkspaceUser({
+      orgId: ctx.organization.id,
+      ws: snapshot,
+      userId: ctx.userId,
+      kind: 'signOffRequests',
+      content: signOffRequestEmail({ processName, owner: processOwner }),
+      sender: { emailVerified: ctx.emailVerified },
+    });
   }
 }
 
@@ -702,17 +705,19 @@ export async function generateExerciseReport(sessionId: string) {
 
   const { notifyWorkspaceUser } = await import('@/lib/email/send');
   const { aarReadyEmail } = await import('@/lib/email/templates');
-  await notifyWorkspaceUser(
+  await notifyWorkspaceUser({
+    orgId: ctx.organization.id,
     ws,
-    await getUserId(),
-    'aarReady',
-    aarReadyEmail({
+    userId: ctx.userId,
+    kind: 'aarReady',
+    content: aarReadyEmail({
       exerciseTitle: session.scenario.title,
       sessionId,
       recommendationCount: report.recommendations.length,
       highPriorityCount: report.recommendations.filter((r) => r.priority === 'high').length,
-    })
-  );
+    }),
+    sender: { emailVerified: ctx.emailVerified },
+  });
 }
 
 export async function deleteExercise(sessionId: string) {
@@ -980,6 +985,12 @@ export async function deleteRisk(id: string) {
  * Ask a process owner to complete their own impact assessment through a
  * signed link. Creating a new request supersedes any earlier one for the
  * same process, so a resend invalidates the previous link.
+ *
+ * The request goes to the owner on record. An `emailOverride` is honored
+ * only for an address the organization already knows (a current member or
+ * the recorded owner), and the coordinator's own address must be verified:
+ * together these keep the flow from becoming a way to mail arbitrary
+ * strangers from the app's domain with workspace text in the body.
  */
 export async function requestAssessmentFromOwner(processId: string, emailOverride?: string) {
   const { createContributionToken, contributionsEnabled, CONTRIBUTION_TTL_MS } = await import(
@@ -991,12 +1002,27 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
 
   const ctx = await getAuthContext();
   assertCan(ctx.role, 'collection:manage');
+  if (!ctx.emailVerified) return { ok: false as const, reason: 'unverified' as const };
   const store = getStore();
   const { workspace: ws, version } = await store.loadForUpdate(ctx.organization.id);
   const process = ws.processes.find((p) => p.id === processId);
   if (!process) return { ok: false as const, reason: 'not_found' as const };
 
-  const address = (emailOverride ?? process.ownerEmail ?? '').trim();
+  let address = (process.ownerEmail ?? '').trim();
+  if (emailOverride !== undefined && emailOverride.trim() !== '') {
+    const { overrideAllowed } = await import('@/lib/email/policy');
+    const { getUserContacts } = await import('@/lib/email/recipients');
+    const members = await listMembers(ctx.organization.id);
+    const contacts = await getUserContacts(members.map((m) => m.userId));
+    const memberEmails = [
+      ...members.map((m) => m.email),
+      ...[...contacts.values()].map((c) => c.email),
+    ].filter((e) => e !== '');
+    if (!overrideAllowed(emailOverride, { ownerEmail: process.ownerEmail, memberEmails })) {
+      return { ok: false as const, reason: 'not_allowed' as const };
+    }
+    address = emailOverride.trim();
+  }
   if (!address) return { ok: false as const, reason: 'no_email' as const };
 
   const now = new Date();
@@ -1010,9 +1036,10 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
     processId,
     requestId,
     issuedAt: now.getTime(),
+    email: address,
   });
 
-  const { emailEnabled, APP_URL } = await import('@/lib/email/client');
+  const { APP_URL } = await import('@/lib/email/client');
   const link = `${APP_URL}/contribute/${token}`;
 
   // Persist first: a crash or concurrency loss after the email is sent would
@@ -1031,39 +1058,35 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
   if (!(await store.save(ctx.organization.id, ws, version))) throw new ConcurrentEditError();
   revalidatePath('/', 'layout');
 
-  let emailed = false;
-  if (emailEnabled()) {
-    const { getResend, EMAIL_FROM } = await import('@/lib/email/client');
-    const { assessmentRequestEmail } = await import('@/lib/email/templates');
-    const content = assessmentRequestEmail({
+  const { sendOrgEmail } = await import('@/lib/email/send');
+  const { assessmentRequestEmail } = await import('@/lib/email/templates');
+  const sent = await sendOrgEmail({
+    orgId: ctx.organization.id,
+    to: address,
+    content: assessmentRequestEmail({
       orgName: ws.org?.name ?? 'your organization',
       processName: process.name,
       ownerName: process.owner,
       link,
       expiresInDays: Math.round(CONTRIBUTION_TTL_MS / (24 * 60 * 60 * 1000)),
-    });
-    try {
-      const { error } = await getResend().emails.send({
-        from: EMAIL_FROM,
-        to: address,
-        subject: content.subject,
-        html: content.html,
-        text: content.text,
-      });
-      if (error) console.error('[email] assessment request failed:', error.message ?? error);
-      else emailed = true;
-    } catch (e) {
-      console.error('[email] assessment request threw:', e instanceof Error ? e.message : e);
-    }
-    // Record whether delivery worked; the request already exists either way
+    }),
+    sender: { emailVerified: ctx.emailVerified },
+  });
+  if (sent.ok) {
+    // Record that delivery worked; the request already exists either way
     // and the link is returned so the coordinator can pass it on by hand.
     await withWorkspace('collection:manage', (w) => {
       const stored = w.collectionRequests.find((r) => r.id === requestId);
-      if (stored) stored.emailed = emailed;
+      if (stored) stored.emailed = true;
     });
   }
 
-  return { ok: true as const, link, emailed };
+  return {
+    ok: true as const,
+    link,
+    emailed: sent.ok,
+    emailFailure: sent.ok ? null : sent.reason,
+  };
 }
 
 export async function revokeAssessmentRequest(requestId: string) {

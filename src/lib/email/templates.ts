@@ -108,7 +108,8 @@ export function invitationEmail(args: {
   link: string;
   expiresInDays: number;
 }): EmailContent {
-  const title = `You have been invited to ${args.orgName}`;
+  // The title lands in the HTML heading as well as the text body.
+  const title = `You have been invited to ${esc(args.orgName)}`;
   const body = `${args.inviterName ? `${esc(args.inviterName)} has` : 'You have been'} invited you to join <strong>${esc(args.orgName)}</strong>'s business continuity workspace as <strong>${esc(args.roleLabel)}</strong>.<br><br>
     The workspace holds the organization's impact assessments, recovery objectives, and continuity plan. Your role decides what you can see and change.<br><br>
     This invitation is tied to this email address and expires in ${args.expiresInDays} days. Sign in with this address to accept it.`;
@@ -118,7 +119,7 @@ export function invitationEmail(args: {
       label: 'Accept the invitation',
       href: args.link,
     }),
-    text: `${title}\n\n${args.inviterName ? `${args.inviterName} has` : 'You have been'} invited you to join ${args.orgName}'s business continuity workspace as ${args.roleLabel}.\n\nThis invitation is tied to this email address and expires in ${args.expiresInDays} days. Sign in with this address to accept it:\n${args.link}`,
+    text: `You have been invited to ${args.orgName}\n\n${args.inviterName ? `${args.inviterName} has` : 'You have been'} invited you to join ${args.orgName}'s business continuity workspace as ${args.roleLabel}.\n\nThis invitation is tied to this email address and expires in ${args.expiresInDays} days. Sign in with this address to accept it:\n${args.link}`,
   };
 }
 
