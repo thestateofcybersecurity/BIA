@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { loadWorkspace } from '@/lib/actions';
+import { pdfExportBlocker } from '@/lib/pdf/limits';
 import { getAuthContext } from '@/lib/auth';
 import { can } from '@/lib/domain/authz';
 import { deriveAll, computeGaps, gapExposure, type GapInfo } from '@/lib/domain/scoring';
@@ -59,6 +60,7 @@ const td = 'border-b border-line/60 py-2 pr-4 align-top';
 export default async function ReportPage() {
   const ws = await loadWorkspace();
   const canExport = can((await getAuthContext()).role, 'report:export');
+  const pdfBlocked = canExport ? pdfExportBlocker(ws) : null;
 
   if (!ws.org || ws.processes.length === 0) {
     return (
@@ -129,9 +131,13 @@ export default async function ReportPage() {
           actions={
             canExport ? (
               <>
-                <a href="/api/report/pdf" className={btn.primary} download>
-                  Download official PDF
-                </a>
+                {pdfBlocked ? (
+                  <span className="max-w-xs text-xs text-ink-muted">{pdfBlocked}</span>
+                ) : (
+                  <a href="/api/report/pdf" className={btn.primary} download>
+                    Download official PDF
+                  </a>
+                )}
                 <PrintButton label="Browser print" />
               </>
             ) : null

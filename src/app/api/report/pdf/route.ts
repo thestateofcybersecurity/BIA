@@ -1,6 +1,7 @@
 import { renderToBuffer } from '@react-pdf/renderer';
 import { loadWorkspace } from '@/lib/actions';
 import { ReportDocument } from '@/lib/pdf/report';
+import { pdfExportBlocker } from '@/lib/pdf/limits';
 import { getAuthContext } from '@/lib/auth';
 import { can } from '@/lib/domain/authz';
 import { claimSlot } from '@/lib/data/rate-limit';
@@ -28,6 +29,10 @@ export async function GET() {
       { status: 400 }
     );
   }
+  // Refused before any layout work starts: the render is synchronous CPU,
+  // and for a large inventory it would hold this instance for minutes.
+  const tooLarge = pdfExportBlocker(ws);
+  if (tooLarge) return new Response(tooLarge, { status: 413 });
 
   const generatedAt = new Date().toISOString();
   const buffer = await renderToBuffer(
