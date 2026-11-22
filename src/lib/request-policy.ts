@@ -34,6 +34,25 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 /**
+ * Whether the catch-all segments of /api/auth/[...path] name an endpoint
+ * under the auth base path. The Neon Auth handler joins them onto its base
+ * URL as they arrive, and the router has already percent-decoded them, so a
+ * segment such as "..%2F..%2Fother" would walk the upstream request out of
+ * the base path, and an encoded "?" would splice a query string into it.
+ * Each segment must be a plain path label; anything else is not forwarded.
+ */
+const AUTH_PATH_SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9._~-]*$/;
+
+export function isSafeAuthProxyPath(segments: unknown): segments is string[] {
+  return (
+    Array.isArray(segments) &&
+    segments.length > 0 &&
+    segments.length <= 8 &&
+    segments.every((s) => typeof s === 'string' && s.length <= 256 && AUTH_PATH_SEGMENT.test(s))
+  );
+}
+
+/**
  * A path with a percent sequence that does not decode (a lone "%ff", a
  * truncated multi-byte character). The router throws on such a path when it
  * fills a dynamic segment, which surfaces as a 500 on the public token

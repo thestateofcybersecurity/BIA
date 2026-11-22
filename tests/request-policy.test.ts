@@ -5,6 +5,7 @@ import {
   canonicalRedirectTarget,
   hasMalformedEncoding,
   isPublicPath,
+  isSafeAuthProxyPath,
   SDK_SKIP_PREFIXES,
   slipsPastSdkMiddleware,
 } from '@/lib/request-policy';
@@ -170,5 +171,44 @@ describe('hasMalformedEncoding', () => {
     for (const path of ['/', '/invite/abc', '/contribute/a%2Eb', '/invite/%25E0%25A4%25A', '/x/%E2%9C%93']) {
       expect(hasMalformedEncoding(path), path).toBe(false);
     }
+  });
+});
+
+describe('isSafeAuthProxyPath', () => {
+  it('accepts the endpoints the auth client calls', () => {
+    for (const path of [
+      ['get-session'],
+      ['sign-in', 'email'],
+      ['sign-up', 'email'],
+      ['sign-out'],
+      ['callback', 'google'],
+      ['reset-password', 'aB3_-tokenValue'],
+      ['token', 'anonymous'],
+    ]) {
+      expect(isSafeAuthProxyPath(path), path.join('/')).toBe(true);
+    }
+  });
+
+  it('refuses segments that would leave the base path or splice the URL', () => {
+    for (const path of [
+      [],
+      ['..'],
+      ['.', 'get-session'],
+      ['../../escape'],
+      ['x', '../../../other-db/auth/admin/list-users'],
+      ['..\\..\\escape'],
+      ['sign-in', 'email?a=b'],
+      ['sign-in', 'email#frag'],
+      ['//evil.example', 'x'],
+      ['', 'get-session'],
+      ['%2e%2e'],
+      ['a b'],
+      ['x'.repeat(300)],
+      Array(9).fill('a'),
+    ]) {
+      expect(isSafeAuthProxyPath(path), JSON.stringify(path).slice(0, 60)).toBe(false);
+    }
+    expect(isSafeAuthProxyPath('get-session')).toBe(false);
+    expect(isSafeAuthProxyPath([['get-session']])).toBe(false);
   });
 });
