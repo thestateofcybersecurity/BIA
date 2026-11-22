@@ -518,7 +518,7 @@ export async function startAiExercise(
 
   const base = CATALOG.find((s) => s.id === scenarioId);
   if (!base) throw new Error('Unknown scenario');
-  focus = focus.trim().slice(0, 1000);
+  focus = String(focus ?? '').trim().slice(0, 1000);
 
   // Checked before the call, not just before the save: a member who cannot
   // run exercises must not be able to spend the organization's allowance.
@@ -590,14 +590,16 @@ export async function generateExerciseReport(sessionId: string) {
   if (!aiEnabled()) throw new Error('The after-action report requires ANTHROPIC_API_KEY to be configured.');
   const { generateAarWithClaude } = await import('@/lib/ai/generate');
 
+  // The role check comes first, like every other action: a member who may
+  // not run exercises gets the same refusal whether or not the id exists.
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'exercise:run');
+  assertCan(ctx.role, 'ai:generate');
   const ws = await loadWorkspace();
   const session = ws.exercises.find((e) => e.id === sessionId);
   if (!session) throw new Error('Session not found');
   if (session.status !== 'completed') throw new Error('Complete the exercise before generating the report.');
 
-  const ctx = await getAuthContext();
-  assertCan(ctx.role, 'exercise:run');
-  assertCan(ctx.role, 'ai:generate');
   const report = await withAiQuota(
     { orgId: ctx.organization.id, userId: ctx.userId },
     'aar',
@@ -659,13 +661,13 @@ export async function draftWorkflowWithAi(
 
   // The focus is free text headed straight into the prompt; a cap keeps it
   // from inflating input tokens charged against the org's allowance.
-  focus = focus.trim().slice(0, 1000);
-  const ws = await loadWorkspace();
-  if (!ws.processes.some((p) => p.id === processId)) throw new Error('Process not found');
-
   const ctx = await getAuthContext();
   assertCan(ctx.role, 'workflow:write');
   assertCan(ctx.role, 'ai:generate');
+  focus = String(focus ?? '').trim().slice(0, 1000);
+  const ws = await loadWorkspace();
+  if (!ws.processes.some((p) => p.id === processId)) throw new Error('Process not found');
+
   const draft = await withAiQuota(
     { orgId: ctx.organization.id, userId: ctx.userId },
     'workflow',

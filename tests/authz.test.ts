@@ -119,3 +119,25 @@ describe('visibleProcessIds and redactWorkspaceFor', () => {
     expect(viewer.processes.every((p) => !('ownerEmail' in p))).toBe(true);
   });
 });
+
+describe('redactWorkspaceFor: personal email mutes', () => {
+  const ws = {
+    ...emptyWorkspace(),
+    emailOptOuts: {
+      u1: { signOffRequests: false, aarReady: true, reviewReminders: true },
+      u2: { signOffRequests: true, aarReady: false, reviewReminders: true },
+    },
+  };
+
+  it('keeps only the caller\'s own entry, for every role', () => {
+    for (const role of ['viewer', 'contributor', 'coordinator', 'admin', 'owner'] as const) {
+      const out = redactWorkspaceFor(ws, member({ userId: 'u1', role }));
+      expect(Object.keys(out.emailOptOuts ?? {})).toEqual(['u1']);
+    }
+  });
+
+  it('returns an empty map to a member with no entry', () => {
+    const out = redactWorkspaceFor(ws, member({ userId: 'u9', role: 'admin' }));
+    expect(out.emailOptOuts).toEqual({});
+  });
+});

@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { authEnabled, getAuth } from '@/lib/neon-auth';
-import { canonicalRedirectTarget, isPublicPath } from '@/lib/request-policy';
+import {
+  canonicalRedirectTarget,
+  isPublicPath,
+  slipsPastSdkMiddleware,
+} from '@/lib/request-policy';
 
 /**
  * Runs before every request that is not a static asset.
@@ -36,6 +40,12 @@ export default function proxy(request: NextRequest) {
   // Server actions handle auth themselves; intercepting them breaks POSTs.
   if (request.headers.has('Next-Action')) return;
   if (isPublicPath(request.nextUrl.pathname)) return;
+  // The SDK middleware exempts its own routes by prefix. A path that only
+  // starts like one of them is not public here, so it is sent to sign-in
+  // rather than handed to a check that would let it through.
+  if (slipsPastSdkMiddleware(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL('/auth/sign-in', request.url));
+  }
   return getAuth().middleware({ loginUrl: '/auth/sign-in' })(request);
 }
 

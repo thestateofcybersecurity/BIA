@@ -206,10 +206,21 @@ export function redactWorkspaceFor<
     resourceProfiles: unknown[];
     assessments: { processId: string }[];
     processes: { id: string; ownerEmail?: string; ownerPhone?: string }[];
+    emailOptOuts?: Record<string, unknown>;
   },
 >(ws: T, member: MemberContext): T {
   const role = member.role;
   const out: T = { ...ws };
+
+  // Personal email mutes are keyed by user id. Nobody needs anyone else's:
+  // the page reads only the caller's own entry, and the full map would hand
+  // every member the account ids of every other member.
+  if (ws.emailOptOuts) {
+    const own = Object.prototype.hasOwnProperty.call(ws.emailOptOuts, member.userId)
+      ? { [member.userId]: ws.emailOptOuts[member.userId] }
+      : {};
+    out.emailOptOuts = own as T['emailOptOuts'];
+  }
 
   // A contributor sees the inventory but only the assessment detail (loss
   // curves, notes, MTPD justification) for the processes they own; the rest

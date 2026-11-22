@@ -34,6 +34,34 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 /**
+ * Path prefixes the Neon Auth middleware lets through without a session.
+ * It matches them with a plain startsWith (see SKIP_ROUTES and the loginUrl
+ * check in @neondatabase/auth), so `/api/authz` or `/auth/sign-in-admin`
+ * would skip the session check there even though isPublicPath above does
+ * not list them. Kept in step with the SDK by tests/request-policy.test.ts.
+ */
+export const SDK_SKIP_PREFIXES = [
+  '/api/auth',
+  '/auth/callback',
+  '/auth/sign-in',
+  '/auth/sign-up',
+  '/auth/magic-link',
+  '/auth/email-otp',
+  '/auth/forgot-password',
+];
+
+/**
+ * True for a path the SDK middleware would wave through although this
+ * policy does not make it public. The proxy turns such a request away
+ * itself, so no route can become reachable without a session just because
+ * its name starts like one of the SDK's own.
+ */
+export function slipsPastSdkMiddleware(pathname: string): boolean {
+  if (isPublicPath(pathname)) return false;
+  return SDK_SKIP_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+/**
  * Machine callers that may legitimately reach the deployment by its
  * vercel.app name: Vercel Cron invokes the production deployment directly,
  * and uptime checks are often pointed at the platform host. Redirecting

@@ -1,4 +1,5 @@
 import { getStore } from '@/lib/data/store';
+import { decodeTokenSegment } from '@/lib/safe-decode';
 import { tokenIssuedTo, verifyContributionToken } from '@/lib/contribution/token';
 import { DEPENDENCY_CLASSES, DEPENDENCY_LABELS } from '@/lib/domain/constants';
 import { ContributeForm } from './contribute-form';
@@ -29,8 +30,9 @@ export default async function ContributePage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
-  const verified = verifyContributionToken(decodeURIComponent(token));
+  const { token: rawToken } = await params;
+  const token = decodeTokenSegment(rawToken);
+  const verified = verifyContributionToken(token);
 
   if (!verified.ok) {
     return (
@@ -143,7 +145,7 @@ export default async function ContributePage({
 
       <div className="mt-6">
         <ContributeForm
-          token={decodeURIComponent(token)}
+          token={token}
           process={{
             id: process.id,
             name: process.name,

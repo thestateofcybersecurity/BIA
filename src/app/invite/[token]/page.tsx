@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { decodeTokenSegment } from '@/lib/safe-decode';
 import { lookupInvitation } from '@/lib/data/tenancy';
 import { getAuthContextOptional } from '@/lib/auth';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '@/lib/domain/authz';
@@ -53,8 +54,9 @@ export default async function InvitePage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
-  const found = await lookupInvitation(decodeURIComponent(token));
+  const { token: rawToken } = await params;
+  const token = decodeTokenSegment(rawToken);
+  const found = await lookupInvitation(token);
 
   if (!found.ok) {
     const copy = FAILURES[found.reason] ?? FAILURES.not_found;
@@ -82,7 +84,7 @@ export default async function InvitePage({
           The invitation is tied to that address, so signing in with a different one will not work.
           Once signed in, open this link again.
         </p>
-        <SignInToAccept token={decodeURIComponent(token)} />
+        <SignInToAccept token={token} />
       </Shell>
     );
   }
@@ -135,7 +137,7 @@ export default async function InvitePage({
         <strong className="text-ink">{roleLabel}</strong>.
       </p>
       <p className="text-ink-muted">{ROLE_DESCRIPTIONS[found.invitation.role]}</p>
-      <AcceptInvite token={decodeURIComponent(token)} orgName={invitedTo} />
+      <AcceptInvite token={token} orgName={invitedTo} />
     </Shell>
   );
 }
