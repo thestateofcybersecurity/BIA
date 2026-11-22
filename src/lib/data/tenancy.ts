@@ -840,6 +840,34 @@ export async function revokeInvitation(orgId: string, id: string): Promise<void>
   `;
 }
 
+/**
+ * Withdraw the pending invitations a member issued. With `aboveRole`, only
+ * those granting more than that role (what the member can no longer hand
+ * out after a demotion); without it, all of them (after a removal).
+ * lookupInvitation refuses such invitations anyway; revoking them makes the
+ * invitation list say so. Returns how many were withdrawn.
+ */
+export async function revokeInvitationsIssuedBy(
+  orgId: string,
+  userId: string,
+  aboveRole?: OrgRole
+): Promise<number> {
+  if (!tenancyEnabled()) return 0;
+  const sql = await getSql();
+  const roles = (Object.keys(ROLE_RANK) as OrgRole[]).filter(
+    (r) => aboveRole === undefined || ROLE_RANK[r] > ROLE_RANK[aboveRole]
+  );
+  if (roles.length === 0) return 0;
+  const rows = (await sql`
+    UPDATE invitations SET revoked_at = now()
+    WHERE org_id = ${orgId} AND invited_by = ${userId}
+      AND accepted_at IS NULL AND revoked_at IS NULL
+      AND role = ANY(${roles})
+    RETURNING id
+  `) as { id: string }[];
+  return rows.length;
+}
+
 export type InviteLookup =
   | { ok: true; invitation: Invitation; organization: Organization }
   | { ok: false; reason: 'not_found' | 'revoked' | 'expired' | 'accepted' };
@@ -866,6 +894,15 @@ export async function lookupInvitation(token: string): Promise<InviteLookup> {
   if (invitation.acceptedAt) return { ok: false, reason: 'accepted' };
   if (new Date(invitation.expiresAt).getTime() < Date.now()) {
     return { ok: false, reason: 'expired' };
+  }
+  // An invitation carries its issuer's authority, so it is only as good as
+  // that authority is today. If the issuer has since been removed, or
+  // demoted below the role the invitation grants, it is treated as
+  // withdrawn: otherwise somebody about to lose access could invite a
+  // second address of their own and walk back in after the removal.
+  const issuer = await getMembership(invitation.orgId, invitation.invitedBy);
+  if (!issuer || ROLE_RANK[issuer.role] < ROLE_RANK[invitation.role]) {
+    return { ok: false, reason: 'revoked' };
   }
   return {
     ok: true,

@@ -18,6 +18,7 @@ import {
   createInvitation,
   listInvitations,
   revokeInvitation,
+  revokeInvitationsIssuedBy,
   recordAudit,
   listAudit,
   type Organization,
@@ -99,12 +100,20 @@ export async function updateMemberRole(
           : 'That person is not a member of this organization.',
     };
   }
+  // A demotion takes back what the member could hand out: their pending
+  // invitations above the new role are withdrawn with it.
+  const withdrawn =
+    ROLE_RANK[role] < ROLE_RANK[previous]
+      ? await revokeInvitationsIssuedBy(ctx.organization.id, targetUserId, role)
+      : 0;
   await recordAudit({
     orgId: ctx.organization.id,
     actorUserId: ctx.userId,
     actorEmail: ctx.email,
     action: 'member:manage',
-    summary: `Changed ${target.email || targetUserId} from ${ROLE_LABELS[previous]} to ${ROLE_LABELS[role]}`,
+    summary:
+      `Changed ${target.email || targetUserId} from ${ROLE_LABELS[previous]} to ${ROLE_LABELS[role]}` +
+      (withdrawn > 0 ? ` and withdrew ${withdrawn} pending invitation${withdrawn === 1 ? '' : 's'} they had issued` : ''),
   });
   revalidatePath('/', 'layout');
   return { ok: true };
@@ -130,12 +139,16 @@ export async function removeOrgMember(targetUserId: string): Promise<MemberActio
           : 'That person is not a member of this organization.',
     };
   }
+  // Whatever they invited people to goes with them.
+  const withdrawn = await revokeInvitationsIssuedBy(ctx.organization.id, targetUserId);
   await recordAudit({
     orgId: ctx.organization.id,
     actorUserId: ctx.userId,
     actorEmail: ctx.email,
     action: 'member:manage',
-    summary: `Removed ${target?.email || targetUserId} from the organization`,
+    summary:
+      `Removed ${target?.email || targetUserId} from the organization` +
+      (withdrawn > 0 ? ` and withdrew ${withdrawn} pending invitation${withdrawn === 1 ? '' : 's'} they had issued` : ''),
   });
   revalidatePath('/', 'layout');
   return { ok: true };
