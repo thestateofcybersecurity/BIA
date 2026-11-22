@@ -28,6 +28,7 @@
     "zod": "^4.5.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.17",
     "@types/node": "^20.14.0",
     "@types/papaparse": "^5.3.14",
     "@types/react": "^19.2.17",

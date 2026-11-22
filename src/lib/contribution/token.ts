@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, hkdfSync, timingSafeEqual } from 'node:crypto';
 
 /**
  * Signed links that let a named process owner complete one impact assessment
@@ -33,24 +33,43 @@ export function hashRecipient(email: string): string {
 }
 
 let warnedFallback = false;
+let derived: { from: string; key: string } | null = null;
 
 /**
- * The HMAC key. CONTRIBUTION_SECRET is the dedicated key; without it the
- * session cookie secret is used, which works but means one leaked key
- * compromises two surfaces. That fallback is logged once per process so it
- * shows up in the deployment logs rather than going unnoticed.
+ * The key used when CONTRIBUTION_SECRET is absent: an HKDF derivation of the
+ * session cookie secret under a label of its own, never the cookie secret
+ * itself. A signature made for a contribution link is then not a signature
+ * under the session key, so neither surface can be used as a signing oracle
+ * for the other. It is still one root secret, which is why the dedicated
+ * variable remains the recommended setup.
+ */
+function derivedFallbackKey(cookieSecret: string): string {
+  if (derived?.from !== cookieSecret) {
+    const bytes = hkdfSync('sha256', cookieSecret, '', 'bia:contribution-link:v1', 32);
+    derived = { from: cookieSecret, key: Buffer.from(bytes).toString('base64url') };
+  }
+  return derived.key;
+}
+
+/**
+ * The HMAC key. CONTRIBUTION_SECRET is the dedicated key; without it a key
+ * derived from the session cookie secret is used, which works but means one
+ * leaked root secret compromises two surfaces. That fallback is logged once
+ * per process so it shows up in the deployment logs rather than going
+ * unnoticed.
  */
 function secret(): string | null {
   const dedicated = process.env.CONTRIBUTION_SECRET;
   if (dedicated) return dedicated;
   const fallback = process.env.NEON_AUTH_COOKIE_SECRET;
-  if (fallback && !warnedFallback) {
+  if (!fallback) return null;
+  if (!warnedFallback) {
     warnedFallback = true;
     console.warn(
-      '[contribution] CONTRIBUTION_SECRET is not set; contribution links are being signed with NEON_AUTH_COOKIE_SECRET. Set a dedicated CONTRIBUTION_SECRET (openssl rand -base64 32) so the session cookie key is not reused for public bearer links. Changing the key invalidates outstanding links.'
+      '[contribution] CONTRIBUTION_SECRET is not set; contribution links are being signed with a key derived from NEON_AUTH_COOKIE_SECRET. Set a dedicated CONTRIBUTION_SECRET (openssl rand -base64 32) so the two surfaces do not share a root secret. Changing the key invalidates outstanding links.'
     );
   }
-  return fallback || null;
+  return derivedFallbackKey(fallback);
 }
 
 // Startup check: surface the fallback as soon as the module loads.
