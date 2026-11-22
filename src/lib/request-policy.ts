@@ -34,6 +34,22 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 /**
+ * A path with a percent sequence that does not decode (a lone "%ff", a
+ * truncated multi-byte character). The router throws on such a path when it
+ * fills a dynamic segment, which surfaces as a 500 on the public token
+ * pages; the proxy answers 400 instead.
+ */
+export function hasMalformedEncoding(pathname: string): boolean {
+  if (!pathname.includes('%')) return false;
+  try {
+    decodeURIComponent(pathname);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Path prefixes the Neon Auth middleware lets through without a session.
  * It matches them with a plain startsWith (see SKIP_ROUTES and the loginUrl
  * check in @neondatabase/auth), so `/api/authz` or `/auth/sign-in-admin`

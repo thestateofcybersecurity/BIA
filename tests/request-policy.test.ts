@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import {
   canonicalRedirectTarget,
+  hasMalformedEncoding,
   isPublicPath,
   SDK_SKIP_PREFIXES,
   slipsPastSdkMiddleware,
@@ -155,5 +156,19 @@ describe('slipsPastSdkMiddleware', () => {
     expect(block, 'SKIP_ROUTES in the SDK').not.toBeNull();
     const sdk = [...block![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]).sort();
     expect([...SDK_SKIP_PREFIXES].sort()).toEqual(sdk);
+  });
+});
+
+describe('hasMalformedEncoding', () => {
+  it('flags percent sequences that do not decode', () => {
+    for (const path of ['/invite/%ff', '/contribute/%E0%A4%A', '/invite/%', '/x/%zz']) {
+      expect(hasMalformedEncoding(path), path).toBe(true);
+    }
+  });
+
+  it('accepts ordinary and correctly encoded paths', () => {
+    for (const path of ['/', '/invite/abc', '/contribute/a%2Eb', '/invite/%25E0%25A4%25A', '/x/%E2%9C%93']) {
+      expect(hasMalformedEncoding(path), path).toBe(false);
+    }
   });
 });

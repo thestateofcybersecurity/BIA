@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authEnabled, getAuth } from '@/lib/neon-auth';
 import {
   canonicalRedirectTarget,
+  hasMalformedEncoding,
   isPublicPath,
   slipsPastSdkMiddleware,
 } from '@/lib/request-policy';
@@ -28,6 +29,11 @@ import {
  * requires a session and a matching, verified address.
  */
 export default function proxy(request: NextRequest) {
+  // An undecodable path is a client error, not something to route.
+  if (hasMalformedEncoding(request.nextUrl.pathname)) {
+    return new NextResponse('Bad request', { status: 400 });
+  }
+
   const target = canonicalRedirectTarget({
     host: request.headers.get('host'),
     pathname: request.nextUrl.pathname,
