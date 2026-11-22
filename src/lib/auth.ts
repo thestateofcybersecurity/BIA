@@ -87,6 +87,17 @@ async function currentUser(): Promise<SessionUser> {
 }
 
 /**
+ * A signed-in caller, and nothing more. Server actions call this before
+ * they parse their arguments, so an anonymous request is turned away at the
+ * cost of one session check rather than after the validator has walked a
+ * megabyte of attacker-chosen input. The role check still happens where it
+ * always did, against the organization getAuthContext resolves.
+ */
+export async function requireSession(): Promise<void> {
+  await currentUser();
+}
+
+/**
  * The caller's organization and role. Resolves the active organization from
  * the cookie when the user is a member of it, and otherwise falls back to
  * claiming or joining by email domain.

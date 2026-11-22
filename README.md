@@ -44,6 +44,8 @@ Open http://localhost:3000. Without any configuration the app runs in single-wor
 | `NEXT_PUBLIC_APP_URL` | Canonical base URL, defaults to `https://bia.cybersecurityalphabetsoup.com`. Used for links inside emails, and requests that arrive on a `*.vercel.app` alias are redirected (308) to this host so the Cloudflare layer cannot be bypassed |
 | `BIA_WORKSPACE_ID` | Workspace id used in demo mode, defaults to `default` |
 
+The image optimizer (`/_next/image`) is switched off in `next.config.js` (`images.unoptimized`), because nothing in the app uses `next/image` and the endpoint is reachable without a session.
+
 Rate limits that need no configuration: PDF report export is limited to 3 per user per minute, and CSV/Excel and JSON workspace imports to 5 per user per minute; JSON imports are validated against the same schemas as the editing forms and capped at 5 MB.
 
 Multi-tenancy: the organization is the tenant. The first person to sign in from a verified work domain claims it and becomes owner; later arrivals from that domain join automatically at the lowest role. Owners can rename the organization, claim further domains by publishing a DNS TXT record, and invite people outside their domains by email at a chosen role. Every capability maps to a minimum role in `src/lib/domain/authz.ts`, mutations are gated by it, and data a role cannot read is stripped server-side rather than hidden in the UI. Membership and role changes, domain claims, and workspace mutations are written to an append-only audit trail visible on People & access.

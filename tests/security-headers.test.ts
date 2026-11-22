@@ -56,3 +56,10 @@ describe('next.config.js security headers', () => {
     expect(directives.get('connect-src')).toContain("'self'");
   });
 });
+
+describe('image optimizer', () => {
+  it('is switched off, so /_next/image is not served', () => {
+    const config = require('../next.config.js') as { images?: { unoptimized?: boolean } };
+    expect(config.images?.unoptimized).toBe(true);
+  });
+});

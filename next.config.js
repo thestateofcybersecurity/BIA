@@ -53,6 +53,11 @@ const nextConfig = {
   // SDKs behind lazy requires the bundler cannot resolve. Loading them from
   // node_modules at runtime keeps code paths we never call out of the build.
   serverExternalPackages: ['exceljs', 'unzipper', 'archiver'],
+  // Nothing in the app uses next/image, so the optimizer endpoint
+  // (/_next/image) is pure attack surface: it is reachable without a session
+  // and has been the subject of repeated critical advisories. With
+  // unoptimized set the endpoint is not served at all.
+  images: { unoptimized: true },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

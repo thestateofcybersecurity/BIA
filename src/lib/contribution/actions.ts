@@ -36,9 +36,14 @@ export type SubmitResult =
 export async function submitContribution(
   input: z.infer<typeof submissionSchema>
 ): Promise<SubmitResult> {
-  const parsed = submissionSchema.parse(input);
-  const verified = verifyContributionToken(parsed.token);
+  // The token is the only credential this action has, so it is checked
+  // before the rest of the payload is validated: an anonymous caller without
+  // a valid link costs one HMAC, not a walk over whatever they sent.
+  const presented = (input as { token?: unknown } | null)?.token;
+  if (typeof presented !== 'string' || presented.length > 2048) return { ok: false, reason: 'invalid' };
+  const verified = verifyContributionToken(presented);
   if (!verified.ok) return { ok: false, reason: 'invalid' };
+  const parsed = submissionSchema.parse(input);
   const { orgId, processId, requestId } = verified.claims;
 
   const store = getStore();

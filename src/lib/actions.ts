@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getStore, emptyWorkspace, ConcurrentEditError } from '@/lib/data/store';
 import { isAssessmentComplete } from '@/lib/domain/scoring';
-import { getAuthContext, getUserId } from '@/lib/auth';
+import { getAuthContext, getUserId, requireSession } from '@/lib/auth';
 import {
   assertCan,
   assertCanWriteAssessment,
@@ -103,6 +103,7 @@ async function loadWorkspaceRaw(): Promise<Workspace> {
 // ---------------- Org profile ----------------
 
 export async function saveOrg(input: Omit<OrgProfile, 'updatedAt'>) {
+  await requireSession();
   const parsed = orgSchema.parse(input);
   await withWorkspace('profile:write', (ws) => {
     ws.org = { ...parsed, updatedAt: new Date().toISOString() };
@@ -112,6 +113,7 @@ export async function saveOrg(input: Omit<OrgProfile, 'updatedAt'>) {
 // ---------------- Processes ----------------
 
 export async function saveProcess(input: z.infer<typeof processSchema>) {
+  await requireSession();
   const parsed = processSchema.parse(input);
   const now = new Date().toISOString();
   // Minted up front so a concurrency retry reuses the same id; assigning
@@ -161,6 +163,7 @@ export async function deleteProcess(id: string) {
 // ---------------- Impact assessment ----------------
 
 export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
+  await requireSession();
   const parsed = assessmentSchema.parse(input);
   const now = new Date().toISOString();
   let becameAwaitingSignOff = false;
@@ -245,6 +248,7 @@ export async function approveAssessment(processId: string, approver: string) {
 // ---------------- Recovery objectives ----------------
 
 export async function saveObjectives(input: z.infer<typeof objectivesSchema>) {
+  await requireSession();
   const parsed = objectivesSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace('objectives:write', (ws) => {
@@ -258,6 +262,7 @@ export async function saveObjectives(input: z.infer<typeof objectivesSchema>) {
 }
 
 export async function saveRemediation(input: z.infer<typeof remediationSchema>) {
+  await requireSession();
   const parsed = remediationSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace('objectives:write', (ws) => {
@@ -277,6 +282,7 @@ export async function saveRemediation(input: z.infer<typeof remediationSchema>) 
 export async function saveResourceProfile(
   input: z.infer<typeof resourceProfileSchema>
 ) {
+  await requireSession();
   const parsed = resourceProfileSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace('workflow:write', (ws) => {
@@ -292,6 +298,7 @@ export async function saveResourceProfile(
 // ---------------- Recovery workflows ----------------
 
 export async function saveWorkflow(input: z.infer<typeof workflowSchema>) {
+  await requireSession();
   const parsed = workflowSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace('workflow:write', (ws) => {
@@ -310,6 +317,7 @@ export async function saveWorkflow(input: z.infer<typeof workflowSchema>) {
 export async function saveMaturityAnswers(
   input: Record<string, MaturityLevel | null>
 ) {
+  await requireSession();
   const parsed = maturityAnswersSchema.parse(input) as Record<string, MaturityLevel | null>;
   await withWorkspace('maturity:write', (ws) => {
     ws.maturity = {
@@ -337,6 +345,7 @@ export interface ImportResult {
 export async function importCsv(
   records: Record<string, string>[]
 ): Promise<ImportResult> {
+  await requireSession();
   const { parseCsvRecord } = await import('@/lib/domain/csv');
   const rows = records.map((r, i) => parseCsvRecord(r, i + 2));
   const baseWarnings = rows.flatMap((r) => r.warnings);
@@ -523,6 +532,7 @@ export async function startAiExercise(
 }
 
 export async function saveExerciseProgress(input: z.infer<typeof progressSchema>) {
+  await requireSession();
   const parsed = progressSchema.parse(input);
   await withWorkspace('exercise:run', (ws) => {
     const session = ws.exercises.find((e) => e.id === parsed.sessionId);
@@ -771,6 +781,7 @@ async function markSuggestion(
   input: z.infer<typeof suggestionSnapshotSchema>,
   status: 'dismissed' | 'added'
 ) {
+  await requireSession();
   const snapshot = suggestionSnapshotSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace(
@@ -796,6 +807,7 @@ export async function acceptRiskSuggestion(input: z.infer<typeof suggestionSnaps
 // ---------------- Risk register ----------------
 
 export async function saveRisk(input: z.infer<typeof riskSchema>) {
+  await requireSession();
   const parsed = riskSchema.parse(input);
   const now = new Date().toISOString();
   // Minted up front so a concurrency retry reuses the same id; assigning
@@ -940,6 +952,7 @@ export async function revokeAssessmentRequest(requestId: string) {
 // ---------------- Continuity plan (activation & comms) ----------------
 
 export async function savePlan(input: z.infer<typeof planSchema>) {
+  await requireSession();
   const parsed = planSchema.parse(input);
   await withWorkspace('plan:write', (ws) => {
     ws.plan = { ...parsed, updatedAt: new Date().toISOString() };
@@ -951,6 +964,7 @@ export async function savePlan(input: z.infer<typeof planSchema>) {
 export async function saveNotificationPrefs(
   input: z.infer<typeof notificationPrefsSchema>
 ) {
+  await requireSession();
   const parsed = notificationPrefsSchema.parse(input);
   await withWorkspace('notifications:manage', (ws) => {
     ws.notifications = parsed;
@@ -965,6 +979,7 @@ export async function saveNotificationPrefs(
 export async function saveMyNotificationPrefs(
   input: z.infer<typeof notificationPrefsSchema>
 ) {
+  await requireSession();
   const parsed = notificationPrefsSchema.parse(input);
   const userId = await getUserId();
   await withWorkspace(

@@ -19,6 +19,21 @@ export const LIST_ITEMS = 50;
 export const short = z.string().max(SHORT);
 export const prose = z.string().max(PROSE);
 
+/**
+ * A record whose entry count is checked before any entry is validated. A
+ * plain z.record() validates every key and value first and only then runs a
+ * refinement, so a payload with a hundred thousand bad entries would build a
+ * hundred thousand issues before being refused. The pipe stops at the count.
+ */
+export const boundedRecord = <V extends z.ZodTypeAny>(maxKeys: number, key: z.ZodString, value: V) =>
+  z
+    .custom<Record<string, unknown>>(
+      (v) =>
+        typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length <= maxKeys,
+      { message: `Expected an object with at most ${maxKeys} entries` }
+    )
+    .pipe(z.record(key, value));
+
 export const orgSchema = z.object({
   name: z.string().trim().min(1).max(SHORT),
   industry: z.string().trim().max(SHORT),
@@ -136,27 +151,27 @@ export const workflowSchema = z.object({
 });
 
 /** Question ids are short slugs; levels are the anchored 0-5 scale or null. */
-export const maturityAnswersSchema = z
-  .record(z.string().max(64), z.number().int().min(0).max(5).nullable())
-  .refine((a) => Object.keys(a).length <= 200, { message: 'Too many answers in one save' });
+export const maturityAnswersSchema = boundedRecord(
+  200,
+  z.string().max(64),
+  z.number().int().min(0).max(5).nullable()
+);
 
-export const progressSchema = z
-  .object({
-    sessionId: z.string().min(1),
-    currentPhase: z.number().int().min(0),
-    responses: z.record(z.string(), z.string().max(5000)),
-    notes: z.array(
+export const progressSchema = z.object({
+  sessionId: z.string().min(1).max(64),
+  currentPhase: z.number().int().min(0),
+  responses: boundedRecord(1000, z.string().max(64), z.string().max(5000)),
+  notes: z
+    .array(
       z.object({
-        id: z.string(),
+        id: z.string().max(64),
         text: z.string().max(5000),
         phase: z.number().int().nullable(),
-        at: z.string(),
+        at: z.string().max(40),
       })
-    ),
-  })
-  .refine((p) => Object.keys(p.responses).length <= 1000 && p.notes.length <= 500, {
-    message: 'Too much session content in one save',
-  });
+    )
+    .max(500),
+});
 
 export const suggestionSnapshotSchema = z.object({
   id: z.string().min(1),
@@ -335,9 +350,7 @@ const importedExerciseSchema = z.object({
   scenario: scenarioSchema,
   status: z.enum(['in_progress', 'completed']),
   currentPhase: z.number().int().min(0),
-  responses: z
-    .record(z.string().max(64), z.string().max(5000))
-    .refine((r) => Object.keys(r).length <= 1000, { message: 'Too many responses' }),
+  responses: boundedRecord(1000, z.string().max(64), z.string().max(5000)),
   notes: z
     .array(
       z.object({
