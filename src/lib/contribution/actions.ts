@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { getStore } from '@/lib/data/store';
+import { PROSE } from '@/lib/domain/schemas';
 import { isAssessmentComplete } from '@/lib/domain/scoring';
 import { tokenIssuedTo, verifyContributionToken } from './token';
 import type { ImpactAssessment } from '@/lib/domain/types';
@@ -26,7 +27,9 @@ const submissionSchema = z.object({
     legal: horizons(severity.nullable()),
     safety: horizons(severity.nullable()),
   }),
-  notes: z.string(),
+  // The same cap the signed-in assessment form applies. This is the one
+  // write an unauthenticated visitor can make, so it gets no looser rules.
+  notes: z.string().max(PROSE),
 });
 
 export type SubmitResult =

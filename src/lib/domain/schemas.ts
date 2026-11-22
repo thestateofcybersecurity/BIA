@@ -54,7 +54,7 @@ export const depsSchema: z.ZodType<DependencyMap> = z.object({
 });
 
 export const processSchema = z.object({
-  id: z.string().optional(),
+  id: z.string().max(64).optional(),
   name: z.string().trim().min(1).max(SHORT),
   description: prose,
   owner: short,
@@ -173,18 +173,27 @@ export const progressSchema = z.object({
     .max(500),
 });
 
+/**
+ * Caps for a stored risk suggestion. Looser than the form caps because the
+ * text is generated (from process names and notes, or by Claude), not typed:
+ * a derived title can legitimately run past SHORT. Shared with the import
+ * schema so an export always re-imports.
+ */
+export const SUGGESTION_TITLE = 1000;
+export const SUGGESTION_PROSE = PROSE * 2;
+
 export const suggestionSnapshotSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  category: z.string(),
-  description: z.string(),
-  processIds: z.array(z.string()),
-  dependencies: z.array(z.string()),
-  basis: prose,
+  id: z.string().min(1).max(64),
+  title: z.string().min(1).max(SUGGESTION_TITLE),
+  category: z.string().max(100),
+  description: z.string().max(SUGGESTION_PROSE),
+  processIds: z.array(z.string().max(64)).max(500),
+  dependencies: z.array(prose).max(LIST_ITEMS),
+  basis: z.string().max(SUGGESTION_PROSE),
 });
 
 export const riskSchema = z.object({
-  id: z.string().optional(),
+  id: z.string().max(64).optional(),
   title: z.string().trim().min(1).max(SHORT),
   category: z.string().max(100),
   description: prose,
@@ -248,8 +257,8 @@ export const notificationPrefsSchema = z.object({
 
 /** Characters of JSON accepted by the import; roughly 5 MB. */
 export const WORKSPACE_IMPORT_MAX_CHARS = 5 * 1024 * 1024;
-/** Records accepted per collection in one import. */
-const RECORDS = 5000;
+/** Records accepted per collection in one import, and held per workspace. */
+export const RECORDS = 5000;
 
 const stamp = z.string().max(40);
 const id = z.string().min(1).max(64);
@@ -278,12 +287,12 @@ const importedRiskSchema = riskSchema.extend({ id, updatedAt: stamp });
 
 const importedRiskSuggestionSchema = z.object({
   id,
-  title: text(SHORT),
+  title: text(SUGGESTION_TITLE),
   category: text(100),
-  description: prose,
+  description: text(SUGGESTION_PROSE),
   processIds: z.array(z.string().max(64)).max(500),
   dependencies: stringList(),
-  basis: prose,
+  basis: text(SUGGESTION_PROSE),
   createdAt: stamp,
   status: z.enum(['open', 'dismissed', 'added']),
 });

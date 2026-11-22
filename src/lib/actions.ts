@@ -35,6 +35,9 @@ import {
   planSchema,
   notificationPrefsSchema,
   parseWorkspaceImport,
+  RECORDS,
+  SUGGESTION_TITLE,
+  SUGGESTION_PROSE,
 } from '@/lib/domain/schemas';
 import type {
   Workspace,
@@ -124,6 +127,13 @@ export async function saveProcess(input: z.infer<typeof processSchema>) {
     if (existing) {
       Object.assign(existing, { ...parsed, id, updatedAt: now });
     } else {
+      // An id in the request names a record to update. It never mints one:
+      // new records get a server-generated id, so a caller cannot choose
+      // what a record is called in URLs, tokens, or the audit trail.
+      if (parsed.id !== undefined) throw new Error('Process not found');
+      if (ws.processes.length >= RECORDS) {
+        throw new Error(`A workspace holds at most ${RECORDS} processes.`);
+      }
       ws.processes.push({ ...parsed, id, createdAt: now, updatedAt: now });
     }
   }, `${parsed.id ? 'Updated' : 'Added'} process "${parsed.name}"`);
@@ -346,7 +356,16 @@ export async function importCsv(
   records: Record<string, string>[]
 ): Promise<ImportResult> {
   await requireSession();
-  const { parseCsvRecord } = await import('@/lib/domain/csv');
+  const { parseCsvRecord, CSV_MAX_ROWS } = await import('@/lib/domain/csv');
+  if (!Array.isArray(records) || records.length > CSV_MAX_ROWS) {
+    return {
+      created: 0,
+      updated: 0,
+      assessments: 0,
+      errors: [`An import holds at most ${CSV_MAX_ROWS} rows. Split the sheet and import it in parts.`],
+      warnings: [],
+    };
+  }
   const rows = records.map((r, i) => parseCsvRecord(r, i + 2));
   const baseWarnings = rows.flatMap((r) => r.warnings);
   const result: ImportResult = {
@@ -392,6 +411,9 @@ export async function importCsv(
         processId = existing.id;
         updated++;
       } else {
+        if (ws.processes.length >= RECORDS) {
+          throw new Error(`A workspace holds at most ${RECORDS} processes.`);
+        }
         processId = nanoid(10);
         const createdRow = {
           ...fields,
@@ -414,10 +436,17 @@ export async function importCsv(
           notes: '',
           updatedAt: now,
         };
-        if (assessment) {
-          Object.assign(assessment, payload);
-        } else {
+        if (!assessment) {
           ws.assessments.push({ id: nanoid(10), processId, ...payload });
+        } else if (
+          JSON.stringify([assessment.financialLoss, assessment.ratings]) !==
+          JSON.stringify([payload.financialLoss, payload.ratings])
+        ) {
+          // The sheet changes figures somebody may have signed off. As with
+          // an edit through the form, the sign-off does not carry over to
+          // numbers its author never saw. A re-import of identical figures
+          // leaves the assessment, and its sign-off, alone.
+          Object.assign(assessment, payload, { approvedBy: null, approvedAt: null });
         }
         assessments++;
       }
@@ -703,18 +732,20 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
     )
   );
 
+  // Generated text is clamped to the caps a stored suggestion must meet, so
+  // a long answer can still be dismissed, accepted, exported, and re-imported.
   const candidates: RiskSuggestion[] = result.suggestions.map((s) => ({
     id: '',
-    title: s.title,
-    category: s.category,
-    description: s.description,
+    title: s.title.slice(0, SUGGESTION_TITLE),
+    category: s.category.slice(0, 100),
+    description: s.description.slice(0, SUGGESTION_PROSE),
     // Names are mapped back to ids here; anything that does not match a real
     // process is dropped rather than trusted.
     processIds: s.processNames
       .map((n) => byName.get(n.trim().toLowerCase()))
       .filter((id): id is string => id != null),
     dependencies: s.dependencies.filter((d) => knownDeps.has(d.trim().toLowerCase())),
-    basis: s.rationale,
+    basis: s.rationale.slice(0, SUGGESTION_PROSE),
     source: 'ai' as const,
   }));
 
@@ -818,6 +849,11 @@ export async function saveRisk(input: z.infer<typeof riskSchema>) {
     if (existing) {
       Object.assign(existing, { ...parsed, id, updatedAt: now });
     } else {
+      // As with processes: a supplied id updates, it never creates.
+      if (parsed.id !== undefined) throw new Error('Risk not found');
+      if (ws.risks.length >= RECORDS) {
+        throw new Error(`A workspace holds at most ${RECORDS} risks.`);
+      }
       ws.risks.push({ ...parsed, id, updatedAt: now });
     }
   }, `${parsed.id ? 'Updated' : 'Registered'} risk "${parsed.title}"`);

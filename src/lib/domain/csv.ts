@@ -105,16 +105,57 @@ function monotonic<T extends number>(
   return out;
 }
 
+/**
+ * Size caps, the same ones the editing forms and the JSON import apply
+ * (see domain/schemas.ts). Without them a spreadsheet was the one way to
+ * put an arbitrarily large string into the shared workspace document.
+ */
+export const CSV_MAX_ROWS = 2000;
+const CELL_SHORT = 200;
+const CELL_PROSE = 4000;
+const CELL_LIST_ITEMS = 50;
+const CELL_UPSTREAM = 500;
+
+/** A cell value quoted in an error message, shortened so the message stays small. */
+const quoted = (raw: string) => (raw.length > 40 ? `${raw.slice(0, 40)}...` : raw);
+
 export function parseCsvRecord(record: Record<string, string>, rowNum: number): ParsedRow {
   const errors: string[] = [];
   const warnings: string[] = [];
-  const get = (col: string) => (record[col] ?? '').trim();
+  const cells: Record<string, unknown> =
+    typeof record === 'object' && record !== null ? record : {};
+  const get = (col: string) => {
+    const value = cells[col];
+    return typeof value === 'string' ? value.trim() : '';
+  };
+  const capped = (col: string, max: number) => {
+    const value = get(col);
+    if (value.length > max) {
+      errors.push(`Row ${rowNum}: "${col}" is longer than ${max} characters`);
+      return '';
+    }
+    return value;
+  };
+  const cappedList = (col: string, maxItems: number) => {
+    const items = splitList(get(col));
+    if (items.length > maxItems) {
+      errors.push(`Row ${rowNum}: "${col}" lists more than ${maxItems} items`);
+      return [];
+    }
+    if (items.some((item) => item.length > CELL_SHORT)) {
+      errors.push(`Row ${rowNum}: an item in "${col}" is longer than ${CELL_SHORT} characters`);
+      return [];
+    }
+    return items;
+  };
 
-  const name = get('name');
-  if (!name) errors.push(`Row ${rowNum}: "name" is required`);
+  const name = capped('name', CELL_SHORT);
+  if (!name && !errors.some((e) => e.includes('"name"'))) {
+    errors.push(`Row ${rowNum}: "name" is required`);
+  }
 
   const dependencies = Object.fromEntries(
-    DEPENDENCY_CLASSES.map((c) => [c, splitList(get(DEP_COLUMNS[c]))])
+    DEPENDENCY_CLASSES.map((c) => [c, cappedList(DEP_COLUMNS[c], CELL_LIST_ITEMS)])
   ) as unknown as DependencyMap;
 
   let losses = emptyHorizons<number | null>(null);
@@ -124,7 +165,7 @@ export function parseCsvRecord(record: Record<string, string>, rowNum: number): 
     if (raw === '') continue;
     const n = Number(raw.replace(/[$,\s]/g, ''));
     if (!Number.isFinite(n) || n < 0) {
-      errors.push(`Row ${rowNum}: loss_${HORIZON_SUFFIX[h]} is not a valid amount ("${raw}")`);
+      errors.push(`Row ${rowNum}: loss_${HORIZON_SUFFIX[h]} is not a valid amount ("${quoted(raw)}")`);
     } else {
       losses[h] = n;
       anyAssessment = true;
@@ -140,7 +181,7 @@ export function parseCsvRecord(record: Record<string, string>, rowNum: number): 
         if (raw === '') continue;
         const n = Number(raw);
         if (!Number.isInteger(n) || n < 0 || n > 4) {
-          errors.push(`Row ${rowNum}: ${cat}_${HORIZON_SUFFIX[h]} must be 0-4 ("${raw}")`);
+          errors.push(`Row ${rowNum}: ${cat}_${HORIZON_SUFFIX[h]} must be 0-4 ("${quoted(raw)}")`);
         } else {
           values[h] = n as Severity;
           anyAssessment = true;
@@ -153,13 +194,13 @@ export function parseCsvRecord(record: Record<string, string>, rowNum: number): 
 
   return {
     name,
-    description: get('description'),
-    owner: get('owner'),
-    department: get('department'),
-    usersServed: get('users_served'),
-    peakPeriods: get('peak_periods'),
+    description: capped('description', CELL_PROSE),
+    owner: capped('owner', CELL_SHORT),
+    department: capped('department', CELL_SHORT),
+    usersServed: capped('users_served', CELL_SHORT),
+    peakPeriods: capped('peak_periods', CELL_SHORT),
     dependencies,
-    upstreamNames: splitList(get('upstream')),
+    upstreamNames: cappedList('upstream', CELL_UPSTREAM),
     losses,
     ratings,
     hasAssessment: anyAssessment,
