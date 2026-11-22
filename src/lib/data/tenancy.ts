@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { OrgRole } from '@/lib/domain/authz';
 import { DEFAULT_JOIN_ROLE, ROLE_LABELS, ROLE_RANK } from '@/lib/domain/authz';
+import { lockedClaim } from '@/lib/data/locked-claim';
 import {
   evaluateDomain,
   organizationNameFromDomain,
@@ -201,6 +202,9 @@ async function getSql() {
           output_tokens integer NOT NULL DEFAULT 0
         )`;
       await sql`CREATE INDEX IF NOT EXISTS ai_usage_org_idx ON ai_usage (org_id, at DESC)`;
+      // Tokens held for a generation that is still running. Counted against
+      // the allowance while fresh, replaced by the real usage on settle.
+      await sql`ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS reserved integer NOT NULL DEFAULT 0`;
       // Pre-tenancy workspaces were keyed by user. Move them on first boot
       // after the upgrade so nobody signs in to an empty workspace; the
       // legacy table is left in place so the previous release still reads.
@@ -1085,15 +1089,24 @@ export async function setOrgPlan(orgId: string, plan: string): Promise<void> {
  * Both meters in one round trip. Token spend is windowed to the current
  * month; the exercise count is not, because the free exercise is a one-off
  * trial rather than a monthly allowance.
+ *
+ * A reservation (a generation in flight) counts while it is fresh. One
+ * older than RESERVATION_TTL_MINUTES belongs to an invocation that died
+ * without settling, and is ignored so a crash cannot shrink the allowance.
  */
 export async function aiUsage(orgId: string, since: Date): Promise<AiUsageSummary> {
   const sql = await getSql();
   const rows = (await sql`
     SELECT
       (SELECT plan FROM organizations WHERE id = ${orgId}) AS plan,
-      COALESCE(SUM(input_tokens + output_tokens)
-        FILTER (WHERE at >= ${since.toISOString()}), 0) AS tokens,
-      COUNT(*) FILTER (WHERE feature = 'exercise') AS exercises
+      COALESCE(SUM(
+        input_tokens + output_tokens +
+        CASE WHEN at > now() - make_interval(mins => ${RESERVATION_TTL_MINUTES}) THEN reserved ELSE 0 END
+      ) FILTER (WHERE at >= ${since.toISOString()}), 0) AS tokens,
+      COUNT(*) FILTER (
+        WHERE feature = 'exercise'
+          AND NOT (reserved > 0 AND at <= now() - make_interval(mins => ${RESERVATION_TTL_MINUTES}))
+      ) AS exercises
     FROM ai_usage WHERE org_id = ${orgId}
   `) as { plan: string | null; tokens: string | number; exercises: string | number }[];
   const r = rows[0];
@@ -1104,64 +1117,87 @@ export async function aiUsage(orgId: string, since: Date): Promise<AiUsageSummar
   };
 }
 
-export async function recordAiUsage(entry: {
+/** How long an unsettled reservation keeps counting against the allowance. */
+export const RESERVATION_TTL_MINUTES = 15;
+
+/**
+ * Claim the right to run one generation, before the provider is spent.
+ *
+ * One ledger row is inserted carrying `reserveTokens` as a reservation, and
+ * only while (a) the organization's spend this month, reservations
+ * included, is still under `tokenLimit`, and (b) for the count-limited
+ * exercise feature, fewer than `exerciseLimit` exercises exist. Because
+ * every claim in flight holds a reservation, N simultaneous requests cannot
+ * all pass against the same remaining balance: at most
+ * ceil(tokenLimit / reserveTokens) are admitted. The claim runs under a
+ * per-organization lock (see locked-claim.ts), which is what makes the
+ * check and the insert one atomic step.
+ *
+ * Returns the row id for the caller to settle with real usage, or null
+ * when the allowance does not admit another generation right now.
+ */
+export async function claimAiUsage(args: {
   orgId: string;
   actorUserId: string;
   feature: string;
-  inputTokens: number;
-  outputTokens: number;
-}): Promise<void> {
+  reserveTokens: number;
+  /** Monthly token allowance; null = unmetered. */
+  tokenLimit: number | null;
+  /** Start of the allowance window. */
+  since: Date;
+  /** Lifetime exercise allowance, for the exercise feature; null = no count limit. */
+  exerciseLimit: number | null;
+}): Promise<number | null> {
   const sql = await getSql();
-  await sql`
-    INSERT INTO ai_usage (org_id, actor_user_id, feature, input_tokens, output_tokens)
-    VALUES (${entry.orgId}, ${entry.actorUserId}, ${entry.feature},
-            ${entry.inputTokens}, ${entry.outputTokens})
-  `;
-}
-
-/**
- * Claim a count-limited slot (AI exercises) before the provider is spent.
- * The count check and the ledger insert are one statement — the INSERT only
- * proceeds while the running count is under the limit — so N concurrent
- * starts cannot all pass against the same remaining-count. (The Neon HTTP
- * driver has no multi-statement transactions; atomicity comes from the
- * single INSERT..SELECT.) Returns the claimed row's id for the caller to
- * settle with real usage, or null when no slot remains.
- */
-export async function claimAiExerciseSlot(
-  orgId: string,
-  actorUserId: string,
-  limit: number | null
-): Promise<number | null> {
-  const sql = await getSql();
-  const rows = (await sql`
-    INSERT INTO ai_usage (org_id, actor_user_id, feature)
-    SELECT ${orgId}, ${actorUserId}, 'exercise'
-    WHERE ${limit === null} OR (
-      SELECT count(*) FROM ai_usage
-      WHERE org_id = ${orgId} AND feature = 'exercise'
-    ) < ${limit ?? 0}
-    RETURNING id
-  `) as { id: number }[];
+  const since = args.since.toISOString();
+  const rows = await lockedClaim<{ id: number }>(
+    sql,
+    `ai:${args.orgId}`,
+    (tx) => tx`
+      INSERT INTO ai_usage (org_id, actor_user_id, feature, reserved)
+      SELECT ${args.orgId}, ${args.actorUserId}, ${args.feature}, ${args.reserveTokens}
+      WHERE (${args.tokenLimit === null} OR (
+          SELECT COALESCE(SUM(
+            input_tokens + output_tokens +
+            CASE WHEN at > now() - make_interval(mins => ${RESERVATION_TTL_MINUTES}) THEN reserved ELSE 0 END
+          ), 0)
+          FROM ai_usage WHERE org_id = ${args.orgId} AND at >= ${since}
+        ) < ${args.tokenLimit ?? 0})
+        AND (${args.exerciseLimit === null} OR (
+          SELECT count(*) FROM ai_usage
+          WHERE org_id = ${args.orgId} AND feature = 'exercise'
+            AND NOT (reserved > 0 AND at <= now() - make_interval(mins => ${RESERVATION_TTL_MINUTES}))
+        ) < ${args.exerciseLimit ?? 0})
+      RETURNING id
+    `
+  );
   return rows[0]?.id ?? null;
 }
 
-/** Fill in the actual token usage once the claimed generation succeeds. */
+/**
+ * Replace a claim's reservation with what the generation actually cost.
+ * `feature` re-labels the row, which is how a billed-but-failed exercise
+ * keeps its token charge without consuming the exercise slot.
+ */
 export async function settleAiUsage(
   id: number,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
+  feature?: string
 ): Promise<void> {
   const sql = await getSql();
   await sql`
-    UPDATE ai_usage SET input_tokens = ${inputTokens}, output_tokens = ${outputTokens}
+    UPDATE ai_usage
+    SET input_tokens = ${inputTokens}, output_tokens = ${outputTokens}, reserved = 0,
+        feature = COALESCE(${feature ?? null}, feature)
     WHERE id = ${id}
   `;
 }
 
 /**
- * Return a claimed slot when its generation failed: it was never used, so
- * it must not count against the plan. Only untouched rows are removed.
+ * Return a claim whose generation failed without the provider billing for
+ * it: nothing was used, so it must not count against the plan. Only
+ * unsettled rows are removed.
  */
 export async function refundAiUsage(id: number): Promise<void> {
   const sql = await getSql();

@@ -7,7 +7,7 @@ import type {
   AfterActionReport,
 } from '@/lib/domain/types';
 import { getAnthropic, AI_MODEL } from './client';
-import type { AiResult, TokenUsage } from './quota';
+import { BilledGenerationError, type AiResult, type TokenUsage } from './quota';
 import {
   AiScenarioSchema,
   AarSchema,
@@ -48,13 +48,51 @@ function usageOf(u: {
   };
 }
 
-function assertUsable(stopReason: string | null): void {
-  if (stopReason === 'refusal') {
-    throw new Error('Claude declined to generate this content. Adjust the focus and try again.');
+/**
+ * Ceiling on the tenant text placed in one prompt, roughly 60,000 tokens.
+ * A workspace has no size limit of its own, and input tokens are billed, so
+ * without this one call could carry a whole context window of inventory.
+ * Anything past the ceiling is dropped with a note the model can see.
+ */
+export const MAX_PROMPT_CHARS = 240_000;
+
+export function clampForPrompt(text: string, max: number = MAX_PROMPT_CHARS): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}\n[Truncated: this section is larger than one prompt carries.]`;
+}
+
+type BilledResponse<T> = {
+  stop_reason: string | null;
+  parsed_output: T | null;
+  usage: Parameters<typeof usageOf>[0];
+};
+
+/**
+ * The parsed output of a response, or a BilledGenerationError carrying its
+ * usage. Every one of these outcomes was billed by the provider, so the
+ * error keeps the token counts for the meter instead of dropping them.
+ */
+function usableOutput<T>(response: BilledResponse<T>): T {
+  const usage = usageOf(response.usage);
+  if (response.stop_reason === 'refusal') {
+    throw new BilledGenerationError(
+      'Claude declined to generate this content. Adjust the focus and try again.',
+      usage
+    );
   }
-  if (stopReason === 'max_tokens') {
-    throw new Error('The generation ran out of output tokens. Try a narrower focus.');
+  if (response.stop_reason === 'max_tokens') {
+    throw new BilledGenerationError(
+      'The generation ran out of output tokens. Try a narrower focus.',
+      usage
+    );
   }
+  if (!response.parsed_output) {
+    throw new BilledGenerationError(
+      'Claude returned output that did not match the expected structure.',
+      usage
+    );
+  }
+  return response.parsed_output;
 }
 
 export async function generateScenarioWithClaude(args: {
@@ -74,7 +112,7 @@ export async function generateScenarioWithClaude(args: {
       {
         role: 'user',
         content: scenarioUserPrompt({
-          brief: workspaceBrief(args.ws),
+          brief: clampForPrompt(workspaceBrief(args.ws)),
           baseTitle: args.baseTitle,
           baseSummary: args.baseSummary,
           focus: args.focus,
@@ -84,9 +122,7 @@ export async function generateScenarioWithClaude(args: {
     output_config: { format: zodOutputFormat(AiScenarioSchema) },
   });
 
-  assertUsable(response.stop_reason);
-  const parsed = response.parsed_output;
-  if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
+  const parsed = usableOutput(response);
 
   return {
     value: {
@@ -118,8 +154,8 @@ export async function generateWorkflowWithClaude(args: {
       {
         role: 'user',
         content: workflowUserPrompt({
-          orgBrief: orgBrief(args.ws),
-          processBrief: processBrief(args.ws, args.processId),
+          orgBrief: clampForPrompt(orgBrief(args.ws), 20_000),
+          processBrief: clampForPrompt(processBrief(args.ws, args.processId)),
           focus: args.focus,
           existingStepCount:
             args.ws.workflows.find((w) => w.processId === args.processId)?.steps.length ?? 0,
@@ -129,11 +165,12 @@ export async function generateWorkflowWithClaude(args: {
     output_config: { format: zodOutputFormat(AiWorkflowSchema) },
   });
 
-  assertUsable(response.stop_reason);
-  const parsed = response.parsed_output;
-  if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
+  const parsed = usableOutput(response);
   if (parsed.steps.length === 0) {
-    throw new Error('Claude returned no steps. Add recovery objectives or dependencies and retry.');
+    throw new BilledGenerationError(
+      'Claude returned no steps. Add recovery objectives or dependencies and retry.',
+      usageOf(response.usage)
+    );
   }
   return { value: parsed, usage: usageOf(response.usage) };
 }
@@ -154,19 +191,17 @@ export async function generateRiskSuggestionsWithClaude(args: {
       {
         role: 'user',
         content: riskSuggestUserPrompt({
-          brief: workspaceBrief(args.ws),
-          existing: args.existing,
-          derived: args.derived,
-          priorAi: args.priorAi,
+          brief: clampForPrompt(workspaceBrief(args.ws)),
+          existing: clampForPrompt(args.existing, 40_000),
+          derived: clampForPrompt(args.derived, 40_000),
+          priorAi: clampForPrompt(args.priorAi, 40_000),
         }),
       },
     ],
     output_config: { format: zodOutputFormat(AiRiskSuggestionsSchema) },
   });
 
-  assertUsable(response.stop_reason);
-  const parsed = response.parsed_output;
-  if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
+  const parsed = usableOutput(response);
   return { value: parsed, usage: usageOf(response.usage) };
 }
 
@@ -207,20 +242,18 @@ export async function generateAarWithClaude(args: {
       {
         role: 'user',
         content: aarUserPrompt({
-          brief: workspaceBrief(args.ws),
+          brief: clampForPrompt(workspaceBrief(args.ws)),
           scenarioTitle: session.scenario.title,
           scenarioObjective: session.scenario.objective,
-          transcript,
-          notes,
+          transcript: clampForPrompt(transcript),
+          notes: clampForPrompt(notes, 60_000),
         }),
       },
     ],
     output_config: { format: zodOutputFormat(AarSchema) },
   });
 
-  assertUsable(response.stop_reason);
-  const parsed = response.parsed_output;
-  if (!parsed) throw new Error('Claude returned output that did not match the expected structure.');
+  const parsed = usableOutput(response);
 
   return {
     value: { ...parsed, generatedAt: new Date().toISOString() },

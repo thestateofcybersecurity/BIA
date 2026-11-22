@@ -2,12 +2,14 @@
  * Fixed-window counters for things that must not run unbounded: outbound
  * email per organization, PDF renders and imports per user.
  *
- * With DATABASE_URL the counter is a ledger table and the check-and-claim is
- * one INSERT ... SELECT ... WHERE count < limit, so concurrent callers on
- * different serverless instances cannot all pass against the same remaining
- * count (the same construction as the AI exercise slot). Without a database
- * (demo mode, local dev) a per-process memory window stands in.
+ * With DATABASE_URL the counter is a ledger table. The check-and-claim is an
+ * INSERT ... SELECT ... WHERE count < limit run under a per-scope advisory
+ * lock (see locked-claim.ts), so concurrent callers on different serverless
+ * instances cannot all pass against the same remaining count. Without a
+ * database (demo mode, local dev) a per-process memory window stands in.
  */
+
+import { lockedClaim } from './locked-claim';
 
 type Sql = ReturnType<typeof import('@neondatabase/serverless').neon>;
 
@@ -84,15 +86,19 @@ export async function claimSlot(scope: string, limit: number, windowMs: number):
 
   const sql = await getSql(url);
   const since = new Date(Date.now() - windowMs).toISOString();
-  const rows = (await sql`
-    INSERT INTO usage_events (scope)
-    SELECT ${scope}
-    WHERE (
-      SELECT count(*) FROM usage_events
-      WHERE scope = ${scope} AND at >= ${since}
-    ) < ${limit}
-    RETURNING id
-  `) as { id: number }[];
+  const rows = await lockedClaim<{ id: number }>(
+    sql,
+    `usage:${scope}`,
+    (tx) => tx`
+      INSERT INTO usage_events (scope)
+      SELECT ${scope}
+      WHERE (
+        SELECT count(*) FROM usage_events
+        WHERE scope = ${scope} AND at >= ${since}
+      ) < ${limit}
+      RETURNING id
+    `
+  );
 
   // Opportunistic housekeeping: nothing reads events older than the longest
   // window (one day), so a small fraction of calls sweeps the stale rows.

@@ -137,13 +137,34 @@ class Harness {
   // ---- module fakes ----
 
   neonModule() {
+    // Like the real driver, a tagged-template call builds a query that runs
+    // only when it is awaited (or handed to transaction()), and runs once.
     const run = (strings: TemplateStringsArray, ...values: unknown[]) => {
       let text = strings[0];
       for (let i = 0; i < values.length; i++) text += `$${i + 1}${strings[i + 1]}`;
-      this.statements.push(text);
-      return this.query(text, values);
+      let started: Promise<unknown[]> | null = null;
+      const execute = () => {
+        if (!started) {
+          this.statements.push(text);
+          started = this.query(text, values);
+        }
+        return started;
+      };
+      return {
+        then: (resolve?: (v: unknown[]) => unknown, reject?: (e: unknown) => unknown) =>
+          execute().then(resolve, reject),
+        catch: (reject?: (e: unknown) => unknown) => execute().catch(reject),
+        finally: (fn?: () => void) => execute().finally(fn),
+      };
     };
-    return { neon: () => run, neonConfig: {} };
+    // The driver's batch transaction. Statements run in order on the one
+    // connection, which is the serial execution the real transaction gives.
+    const transaction = async (queries: PromiseLike<unknown>[]) => {
+      const results: unknown[] = [];
+      for (const query of queries) results.push(await query);
+      return results;
+    };
+    return { neon: () => Object.assign(run, { transaction }), neonConfig: {} };
   }
 
   headersModule() {
