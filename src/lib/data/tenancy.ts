@@ -42,8 +42,12 @@ export interface Membership {
 export interface OrgResolution {
   organization: Organization;
   membership: Membership;
-  /** Set when the address could not claim a shared domain. */
-  privateReason: DomainRejection | null;
+  /**
+   * Set when the address could not claim or join a shared domain; 'removed'
+   * when an administrator took this person out of the organization their
+   * domain would otherwise admit them to.
+   */
+  privateReason: DomainRejection | 'removed' | null;
   /** True when this call created the organization and made the user owner. */
   claimed: boolean;
 }
@@ -128,6 +132,16 @@ async function getSql() {
           PRIMARY KEY (org_id, user_id)
         )`;
       await sql`CREATE INDEX IF NOT EXISTS memberships_user_idx ON memberships (user_id)`;
+      // A removal has to outlive the membership row it deletes: without a
+      // record of it, joining by email domain would hand a removed person
+      // their access back on their very next request.
+      await sql`
+        CREATE TABLE IF NOT EXISTS membership_removals (
+          org_id text NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          user_id text NOT NULL,
+          removed_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (org_id, user_id)
+        )`;
       // Workspaces keyed by organization, with a version for optimistic
       // concurrency. The original user-keyed table is left untouched so the
       // previous release can still read it.
@@ -371,14 +385,7 @@ export async function resolveOrgForUser(
 
   const verdict = evaluateDomain(user.email, user.emailVerified);
 
-  if (!verdict.claimable) {
-    const org = await insertOrg(
-      user.email ? `${user.email.split('@')[0]}'s workspace` : 'Private workspace',
-      null
-    );
-    const membership = await upsertMembership(org.id, user.userId, user.email, 'owner');
-    return { organization: org, membership, privateReason: verdict.reason, claimed: true };
-  }
+  if (!verdict.claimable) return privateWorkspace(user, verdict.reason);
 
   const domain = verdict.domain;
   // Only an active domain admits members; a pending claim awaiting DNS
@@ -389,45 +396,75 @@ export async function resolveOrgForUser(
   `) as OrgRow[];
 
   if (claimed.length > 0) {
-    const org = toOrg(claimed[0]);
-    const membership = await upsertMembership(
-      org.id,
-      user.userId,
-      user.email,
-      DEFAULT_JOIN_ROLE
-    );
-    return { organization: org, membership, privateReason: null, claimed: false };
+    return joinByDomain(toOrg(claimed[0]), user);
   }
 
   // First verified arrival from this domain claims it and becomes owner.
+  // A pending claim somebody else typed into a form is not in the way: it
+  // has proven nothing, whereas this person holds a verified mailbox at the
+  // domain, so the pending row is superseded. Only an active row (somebody
+  // claimed it between our lookup and this insert) makes the insert yield.
   const org = await insertOrg(organizationNameFromDomain(domain), domain);
   const inserted = (await sql`
-    INSERT INTO org_domains (domain, org_id, added_by)
-    VALUES (${domain}, ${org.id}, ${user.userId})
-    ON CONFLICT (domain) DO NOTHING
+    INSERT INTO org_domains (domain, org_id, added_by, status)
+    VALUES (${domain}, ${org.id}, ${user.userId}, 'active')
+    ON CONFLICT (domain) DO UPDATE
+      SET org_id = EXCLUDED.org_id,
+          added_by = EXCLUDED.added_by,
+          status = 'active',
+          verification_token = NULL,
+          verified_at = NULL,
+          created_at = now()
+      WHERE org_domains.status = 'pending'
     RETURNING org_id
   `) as { org_id: string }[];
 
   if (inserted.length === 0) {
-    // Someone claimed it between our lookup and our insert. Their claim
-    // stands; we join it and drop the organization we optimistically made.
+    // Someone's active claim landed first. Theirs stands; we join it and
+    // drop the organization we optimistically made.
     const winner = (await sql`
       SELECT o.* FROM org_domains d JOIN organizations o ON o.id = d.org_id
-      WHERE d.domain = ${domain}
+      WHERE d.domain = ${domain} AND d.status = 'active'
     `) as OrgRow[];
     await sql`DELETE FROM organizations WHERE id = ${org.id}`;
-    const winnerOrg = toOrg(winner[0]);
-    const membership = await upsertMembership(
-      winnerOrg.id,
-      user.userId,
-      user.email,
-      DEFAULT_JOIN_ROLE
-    );
-    return { organization: winnerOrg, membership, privateReason: null, claimed: false };
+    if (winner.length > 0) return joinByDomain(toOrg(winner[0]), user);
+    return privateWorkspace(user, null);
   }
 
   const membership = await upsertMembership(org.id, user.userId, user.email, 'owner');
   return { organization: org, membership, privateReason: null, claimed: true };
+}
+
+/** A single-member organization for somebody no shared domain admits. */
+async function privateWorkspace(
+  user: { userId: string; email: string },
+  reason: OrgResolution['privateReason']
+): Promise<OrgResolution> {
+  const org = await insertOrg(
+    user.email ? `${user.email.split('@')[0]}'s workspace` : 'Private workspace',
+    null
+  );
+  const membership = await upsertMembership(org.id, user.userId, user.email, 'owner');
+  return { organization: org, membership, privateReason: reason, claimed: true };
+}
+
+/**
+ * Admit a verified arrival to the organization that holds their domain, at
+ * the lowest role. Somebody an administrator removed from that organization
+ * is not readmitted this way: they get a private workspace instead, and
+ * come back only through an invitation, which is a deliberate act.
+ */
+async function joinByDomain(
+  org: Organization,
+  user: { userId: string; email: string }
+): Promise<OrgResolution> {
+  const sql = await getSql();
+  const removed = (await sql`
+    SELECT 1 FROM membership_removals WHERE org_id = ${org.id} AND user_id = ${user.userId}
+  `) as unknown[];
+  if (removed.length > 0) return privateWorkspace(user, 'removed');
+  const membership = await upsertMembership(org.id, user.userId, user.email, DEFAULT_JOIN_ROLE);
+  return { organization: org, membership, privateReason: null, claimed: false };
 }
 
 /** Every organization a user belongs to, for the switcher. */
@@ -539,9 +576,15 @@ export async function removeMember(
         AND (SELECT count(*) FROM memberships WHERE org_id = ${orgId} AND role = 'owner') > 1
       RETURNING user_id
     `) as { user_id: string }[];
-    return removed.length > 0 ? { ok: true } : { ok: false, reason: 'last_owner' };
+    if (removed.length === 0) return { ok: false, reason: 'last_owner' };
+  } else {
+    await sql`DELETE FROM memberships WHERE org_id = ${orgId} AND user_id = ${targetUserId}`;
   }
-  await sql`DELETE FROM memberships WHERE org_id = ${orgId} AND user_id = ${targetUserId}`;
+  // Remember the removal, so joining by email domain does not undo it.
+  await sql`
+    INSERT INTO membership_removals (org_id, user_id) VALUES (${orgId}, ${targetUserId})
+    ON CONFLICT (org_id, user_id) DO UPDATE SET removed_at = now()
+  `;
   return { ok: true };
 }
 
@@ -595,6 +638,9 @@ export async function listDomains(orgId: string): Promise<DomainClaim[]> {
   return rows.map(toDomain);
 }
 
+/** How long an unproven domain claim keeps other organizations out. */
+export const PENDING_CLAIM_TTL_DAYS = 7;
+
 export type AddDomainResult =
   | { ok: true; claim: DomainClaim }
   | { ok: false; reason: 'not_claimable' | 'taken' };
@@ -618,10 +664,22 @@ export async function addDomainClaim(
 
   const sql = await getSql();
   const token = nanoid(24);
+  // A pending claim holds the name only while it is fresh. One that has sat
+  // unproven for longer than PENDING_CLAIM_TTL_DAYS can be replaced by
+  // another organization's claim, so typing somebody else's domain into the
+  // form cannot lock its real owner out indefinitely. An active claim is
+  // never replaced.
   const rows = (await sql`
     INSERT INTO org_domains (domain, org_id, added_by, status, verification_token)
     VALUES (${domain}, ${orgId}, ${addedBy}, 'pending', ${token})
-    ON CONFLICT (domain) DO NOTHING
+    ON CONFLICT (domain) DO UPDATE
+      SET org_id = EXCLUDED.org_id,
+          added_by = EXCLUDED.added_by,
+          verification_token = EXCLUDED.verification_token,
+          verified_at = NULL,
+          created_at = now()
+      WHERE org_domains.status = 'pending'
+        AND org_domains.created_at < now() - make_interval(days => ${PENDING_CLAIM_TTL_DAYS})
     RETURNING *
   `) as DomainRow[];
   if (rows.length === 0) return { ok: false, reason: 'taken' };
@@ -854,6 +912,11 @@ export async function acceptInvitation(
       : found.invitation.role;
 
   await upsertMembership(found.invitation.orgId, user.userId, user.email, granted);
+  // An invitation is a deliberate readmission; it lifts an earlier removal.
+  await sql`
+    DELETE FROM membership_removals
+    WHERE org_id = ${found.invitation.orgId} AND user_id = ${user.userId}
+  `;
   await sql`
     UPDATE memberships SET role = ${granted}
     WHERE org_id = ${found.invitation.orgId} AND user_id = ${user.userId}
