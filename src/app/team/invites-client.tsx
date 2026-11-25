@@ -77,7 +77,15 @@ export function InvitesClient({
               start(async () => {
                 const result = await inviteMember(email, role);
                 if (result.ok) {
-                  setMessage({ text: `Invitation sent to ${email.trim()}.`, ok: true });
+                  const address = email.trim();
+                  setMessage(
+                    result.note
+                      ? {
+                          text: `Invitation created for ${address}, but it was not emailed. ${result.note} Copy the link below and pass it on yourself.`,
+                          ok: false,
+                        }
+                      : { text: `Invitation sent to ${address}.`, ok: true }
+                  );
                   setLink(result.link ?? null);
                   setEmail('');
                   router.refresh();

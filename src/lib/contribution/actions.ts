@@ -2,8 +2,9 @@
 
 import { z } from 'zod';
 import { getStore } from '@/lib/data/store';
+import { PROSE } from '@/lib/domain/schemas';
 import { isAssessmentComplete } from '@/lib/domain/scoring';
-import { verifyContributionToken } from './token';
+import { tokenIssuedTo, verifyContributionToken } from './token';
 import type { ImpactAssessment } from '@/lib/domain/types';
 
 /**
@@ -26,7 +27,9 @@ const submissionSchema = z.object({
     legal: horizons(severity.nullable()),
     safety: horizons(severity.nullable()),
   }),
-  notes: z.string(),
+  // The same cap the signed-in assessment form applies. This is the one
+  // write an unauthenticated visitor can make, so it gets no looser rules.
+  notes: z.string().max(PROSE),
 });
 
 export type SubmitResult =
@@ -36,15 +39,22 @@ export type SubmitResult =
 export async function submitContribution(
   input: z.infer<typeof submissionSchema>
 ): Promise<SubmitResult> {
-  const parsed = submissionSchema.parse(input);
-  const verified = verifyContributionToken(parsed.token);
+  // The token is the only credential this action has, so it is checked
+  // before the rest of the payload is validated: an anonymous caller without
+  // a valid link costs one HMAC, not a walk over whatever they sent.
+  const presented = (input as { token?: unknown } | null)?.token;
+  if (typeof presented !== 'string' || presented.length > 2048) return { ok: false, reason: 'invalid' };
+  const verified = verifyContributionToken(presented);
   if (!verified.ok) return { ok: false, reason: 'invalid' };
+  const parsed = submissionSchema.parse(input);
   const { orgId, processId, requestId } = verified.claims;
 
   const store = getStore();
   const { workspace: ws, version } = await store.loadForUpdate(orgId);
   const request = ws.collectionRequests.find((r) => r.id === requestId);
   if (!request || request.processId !== processId) return { ok: false, reason: 'not_found' };
+  // The link must have been minted for the address this request names.
+  if (!tokenIssuedTo(verified.claims, request.email)) return { ok: false, reason: 'invalid' };
   if (request.status === 'revoked') return { ok: false, reason: 'revoked' };
   if (!ws.processes.some((p) => p.id === processId)) return { ok: false, reason: 'not_found' };
 

@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getStore, emptyWorkspace, ConcurrentEditError } from '@/lib/data/store';
 import { isAssessmentComplete } from '@/lib/domain/scoring';
-import { getAuthContext, getUserId } from '@/lib/auth';
+import { getAuthContext, getUserId, requireSession } from '@/lib/auth';
 import {
   assertCan,
   assertCanWriteAssessment,
@@ -13,23 +13,41 @@ import {
   AUDIT_LABELS,
   type Capability,
 } from '@/lib/domain/authz';
-import { recordAudit } from '@/lib/data/tenancy';
+import { recordAudit, listMembers } from '@/lib/data/tenancy';
+import { claimSlot } from '@/lib/data/rate-limit';
 import { withAiQuota } from '@/lib/ai/quota';
 import type { AiStatus, AiAllowance } from '@/lib/ai/quota';
 import type { AiFeature } from '@/lib/domain/plans';
 import { sampleWorkspace } from '@/lib/data/sample';
 import type { RiskSuggestion } from '@/lib/domain/risk-suggestions';
+import {
+  orgSchema,
+  processSchema,
+  assessmentSchema,
+  objectivesSchema,
+  remediationSchema,
+  resourceProfileSchema,
+  workflowSchema,
+  maturityAnswersSchema,
+  progressSchema,
+  suggestionSnapshotSchema,
+  riskSchema,
+  planSchema,
+  notificationPrefsSchema,
+  parseWorkspaceImport,
+  RECORDS,
+  SUGGESTION_TITLE,
+  SUGGESTION_PROSE,
+} from '@/lib/domain/schemas';
 import type {
   Workspace,
   OrgProfile,
-  BusinessProcess,
   ImpactAssessment,
   RecoveryObjectives,
   GapRemediation,
   RecoveryWorkflow,
   RecoveryStep,
   MaturityLevel,
-  DependencyMap,
 } from '@/lib/domain/types';
 
 /**
@@ -76,7 +94,7 @@ async function withWorkspace(
 export async function loadWorkspace(): Promise<Workspace> {
   const ctx = await getAuthContext();
   const ws = await getStore().load(ctx.organization.id);
-  return redactWorkspaceFor(ws, ctx.role);
+  return redactWorkspaceFor(ws, ctx.member);
 }
 
 /** Unredacted read for server-side work that has already checked its own access. */
@@ -87,28 +105,8 @@ async function loadWorkspaceRaw(): Promise<Workspace> {
 
 // ---------------- Org profile ----------------
 
-/**
- * Input size caps. Everything here lands in one JSONB document that is read
- * and written whole on every action, so an unbounded string lets one field
- * slow every page for the whole organization.
- */
-const SHORT = 200;
-const PROSE = 4000;
-const LIST_ITEMS = 50;
-const short = z.string().max(SHORT);
-const prose = z.string().max(PROSE);
-
-const orgSchema = z.object({
-  name: z.string().trim().min(1).max(SHORT),
-  industry: z.string().trim().max(SHORT),
-  regulatoryContext: z.string().trim().max(PROSE),
-  annualRevenue: z.number().positive(),
-  employees: z.number().int().positive(),
-  riskAppetite: z.enum(['conservative', 'moderate', 'aggressive']),
-  currency: z.string().trim().min(3).max(3),
-});
-
 export async function saveOrg(input: Omit<OrgProfile, 'updatedAt'>) {
+  await requireSession();
   const parsed = orgSchema.parse(input);
   await withWorkspace('profile:write', (ws) => {
     ws.org = { ...parsed, updatedAt: new Date().toISOString() };
@@ -117,30 +115,8 @@ export async function saveOrg(input: Omit<OrgProfile, 'updatedAt'>) {
 
 // ---------------- Processes ----------------
 
-const depsSchema: z.ZodType<DependencyMap> = z.object({
-  people: z.array(short).max(LIST_ITEMS),
-  applications: z.array(short).max(LIST_ITEMS),
-  equipment: z.array(short).max(LIST_ITEMS),
-  facilities: z.array(short).max(LIST_ITEMS),
-  suppliers: z.array(short).max(LIST_ITEMS),
-  data: z.array(short).max(LIST_ITEMS),
-});
-
-const processSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().trim().min(1).max(SHORT),
-  description: prose,
-  owner: short,
-  ownerEmail: z.string().trim().max(SHORT).optional(),
-  ownerPhone: z.string().trim().max(40).optional(),
-  department: short,
-  usersServed: short,
-  peakPeriods: short,
-  dependencies: depsSchema,
-  upstreamProcessIds: z.array(z.string()).max(500),
-});
-
 export async function saveProcess(input: z.infer<typeof processSchema>) {
+  await requireSession();
   const parsed = processSchema.parse(input);
   const now = new Date().toISOString();
   // Minted up front so a concurrency retry reuses the same id; assigning
@@ -151,6 +127,13 @@ export async function saveProcess(input: z.infer<typeof processSchema>) {
     if (existing) {
       Object.assign(existing, { ...parsed, id, updatedAt: now });
     } else {
+      // An id in the request names a record to update. It never mints one:
+      // new records get a server-generated id, so a caller cannot choose
+      // what a record is called in URLs, tokens, or the audit trail.
+      if (parsed.id !== undefined) throw new Error('Process not found');
+      if (ws.processes.length >= RECORDS) {
+        throw new Error(`A workspace holds at most ${RECORDS} processes.`);
+      }
       ws.processes.push({ ...parsed, id, createdAt: now, updatedAt: now });
     }
   }, `${parsed.id ? 'Updated' : 'Added'} process "${parsed.name}"`);
@@ -189,32 +172,8 @@ export async function deleteProcess(id: string) {
 
 // ---------------- Impact assessment ----------------
 
-const severity = z.union([
-  z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4),
-]).nullable();
-
-const horizonRecord = <T extends z.ZodTypeAny>(v: T) =>
-  z.object({ h4: v, h24: v, d3: v, w1: v, m1: v });
-
-const assessmentSchema = z.object({
-  processId: z.string().min(1),
-  financialLoss: horizonRecord(z.number().min(0).nullable()),
-  ratings: z.object({
-    operational: horizonRecord(severity),
-    reputational: horizonRecord(severity),
-    legal: horizonRecord(severity),
-    safety: horizonRecord(severity),
-  }),
-  mtpdOverride: z
-    .object({
-      value: z.enum(['h4', 'h24', 'd3', 'w1', 'm1', 'beyond']),
-      justification: z.string().trim().min(1).max(PROSE),
-    })
-    .nullable(),
-  notes: prose,
-});
-
 export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
+  await requireSession();
   const parsed = assessmentSchema.parse(input);
   const now = new Date().toISOString();
   let becameAwaitingSignOff = false;
@@ -223,9 +182,13 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
   let snapshot: Workspace | null = null;
   const ctx = await getAuthContext();
   await withWorkspace('assessment:writeOwn', (ws) => {
-    // Coordinators write any assessment; a contributor only their own.
+    // Coordinators write any assessment; a contributor only their own. An
+    // assessment for a process that does not exist is refused outright:
+    // there is nothing to scope it to, and an orphan record would otherwise
+    // let a contributor write into the shared document unchecked.
     const target = ws.processes.find((p) => p.id === parsed.processId);
-    if (target) assertCanWriteAssessment(ctx.member, target);
+    if (!target) throw new Error('Process not found');
+    assertCanWriteAssessment(ctx.member, target);
     const existing = ws.assessments.find((a) => a.processId === parsed.processId);
     const wasCompleteAndUnapproved =
       existing != null && isAssessmentComplete(existing) && !existing.approvedBy;
@@ -260,12 +223,14 @@ export async function saveAssessment(input: z.infer<typeof assessmentSchema>) {
   if (becameAwaitingSignOff && snapshot) {
     const { notifyWorkspaceUser } = await import('@/lib/email/send');
     const { signOffRequestEmail } = await import('@/lib/email/templates');
-    await notifyWorkspaceUser(
-      snapshot,
-      await getUserId(),
-      'signOffRequests',
-      signOffRequestEmail({ processName, owner: processOwner })
-    );
+    await notifyWorkspaceUser({
+      orgId: ctx.organization.id,
+      ws: snapshot,
+      userId: ctx.userId,
+      kind: 'signOffRequests',
+      content: signOffRequestEmail({ processName, owner: processOwner }),
+      sender: { emailVerified: ctx.emailVerified },
+    });
   }
 }
 
@@ -292,18 +257,8 @@ export async function approveAssessment(processId: string, approver: string) {
 
 // ---------------- Recovery objectives ----------------
 
-const objectivesSchema = z.object({
-  processId: z.string().min(1),
-  rtoTargetHours: z.number().min(0).nullable(),
-  rpoTargetHours: z.number().min(0).nullable(),
-  mbcoPercent: z.number().min(0).max(100).nullable(),
-  rtoAchievableHours: z.number().min(0).nullable(),
-  rpoAchievableHours: z.number().min(0).nullable(),
-  wrtHours: z.number().min(0).nullable(),
-  dataLossNotes: prose,
-});
-
 export async function saveObjectives(input: z.infer<typeof objectivesSchema>) {
+  await requireSession();
   const parsed = objectivesSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace('objectives:write', (ws) => {
@@ -316,29 +271,8 @@ export async function saveObjectives(input: z.infer<typeof objectivesSchema>) {
   });
 }
 
-const remediationSchema = z.object({
-  processId: z.string().min(1),
-  kind: z.enum(['rto', 'rpo']),
-  owner: short,
-  action: prose,
-  status: z.enum(['open', 'in_progress', 'resolved', 'accepted']),
-  strategy: z
-    .enum([
-      'workaround',
-      'alternate_site',
-      'standby',
-      'third_party',
-      'capacity',
-      'data_protection',
-      'accept',
-    ])
-    .nullable()
-    .optional(),
-  estimatedCost: z.number().min(0).nullable().optional(),
-  targetDate: z.string().max(40).nullable().optional(),
-});
-
 export async function saveRemediation(input: z.infer<typeof remediationSchema>) {
+  await requireSession();
   const parsed = remediationSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace('objectives:write', (ws) => {
@@ -355,20 +289,10 @@ export async function saveRemediation(input: z.infer<typeof remediationSchema>) 
 
 // ---------------- Recovery resource profiles ----------------
 
-const horizonNumbers = horizonRecord(z.number().min(0).nullable());
-
-const resourceProfileSchema = z.object({
-  processId: z.string().min(1),
-  staff: horizonNumbers,
-  workstations: horizonNumbers,
-  facilitySeats: horizonNumbers,
-  vitalRecords: z.array(short).max(LIST_ITEMS),
-  notes: prose,
-});
-
 export async function saveResourceProfile(
   input: z.infer<typeof resourceProfileSchema>
 ) {
+  await requireSession();
   const parsed = resourceProfileSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace('workflow:write', (ws) => {
@@ -383,21 +307,8 @@ export async function saveResourceProfile(
 
 // ---------------- Recovery workflows ----------------
 
-const stepSchema = z.object({
-  id: z.string(),
-  description: z.string().max(1000),
-  team: short,
-  durationHours: z.number().min(0),
-  dependencies: depsSchema,
-  alternateStaff: z.array(short).max(LIST_ITEMS),
-});
-
-const workflowSchema = z.object({
-  processId: z.string().min(1),
-  steps: z.array(stepSchema).max(200),
-});
-
 export async function saveWorkflow(input: z.infer<typeof workflowSchema>) {
+  await requireSession();
   const parsed = workflowSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace('workflow:write', (ws) => {
@@ -413,14 +324,10 @@ export async function saveWorkflow(input: z.infer<typeof workflowSchema>) {
 
 // ---------------- Maturity ----------------
 
-/** Question ids are short slugs; levels are the anchored 0-5 scale or null. */
-const maturityAnswersSchema = z
-  .record(z.string().max(64), z.number().int().min(0).max(5).nullable())
-  .refine((a) => Object.keys(a).length <= 200, { message: 'Too many answers in one save' });
-
 export async function saveMaturityAnswers(
   input: Record<string, MaturityLevel | null>
 ) {
+  await requireSession();
   const parsed = maturityAnswersSchema.parse(input) as Record<string, MaturityLevel | null>;
   await withWorkspace('maturity:write', (ws) => {
     ws.maturity = {
@@ -448,7 +355,17 @@ export interface ImportResult {
 export async function importCsv(
   records: Record<string, string>[]
 ): Promise<ImportResult> {
-  const { parseCsvRecord } = await import('@/lib/domain/csv');
+  await requireSession();
+  const { parseCsvRecord, CSV_MAX_ROWS } = await import('@/lib/domain/csv');
+  if (!Array.isArray(records) || records.length > CSV_MAX_ROWS) {
+    return {
+      created: 0,
+      updated: 0,
+      assessments: 0,
+      errors: [`An import holds at most ${CSV_MAX_ROWS} rows. Split the sheet and import it in parts.`],
+      warnings: [],
+    };
+  }
   const rows = records.map((r, i) => parseCsvRecord(r, i + 2));
   const baseWarnings = rows.flatMap((r) => r.warnings);
   const result: ImportResult = {
@@ -460,6 +377,10 @@ export async function importCsv(
   };
   const valid = rows.filter((r) => r.errors.length === 0);
   if (valid.length === 0) return result;
+  if (!(await claimImportSlot())) {
+    result.errors.push(IMPORT_RATE_MESSAGE);
+    return result;
+  }
 
   const now = new Date().toISOString();
   // Counted per attempt and committed only after the save succeeds, so a
@@ -490,6 +411,9 @@ export async function importCsv(
         processId = existing.id;
         updated++;
       } else {
+        if (ws.processes.length >= RECORDS) {
+          throw new Error(`A workspace holds at most ${RECORDS} processes.`);
+        }
         processId = nanoid(10);
         const createdRow = {
           ...fields,
@@ -512,10 +436,17 @@ export async function importCsv(
           notes: '',
           updatedAt: now,
         };
-        if (assessment) {
-          Object.assign(assessment, payload);
-        } else {
+        if (!assessment) {
           ws.assessments.push({ id: nanoid(10), processId, ...payload });
+        } else if (
+          JSON.stringify([assessment.financialLoss, assessment.ratings]) !==
+          JSON.stringify([payload.financialLoss, payload.ratings])
+        ) {
+          // The sheet changes figures somebody may have signed off. As with
+          // an edit through the form, the sign-off does not carry over to
+          // numbers its author never saw. A re-import of identical figures
+          // leaves the assessment, and its sign-off, alone.
+          Object.assign(assessment, payload, { approvedBy: null, approvedAt: null });
         }
         assessments++;
       }
@@ -587,7 +518,7 @@ export async function startAiExercise(
 
   const base = CATALOG.find((s) => s.id === scenarioId);
   if (!base) throw new Error('Unknown scenario');
-  focus = focus.trim().slice(0, 1000);
+  focus = String(focus ?? '').trim().slice(0, 1000);
 
   // Checked before the call, not just before the save: a member who cannot
   // run exercises must not be able to spend the organization's allowance.
@@ -629,25 +560,8 @@ export async function startAiExercise(
   return { id };
 }
 
-const progressSchema = z
-  .object({
-    sessionId: z.string().min(1),
-    currentPhase: z.number().int().min(0),
-    responses: z.record(z.string(), z.string().max(5000)),
-    notes: z.array(
-      z.object({
-        id: z.string(),
-        text: z.string().max(5000),
-        phase: z.number().int().nullable(),
-        at: z.string(),
-      })
-    ),
-  })
-  .refine((p) => Object.keys(p.responses).length <= 1000 && p.notes.length <= 500, {
-    message: 'Too much session content in one save',
-  });
-
 export async function saveExerciseProgress(input: z.infer<typeof progressSchema>) {
+  await requireSession();
   const parsed = progressSchema.parse(input);
   await withWorkspace('exercise:run', (ws) => {
     const session = ws.exercises.find((e) => e.id === parsed.sessionId);
@@ -676,14 +590,16 @@ export async function generateExerciseReport(sessionId: string) {
   if (!aiEnabled()) throw new Error('The after-action report requires ANTHROPIC_API_KEY to be configured.');
   const { generateAarWithClaude } = await import('@/lib/ai/generate');
 
+  // The role check comes first, like every other action: a member who may
+  // not run exercises gets the same refusal whether or not the id exists.
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'exercise:run');
+  assertCan(ctx.role, 'ai:generate');
   const ws = await loadWorkspace();
   const session = ws.exercises.find((e) => e.id === sessionId);
   if (!session) throw new Error('Session not found');
   if (session.status !== 'completed') throw new Error('Complete the exercise before generating the report.');
 
-  const ctx = await getAuthContext();
-  assertCan(ctx.role, 'exercise:run');
-  assertCan(ctx.role, 'ai:generate');
   const report = await withAiQuota(
     { orgId: ctx.organization.id, userId: ctx.userId },
     'aar',
@@ -698,17 +614,19 @@ export async function generateExerciseReport(sessionId: string) {
 
   const { notifyWorkspaceUser } = await import('@/lib/email/send');
   const { aarReadyEmail } = await import('@/lib/email/templates');
-  await notifyWorkspaceUser(
+  await notifyWorkspaceUser({
+    orgId: ctx.organization.id,
     ws,
-    await getUserId(),
-    'aarReady',
-    aarReadyEmail({
+    userId: ctx.userId,
+    kind: 'aarReady',
+    content: aarReadyEmail({
       exerciseTitle: session.scenario.title,
       sessionId,
       recommendationCount: report.recommendations.length,
       highPriorityCount: report.recommendations.filter((r) => r.priority === 'high').length,
-    })
-  );
+    }),
+    sender: { emailVerified: ctx.emailVerified },
+  });
 }
 
 export async function deleteExercise(sessionId: string) {
@@ -743,13 +661,13 @@ export async function draftWorkflowWithAi(
 
   // The focus is free text headed straight into the prompt; a cap keeps it
   // from inflating input tokens charged against the org's allowance.
-  focus = focus.trim().slice(0, 1000);
-  const ws = await loadWorkspace();
-  if (!ws.processes.some((p) => p.id === processId)) throw new Error('Process not found');
-
   const ctx = await getAuthContext();
   assertCan(ctx.role, 'workflow:write');
   assertCan(ctx.role, 'ai:generate');
+  focus = String(focus ?? '').trim().slice(0, 1000);
+  const ws = await loadWorkspace();
+  if (!ws.processes.some((p) => p.id === processId)) throw new Error('Process not found');
+
   const draft = await withAiQuota(
     { orgId: ctx.organization.id, userId: ctx.userId },
     'workflow',
@@ -816,18 +734,20 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
     )
   );
 
+  // Generated text is clamped to the caps a stored suggestion must meet, so
+  // a long answer can still be dismissed, accepted, exported, and re-imported.
   const candidates: RiskSuggestion[] = result.suggestions.map((s) => ({
     id: '',
-    title: s.title,
-    category: s.category,
-    description: s.description,
+    title: s.title.slice(0, SUGGESTION_TITLE),
+    category: s.category.slice(0, 100),
+    description: s.description.slice(0, SUGGESTION_PROSE),
     // Names are mapped back to ids here; anything that does not match a real
     // process is dropped rather than trusted.
     processIds: s.processNames
       .map((n) => byName.get(n.trim().toLowerCase()))
       .filter((id): id is string => id != null),
     dependencies: s.dependencies.filter((d) => knownDeps.has(d.trim().toLowerCase())),
-    basis: s.rationale,
+    basis: s.rationale.slice(0, SUGGESTION_PROSE),
     source: 'ai' as const,
   }));
 
@@ -882,16 +802,6 @@ export async function suggestRisksWithAi(): Promise<RiskSuggestion[]> {
   ];
 }
 
-const suggestionSnapshotSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  category: z.string(),
-  description: z.string(),
-  processIds: z.array(z.string()),
-  dependencies: z.array(z.string()),
-  basis: prose,
-});
-
 /**
  * Record a decision about a suggestion so it does not come back.
  *
@@ -904,6 +814,7 @@ async function markSuggestion(
   input: z.infer<typeof suggestionSnapshotSchema>,
   status: 'dismissed' | 'added'
 ) {
+  await requireSession();
   const snapshot = suggestionSnapshotSchema.parse(input);
   const now = new Date().toISOString();
   await withWorkspace(
@@ -928,24 +839,8 @@ export async function acceptRiskSuggestion(input: z.infer<typeof suggestionSnaps
 
 // ---------------- Risk register ----------------
 
-const riskSchema = z.object({
-  id: z.string().optional(),
-  title: z.string().trim().min(1).max(SHORT),
-  category: z.string().max(100),
-  description: prose,
-  processIds: z.array(z.string()).max(500),
-  dependencies: z.array(short).max(LIST_ITEMS),
-  likelihood: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
-  likelihoodRationale: prose,
-  existingControls: prose,
-  treatment: z.enum(['avoid', 'reduce', 'transfer', 'accept']).nullable(),
-  treatmentAction: prose,
-  owner: short,
-  targetDate: z.string().max(40).nullable(),
-  status: z.enum(['open', 'treating', 'treated', 'accepted']),
-});
-
 export async function saveRisk(input: z.infer<typeof riskSchema>) {
+  await requireSession();
   const parsed = riskSchema.parse(input);
   const now = new Date().toISOString();
   // Minted up front so a concurrency retry reuses the same id; assigning
@@ -956,6 +851,11 @@ export async function saveRisk(input: z.infer<typeof riskSchema>) {
     if (existing) {
       Object.assign(existing, { ...parsed, id, updatedAt: now });
     } else {
+      // As with processes: a supplied id updates, it never creates.
+      if (parsed.id !== undefined) throw new Error('Risk not found');
+      if (ws.risks.length >= RECORDS) {
+        throw new Error(`A workspace holds at most ${RECORDS} risks.`);
+      }
       ws.risks.push({ ...parsed, id, updatedAt: now });
     }
   }, `${parsed.id ? 'Updated' : 'Registered'} risk "${parsed.title}"`);
@@ -976,6 +876,12 @@ export async function deleteRisk(id: string) {
  * Ask a process owner to complete their own impact assessment through a
  * signed link. Creating a new request supersedes any earlier one for the
  * same process, so a resend invalidates the previous link.
+ *
+ * The request goes to the owner on record. An `emailOverride` is honored
+ * only for an address the organization already knows (a current member or
+ * the recorded owner), and the coordinator's own address must be verified:
+ * together these keep the flow from becoming a way to mail arbitrary
+ * strangers from the app's domain with workspace text in the body.
  */
 export async function requestAssessmentFromOwner(processId: string, emailOverride?: string) {
   const { createContributionToken, contributionsEnabled, CONTRIBUTION_TTL_MS } = await import(
@@ -987,12 +893,27 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
 
   const ctx = await getAuthContext();
   assertCan(ctx.role, 'collection:manage');
+  if (!ctx.emailVerified) return { ok: false as const, reason: 'unverified' as const };
   const store = getStore();
   const { workspace: ws, version } = await store.loadForUpdate(ctx.organization.id);
   const process = ws.processes.find((p) => p.id === processId);
   if (!process) return { ok: false as const, reason: 'not_found' as const };
 
-  const address = (emailOverride ?? process.ownerEmail ?? '').trim();
+  let address = (process.ownerEmail ?? '').trim();
+  if (emailOverride !== undefined && emailOverride.trim() !== '') {
+    const { overrideAllowed } = await import('@/lib/email/policy');
+    const { getUserContacts } = await import('@/lib/email/recipients');
+    const members = await listMembers(ctx.organization.id);
+    const contacts = await getUserContacts(members.map((m) => m.userId));
+    const memberEmails = [
+      ...members.map((m) => m.email),
+      ...[...contacts.values()].map((c) => c.email),
+    ].filter((e) => e !== '');
+    if (!overrideAllowed(emailOverride, { ownerEmail: process.ownerEmail, memberEmails })) {
+      return { ok: false as const, reason: 'not_allowed' as const };
+    }
+    address = emailOverride.trim();
+  }
   if (!address) return { ok: false as const, reason: 'no_email' as const };
 
   const now = new Date();
@@ -1006,9 +927,10 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
     processId,
     requestId,
     issuedAt: now.getTime(),
+    email: address,
   });
 
-  const { emailEnabled, APP_URL } = await import('@/lib/email/client');
+  const { APP_URL } = await import('@/lib/email/client');
   const link = `${APP_URL}/contribute/${token}`;
 
   // Persist first: a crash or concurrency loss after the email is sent would
@@ -1027,39 +949,35 @@ export async function requestAssessmentFromOwner(processId: string, emailOverrid
   if (!(await store.save(ctx.organization.id, ws, version))) throw new ConcurrentEditError();
   revalidatePath('/', 'layout');
 
-  let emailed = false;
-  if (emailEnabled()) {
-    const { getResend, EMAIL_FROM } = await import('@/lib/email/client');
-    const { assessmentRequestEmail } = await import('@/lib/email/templates');
-    const content = assessmentRequestEmail({
+  const { sendOrgEmail } = await import('@/lib/email/send');
+  const { assessmentRequestEmail } = await import('@/lib/email/templates');
+  const sent = await sendOrgEmail({
+    orgId: ctx.organization.id,
+    to: address,
+    content: assessmentRequestEmail({
       orgName: ws.org?.name ?? 'your organization',
       processName: process.name,
       ownerName: process.owner,
       link,
       expiresInDays: Math.round(CONTRIBUTION_TTL_MS / (24 * 60 * 60 * 1000)),
-    });
-    try {
-      const { error } = await getResend().emails.send({
-        from: EMAIL_FROM,
-        to: address,
-        subject: content.subject,
-        html: content.html,
-        text: content.text,
-      });
-      if (error) console.error('[email] assessment request failed:', error.message ?? error);
-      else emailed = true;
-    } catch (e) {
-      console.error('[email] assessment request threw:', e instanceof Error ? e.message : e);
-    }
-    // Record whether delivery worked; the request already exists either way
+    }),
+    sender: { emailVerified: ctx.emailVerified },
+  });
+  if (sent.ok) {
+    // Record that delivery worked; the request already exists either way
     // and the link is returned so the coordinator can pass it on by hand.
     await withWorkspace('collection:manage', (w) => {
       const stored = w.collectionRequests.find((r) => r.id === requestId);
-      if (stored) stored.emailed = emailed;
+      if (stored) stored.emailed = true;
     });
   }
 
-  return { ok: true as const, link, emailed };
+  return {
+    ok: true as const,
+    link,
+    emailed: sent.ok,
+    emailFailure: sent.ok ? null : sent.reason,
+  };
 }
 
 export async function revokeAssessmentRequest(requestId: string) {
@@ -1071,44 +989,8 @@ export async function revokeAssessmentRequest(requestId: string) {
 
 // ---------------- Continuity plan (activation & comms) ----------------
 
-const planSchema = z.object({
-  declarationAuthority: short,
-  standDownAuthority: short,
-  commandLocation: short,
-  bridgeDetails: short,
-  team: z.array(
-    z.object({
-      id: z.string(),
-      role: short,
-      name: short,
-      title: short,
-      email: short,
-      phone: z.string().max(40),
-      deputy: short,
-      deputyPhone: z.string().max(40),
-    })
-  ).max(50),
-  triggers: z.array(
-    z.object({
-      id: z.string(),
-      level: z.enum(['monitor', 'partial', 'full']),
-      condition: prose,
-      authority: short,
-    })
-  ).max(20),
-  communications: z.array(
-    z.object({
-      id: z.string(),
-      audience: short,
-      channel: short,
-      timing: short,
-      owner: short,
-      keyMessage: prose,
-    })
-  ).max(30),
-});
-
 export async function savePlan(input: z.infer<typeof planSchema>) {
+  await requireSession();
   const parsed = planSchema.parse(input);
   await withWorkspace('plan:write', (ws) => {
     ws.plan = { ...parsed, updatedAt: new Date().toISOString() };
@@ -1117,15 +999,10 @@ export async function savePlan(input: z.infer<typeof planSchema>) {
 
 // ---------------- Notification preferences ----------------
 
-const notificationPrefsSchema = z.object({
-  signOffRequests: z.boolean(),
-  aarReady: z.boolean(),
-  reviewReminders: z.boolean(),
-});
-
 export async function saveNotificationPrefs(
   input: z.infer<typeof notificationPrefsSchema>
 ) {
+  await requireSession();
   const parsed = notificationPrefsSchema.parse(input);
   await withWorkspace('notifications:manage', (ws) => {
     ws.notifications = parsed;
@@ -1140,6 +1017,7 @@ export async function saveNotificationPrefs(
 export async function saveMyNotificationPrefs(
   input: z.infer<typeof notificationPrefsSchema>
 ) {
+  await requireSession();
   const parsed = notificationPrefsSchema.parse(input);
   const userId = await getUserId();
   await withWorkspace(
@@ -1166,18 +1044,39 @@ export async function resetWorkspace() {
   }, 'Erased the entire workspace');
 }
 
-export async function importWorkspace(json: string) {
-  // Capped before parsing: the workspace is one document read whole forever
-  // after, so a bloated import is a permanent tax on every action.
-  if (json.length > 20_000_000) throw new Error('That export is too large to import.');
-  const parsed = JSON.parse(json) as Workspace;
-  // Minimal shape check; detailed validation happens on next edit of each record.
-  if (typeof parsed !== 'object' || parsed === null || !Array.isArray(parsed.processes)) {
-    throw new Error('Not a valid workspace export');
-  }
+/**
+ * Imports and CSV/Excel uploads are the two heaviest things a member can
+ * ask the server to do, and both rewrite the shared document, so each user
+ * gets a few per minute. Counted in the database so the limit holds across
+ * serverless instances.
+ */
+const IMPORT_RATE_MESSAGE = 'Too many imports in the last minute. Wait a moment and try again.';
+
+async function claimImportSlot(): Promise<boolean> {
+  const ctx = await getAuthContext();
+  return claimSlot(`import:${ctx.userId}`, 5, 60_000);
+}
+
+/**
+ * Replace the workspace with an exported document. The file is validated
+ * against the same schemas every editing action uses, so a hand-crafted
+ * export cannot plant malformed records that break every page for the
+ * organization, and unknown keys are dropped. Personal email mutes are
+ * kept from the current workspace: they belong to the people who set them,
+ * not to whoever produced the file.
+ */
+export async function importWorkspace(
+  json: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ctx = await getAuthContext();
+  assertCan(ctx.role, 'workspace:destroy');
+  if (!(await claimImportSlot())) return { ok: false, message: IMPORT_RATE_MESSAGE };
+  const parsed = parseWorkspaceImport(json);
+  if (!parsed.ok) return parsed;
   await withWorkspace('workspace:destroy', (ws) => {
-    Object.assign(ws, { ...emptyWorkspace(), ...parsed });
-  });
+    Object.assign(ws, { ...emptyWorkspace(), ...parsed.workspace, emailOptOuts: ws.emailOptOuts });
+  }, 'Replaced the entire workspace with an imported export');
+  return { ok: true };
 }
 
 // ---------------- AI plan limits ----------------

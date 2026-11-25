@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { OrgRole } from '@/lib/domain/authz';
 import { DEFAULT_JOIN_ROLE, ROLE_LABELS, ROLE_RANK } from '@/lib/domain/authz';
+import { lockedClaim } from '@/lib/data/locked-claim';
 import {
   evaluateDomain,
   organizationNameFromDomain,
@@ -42,8 +43,12 @@ export interface Membership {
 export interface OrgResolution {
   organization: Organization;
   membership: Membership;
-  /** Set when the address could not claim a shared domain. */
-  privateReason: DomainRejection | null;
+  /**
+   * Set when the address could not claim or join a shared domain; 'removed'
+   * when an administrator took this person out of the organization their
+   * domain would otherwise admit them to.
+   */
+  privateReason: DomainRejection | 'removed' | null;
   /** True when this call created the organization and made the user owner. */
   claimed: boolean;
 }
@@ -128,6 +133,16 @@ async function getSql() {
           PRIMARY KEY (org_id, user_id)
         )`;
       await sql`CREATE INDEX IF NOT EXISTS memberships_user_idx ON memberships (user_id)`;
+      // A removal has to outlive the membership row it deletes: without a
+      // record of it, joining by email domain would hand a removed person
+      // their access back on their very next request.
+      await sql`
+        CREATE TABLE IF NOT EXISTS membership_removals (
+          org_id text NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          user_id text NOT NULL,
+          removed_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (org_id, user_id)
+        )`;
       // Workspaces keyed by organization, with a version for optimistic
       // concurrency. The original user-keyed table is left untouched so the
       // previous release can still read it.
@@ -187,6 +202,9 @@ async function getSql() {
           output_tokens integer NOT NULL DEFAULT 0
         )`;
       await sql`CREATE INDEX IF NOT EXISTS ai_usage_org_idx ON ai_usage (org_id, at DESC)`;
+      // Tokens held for a generation that is still running. Counted against
+      // the allowance while fresh, replaced by the real usage on settle.
+      await sql`ALTER TABLE ai_usage ADD COLUMN IF NOT EXISTS reserved integer NOT NULL DEFAULT 0`;
       // Pre-tenancy workspaces were keyed by user. Move them on first boot
       // after the upgrade so nobody signs in to an empty workspace; the
       // legacy table is left in place so the previous release still reads.
@@ -371,14 +389,7 @@ export async function resolveOrgForUser(
 
   const verdict = evaluateDomain(user.email, user.emailVerified);
 
-  if (!verdict.claimable) {
-    const org = await insertOrg(
-      user.email ? `${user.email.split('@')[0]}'s workspace` : 'Private workspace',
-      null
-    );
-    const membership = await upsertMembership(org.id, user.userId, user.email, 'owner');
-    return { organization: org, membership, privateReason: verdict.reason, claimed: true };
-  }
+  if (!verdict.claimable) return privateWorkspace(user, verdict.reason);
 
   const domain = verdict.domain;
   // Only an active domain admits members; a pending claim awaiting DNS
@@ -389,45 +400,75 @@ export async function resolveOrgForUser(
   `) as OrgRow[];
 
   if (claimed.length > 0) {
-    const org = toOrg(claimed[0]);
-    const membership = await upsertMembership(
-      org.id,
-      user.userId,
-      user.email,
-      DEFAULT_JOIN_ROLE
-    );
-    return { organization: org, membership, privateReason: null, claimed: false };
+    return joinByDomain(toOrg(claimed[0]), user);
   }
 
   // First verified arrival from this domain claims it and becomes owner.
+  // A pending claim somebody else typed into a form is not in the way: it
+  // has proven nothing, whereas this person holds a verified mailbox at the
+  // domain, so the pending row is superseded. Only an active row (somebody
+  // claimed it between our lookup and this insert) makes the insert yield.
   const org = await insertOrg(organizationNameFromDomain(domain), domain);
   const inserted = (await sql`
-    INSERT INTO org_domains (domain, org_id, added_by)
-    VALUES (${domain}, ${org.id}, ${user.userId})
-    ON CONFLICT (domain) DO NOTHING
+    INSERT INTO org_domains (domain, org_id, added_by, status)
+    VALUES (${domain}, ${org.id}, ${user.userId}, 'active')
+    ON CONFLICT (domain) DO UPDATE
+      SET org_id = EXCLUDED.org_id,
+          added_by = EXCLUDED.added_by,
+          status = 'active',
+          verification_token = NULL,
+          verified_at = NULL,
+          created_at = now()
+      WHERE org_domains.status = 'pending'
     RETURNING org_id
   `) as { org_id: string }[];
 
   if (inserted.length === 0) {
-    // Someone claimed it between our lookup and our insert. Their claim
-    // stands; we join it and drop the organization we optimistically made.
+    // Someone's active claim landed first. Theirs stands; we join it and
+    // drop the organization we optimistically made.
     const winner = (await sql`
       SELECT o.* FROM org_domains d JOIN organizations o ON o.id = d.org_id
-      WHERE d.domain = ${domain}
+      WHERE d.domain = ${domain} AND d.status = 'active'
     `) as OrgRow[];
     await sql`DELETE FROM organizations WHERE id = ${org.id}`;
-    const winnerOrg = toOrg(winner[0]);
-    const membership = await upsertMembership(
-      winnerOrg.id,
-      user.userId,
-      user.email,
-      DEFAULT_JOIN_ROLE
-    );
-    return { organization: winnerOrg, membership, privateReason: null, claimed: false };
+    if (winner.length > 0) return joinByDomain(toOrg(winner[0]), user);
+    return privateWorkspace(user, null);
   }
 
   const membership = await upsertMembership(org.id, user.userId, user.email, 'owner');
   return { organization: org, membership, privateReason: null, claimed: true };
+}
+
+/** A single-member organization for somebody no shared domain admits. */
+async function privateWorkspace(
+  user: { userId: string; email: string },
+  reason: OrgResolution['privateReason']
+): Promise<OrgResolution> {
+  const org = await insertOrg(
+    user.email ? `${user.email.split('@')[0]}'s workspace` : 'Private workspace',
+    null
+  );
+  const membership = await upsertMembership(org.id, user.userId, user.email, 'owner');
+  return { organization: org, membership, privateReason: reason, claimed: true };
+}
+
+/**
+ * Admit a verified arrival to the organization that holds their domain, at
+ * the lowest role. Somebody an administrator removed from that organization
+ * is not readmitted this way: they get a private workspace instead, and
+ * come back only through an invitation, which is a deliberate act.
+ */
+async function joinByDomain(
+  org: Organization,
+  user: { userId: string; email: string }
+): Promise<OrgResolution> {
+  const sql = await getSql();
+  const removed = (await sql`
+    SELECT 1 FROM membership_removals WHERE org_id = ${org.id} AND user_id = ${user.userId}
+  `) as unknown[];
+  if (removed.length > 0) return privateWorkspace(user, 'removed');
+  const membership = await upsertMembership(org.id, user.userId, user.email, DEFAULT_JOIN_ROLE);
+  return { organization: org, membership, privateReason: null, claimed: false };
 }
 
 /** Every organization a user belongs to, for the switcher. */
@@ -539,9 +580,15 @@ export async function removeMember(
         AND (SELECT count(*) FROM memberships WHERE org_id = ${orgId} AND role = 'owner') > 1
       RETURNING user_id
     `) as { user_id: string }[];
-    return removed.length > 0 ? { ok: true } : { ok: false, reason: 'last_owner' };
+    if (removed.length === 0) return { ok: false, reason: 'last_owner' };
+  } else {
+    await sql`DELETE FROM memberships WHERE org_id = ${orgId} AND user_id = ${targetUserId}`;
   }
-  await sql`DELETE FROM memberships WHERE org_id = ${orgId} AND user_id = ${targetUserId}`;
+  // Remember the removal, so joining by email domain does not undo it.
+  await sql`
+    INSERT INTO membership_removals (org_id, user_id) VALUES (${orgId}, ${targetUserId})
+    ON CONFLICT (org_id, user_id) DO UPDATE SET removed_at = now()
+  `;
   return { ok: true };
 }
 
@@ -595,6 +642,9 @@ export async function listDomains(orgId: string): Promise<DomainClaim[]> {
   return rows.map(toDomain);
 }
 
+/** How long an unproven domain claim keeps other organizations out. */
+export const PENDING_CLAIM_TTL_DAYS = 7;
+
 export type AddDomainResult =
   | { ok: true; claim: DomainClaim }
   | { ok: false; reason: 'not_claimable' | 'taken' };
@@ -618,10 +668,22 @@ export async function addDomainClaim(
 
   const sql = await getSql();
   const token = nanoid(24);
+  // A pending claim holds the name only while it is fresh. One that has sat
+  // unproven for longer than PENDING_CLAIM_TTL_DAYS can be replaced by
+  // another organization's claim, so typing somebody else's domain into the
+  // form cannot lock its real owner out indefinitely. An active claim is
+  // never replaced.
   const rows = (await sql`
     INSERT INTO org_domains (domain, org_id, added_by, status, verification_token)
     VALUES (${domain}, ${orgId}, ${addedBy}, 'pending', ${token})
-    ON CONFLICT (domain) DO NOTHING
+    ON CONFLICT (domain) DO UPDATE
+      SET org_id = EXCLUDED.org_id,
+          added_by = EXCLUDED.added_by,
+          verification_token = EXCLUDED.verification_token,
+          verified_at = NULL,
+          created_at = now()
+      WHERE org_domains.status = 'pending'
+        AND org_domains.created_at < now() - make_interval(days => ${PENDING_CLAIM_TTL_DAYS})
     RETURNING *
   `) as DomainRow[];
   if (rows.length === 0) return { ok: false, reason: 'taken' };
@@ -778,6 +840,34 @@ export async function revokeInvitation(orgId: string, id: string): Promise<void>
   `;
 }
 
+/**
+ * Withdraw the pending invitations a member issued. With `aboveRole`, only
+ * those granting more than that role (what the member can no longer hand
+ * out after a demotion); without it, all of them (after a removal).
+ * lookupInvitation refuses such invitations anyway; revoking them makes the
+ * invitation list say so. Returns how many were withdrawn.
+ */
+export async function revokeInvitationsIssuedBy(
+  orgId: string,
+  userId: string,
+  aboveRole?: OrgRole
+): Promise<number> {
+  if (!tenancyEnabled()) return 0;
+  const sql = await getSql();
+  const roles = (Object.keys(ROLE_RANK) as OrgRole[]).filter(
+    (r) => aboveRole === undefined || ROLE_RANK[r] > ROLE_RANK[aboveRole]
+  );
+  if (roles.length === 0) return 0;
+  const rows = (await sql`
+    UPDATE invitations SET revoked_at = now()
+    WHERE org_id = ${orgId} AND invited_by = ${userId}
+      AND accepted_at IS NULL AND revoked_at IS NULL
+      AND role = ANY(${roles})
+    RETURNING id
+  `) as { id: string }[];
+  return rows.length;
+}
+
 export type InviteLookup =
   | { ok: true; invitation: Invitation; organization: Organization }
   | { ok: false; reason: 'not_found' | 'revoked' | 'expired' | 'accepted' };
@@ -805,6 +895,15 @@ export async function lookupInvitation(token: string): Promise<InviteLookup> {
   if (new Date(invitation.expiresAt).getTime() < Date.now()) {
     return { ok: false, reason: 'expired' };
   }
+  // An invitation carries its issuer's authority, so it is only as good as
+  // that authority is today. If the issuer has since been removed, or
+  // demoted below the role the invitation grants, it is treated as
+  // withdrawn: otherwise somebody about to lose access could invite a
+  // second address of their own and walk back in after the removal.
+  const issuer = await getMembership(invitation.orgId, invitation.invitedBy);
+  if (!issuer || ROLE_RANK[issuer.role] < ROLE_RANK[invitation.role]) {
+    return { ok: false, reason: 'revoked' };
+  }
   return {
     ok: true,
     invitation,
@@ -820,21 +919,27 @@ export async function lookupInvitation(token: string): Promise<InviteLookup> {
 
 export type AcceptResult =
   | { ok: true; orgId: string; role: OrgRole }
-  | { ok: false; reason: 'not_found' | 'revoked' | 'expired' | 'accepted' | 'wrong_email' };
+  | {
+      ok: false;
+      reason: 'not_found' | 'revoked' | 'expired' | 'accepted' | 'wrong_email' | 'unverified';
+    };
 
 /**
- * Accept an invitation. The signed-in address must be the one invited:
- * otherwise a forwarded link would hand access to whoever opened it.
+ * Accept an invitation. The signed-in address must be the one invited, and
+ * the identity provider must have verified it: otherwise a forwarded link
+ * would hand access to whoever registered the invited address first, since
+ * registering an address proves nothing about owning the mailbox.
  */
 export async function acceptInvitation(
   token: string,
-  user: { userId: string; email: string }
+  user: { userId: string; email: string; emailVerified: boolean }
 ): Promise<AcceptResult> {
   const found = await lookupInvitation(token);
   if (!found.ok) return { ok: false, reason: found.reason };
   if (found.invitation.email !== user.email.trim().toLowerCase()) {
     return { ok: false, reason: 'wrong_email' };
   }
+  if (!user.emailVerified) return { ok: false, reason: 'unverified' };
   const sql = await getSql();
   const existing = await getMembership(found.invitation.orgId, user.userId);
 
@@ -848,6 +953,11 @@ export async function acceptInvitation(
       : found.invitation.role;
 
   await upsertMembership(found.invitation.orgId, user.userId, user.email, granted);
+  // An invitation is a deliberate readmission; it lifts an earlier removal.
+  await sql`
+    DELETE FROM membership_removals
+    WHERE org_id = ${found.invitation.orgId} AND user_id = ${user.userId}
+  `;
   await sql`
     UPDATE memberships SET role = ${granted}
     WHERE org_id = ${found.invitation.orgId} AND user_id = ${user.userId}
@@ -1016,15 +1126,24 @@ export async function setOrgPlan(orgId: string, plan: string): Promise<void> {
  * Both meters in one round trip. Token spend is windowed to the current
  * month; the exercise count is not, because the free exercise is a one-off
  * trial rather than a monthly allowance.
+ *
+ * A reservation (a generation in flight) counts while it is fresh. One
+ * older than RESERVATION_TTL_MINUTES belongs to an invocation that died
+ * without settling, and is ignored so a crash cannot shrink the allowance.
  */
 export async function aiUsage(orgId: string, since: Date): Promise<AiUsageSummary> {
   const sql = await getSql();
   const rows = (await sql`
     SELECT
       (SELECT plan FROM organizations WHERE id = ${orgId}) AS plan,
-      COALESCE(SUM(input_tokens + output_tokens)
-        FILTER (WHERE at >= ${since.toISOString()}), 0) AS tokens,
-      COUNT(*) FILTER (WHERE feature = 'exercise') AS exercises
+      COALESCE(SUM(
+        input_tokens + output_tokens +
+        CASE WHEN at > now() - make_interval(mins => ${RESERVATION_TTL_MINUTES}) THEN reserved ELSE 0 END
+      ) FILTER (WHERE at >= ${since.toISOString()}), 0) AS tokens,
+      COUNT(*) FILTER (
+        WHERE feature = 'exercise'
+          AND NOT (reserved > 0 AND at <= now() - make_interval(mins => ${RESERVATION_TTL_MINUTES}))
+      ) AS exercises
     FROM ai_usage WHERE org_id = ${orgId}
   `) as { plan: string | null; tokens: string | number; exercises: string | number }[];
   const r = rows[0];
@@ -1035,64 +1154,87 @@ export async function aiUsage(orgId: string, since: Date): Promise<AiUsageSummar
   };
 }
 
-export async function recordAiUsage(entry: {
+/** How long an unsettled reservation keeps counting against the allowance. */
+export const RESERVATION_TTL_MINUTES = 15;
+
+/**
+ * Claim the right to run one generation, before the provider is spent.
+ *
+ * One ledger row is inserted carrying `reserveTokens` as a reservation, and
+ * only while (a) the organization's spend this month, reservations
+ * included, is still under `tokenLimit`, and (b) for the count-limited
+ * exercise feature, fewer than `exerciseLimit` exercises exist. Because
+ * every claim in flight holds a reservation, N simultaneous requests cannot
+ * all pass against the same remaining balance: at most
+ * ceil(tokenLimit / reserveTokens) are admitted. The claim runs under a
+ * per-organization lock (see locked-claim.ts), which is what makes the
+ * check and the insert one atomic step.
+ *
+ * Returns the row id for the caller to settle with real usage, or null
+ * when the allowance does not admit another generation right now.
+ */
+export async function claimAiUsage(args: {
   orgId: string;
   actorUserId: string;
   feature: string;
-  inputTokens: number;
-  outputTokens: number;
-}): Promise<void> {
+  reserveTokens: number;
+  /** Monthly token allowance; null = unmetered. */
+  tokenLimit: number | null;
+  /** Start of the allowance window. */
+  since: Date;
+  /** Lifetime exercise allowance, for the exercise feature; null = no count limit. */
+  exerciseLimit: number | null;
+}): Promise<number | null> {
   const sql = await getSql();
-  await sql`
-    INSERT INTO ai_usage (org_id, actor_user_id, feature, input_tokens, output_tokens)
-    VALUES (${entry.orgId}, ${entry.actorUserId}, ${entry.feature},
-            ${entry.inputTokens}, ${entry.outputTokens})
-  `;
-}
-
-/**
- * Claim a count-limited slot (AI exercises) before the provider is spent.
- * The count check and the ledger insert are one statement — the INSERT only
- * proceeds while the running count is under the limit — so N concurrent
- * starts cannot all pass against the same remaining-count. (The Neon HTTP
- * driver has no multi-statement transactions; atomicity comes from the
- * single INSERT..SELECT.) Returns the claimed row's id for the caller to
- * settle with real usage, or null when no slot remains.
- */
-export async function claimAiExerciseSlot(
-  orgId: string,
-  actorUserId: string,
-  limit: number | null
-): Promise<number | null> {
-  const sql = await getSql();
-  const rows = (await sql`
-    INSERT INTO ai_usage (org_id, actor_user_id, feature)
-    SELECT ${orgId}, ${actorUserId}, 'exercise'
-    WHERE ${limit === null} OR (
-      SELECT count(*) FROM ai_usage
-      WHERE org_id = ${orgId} AND feature = 'exercise'
-    ) < ${limit ?? 0}
-    RETURNING id
-  `) as { id: number }[];
+  const since = args.since.toISOString();
+  const rows = await lockedClaim<{ id: number }>(
+    sql,
+    `ai:${args.orgId}`,
+    (tx) => tx`
+      INSERT INTO ai_usage (org_id, actor_user_id, feature, reserved)
+      SELECT ${args.orgId}, ${args.actorUserId}, ${args.feature}, ${args.reserveTokens}
+      WHERE (${args.tokenLimit === null} OR (
+          SELECT COALESCE(SUM(
+            input_tokens + output_tokens +
+            CASE WHEN at > now() - make_interval(mins => ${RESERVATION_TTL_MINUTES}) THEN reserved ELSE 0 END
+          ), 0)
+          FROM ai_usage WHERE org_id = ${args.orgId} AND at >= ${since}
+        ) < ${args.tokenLimit ?? 0})
+        AND (${args.exerciseLimit === null} OR (
+          SELECT count(*) FROM ai_usage
+          WHERE org_id = ${args.orgId} AND feature = 'exercise'
+            AND NOT (reserved > 0 AND at <= now() - make_interval(mins => ${RESERVATION_TTL_MINUTES}))
+        ) < ${args.exerciseLimit ?? 0})
+      RETURNING id
+    `
+  );
   return rows[0]?.id ?? null;
 }
 
-/** Fill in the actual token usage once the claimed generation succeeds. */
+/**
+ * Replace a claim's reservation with what the generation actually cost.
+ * `feature` re-labels the row, which is how a billed-but-failed exercise
+ * keeps its token charge without consuming the exercise slot.
+ */
 export async function settleAiUsage(
   id: number,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
+  feature?: string
 ): Promise<void> {
   const sql = await getSql();
   await sql`
-    UPDATE ai_usage SET input_tokens = ${inputTokens}, output_tokens = ${outputTokens}
+    UPDATE ai_usage
+    SET input_tokens = ${inputTokens}, output_tokens = ${outputTokens}, reserved = 0,
+        feature = COALESCE(${feature ?? null}, feature)
     WHERE id = ${id}
   `;
 }
 
 /**
- * Return a claimed slot when its generation failed: it was never used, so
- * it must not count against the plan. Only untouched rows are removed.
+ * Return a claim whose generation failed without the provider billing for
+ * it: nothing was used, so it must not count against the plan. Only
+ * unsettled rows are removed.
  */
 export async function refundAiUsage(id: number): Promise<void> {
   const sql = await getSql();

@@ -25,6 +25,9 @@ export function SignInForm() {
         setError(result.error.message ?? 'Authentication failed.');
         setPending(false);
       } else {
+        // A full navigation, not a client transition: the session cookie was
+        // just written and every server component must re-render against it.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = '/';
       }
     } catch (e) {

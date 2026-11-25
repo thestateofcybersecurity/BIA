@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAuthContext, ACTIVE_ORG_COOKIE, INVITE_COOKIE } from '@/lib/auth';
 import { acceptInvitation } from '@/lib/data/tenancy';
+import { VERIFY_FIRST_MESSAGE } from '@/lib/invite-messages';
 
 /**
  * Remember the invitation, then send the visitor to sign in. Creating an
@@ -30,13 +31,17 @@ export async function rememberInviteAndSignIn(token: string): Promise<void> {
  * Accepting an invitation. Kept apart from the administration actions
  * because this is the one membership change a non-member is allowed to make,
  * and only for themselves: the address on the invitation must match the
- * signed-in account, so forwarding the link grants nothing.
+ * signed-in account and be verified, so forwarding the link grants nothing.
  */
 export async function acceptOrgInvitation(
   token: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const ctx = await getAuthContext();
-  const result = await acceptInvitation(token, { userId: ctx.userId, email: ctx.email });
+  const result = await acceptInvitation(token, {
+    userId: ctx.userId,
+    email: ctx.email,
+    emailVerified: ctx.emailVerified,
+  });
 
   if (!result.ok) {
     const messages: Record<typeof result.reason, string> = {
@@ -45,6 +50,7 @@ export async function acceptOrgInvitation(
       expired: 'This invitation has expired.',
       accepted: 'This invitation has already been used.',
       wrong_email: 'This invitation was issued to a different email address.',
+      unverified: VERIFY_FIRST_MESSAGE,
     };
     return { ok: false, message: messages[result.reason] };
   }
@@ -55,6 +61,9 @@ export async function acceptOrgInvitation(
   // Land them in the organization they just joined rather than whichever one
   // they happened to be looking at.
   const jar = await cookies();
+  // The remembered invitation has done its job; without this it would be
+  // re-tried on every request for the rest of its half hour.
+  jar.delete(INVITE_COOKIE);
   jar.set(ACTIVE_ORG_COOKIE, result.orgId, {
     httpOnly: true,
     sameSite: 'lax',

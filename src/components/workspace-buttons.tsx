@@ -97,10 +97,14 @@ export function ImportButton() {
           start(async () => {
             const text = await file.text();
             try {
-              await importWorkspace(text);
+              const result = await importWorkspace(text);
+              if (!result.ok) {
+                alert(result.message);
+                return;
+              }
               router.refresh();
             } catch {
-              alert('That file is not a valid workspace export.');
+              alert('That file could not be imported.');
             }
           });
           e.target.value = '';

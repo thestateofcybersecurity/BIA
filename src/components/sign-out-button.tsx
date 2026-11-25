@@ -12,6 +12,8 @@ export function SignOutButton() {
         } catch (e) {
           console.error(e);
         }
+        // Full reload so no server component keeps rendering the old session.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = '/auth/sign-in';
       }}
     >

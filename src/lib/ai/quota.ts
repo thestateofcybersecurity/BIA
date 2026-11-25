@@ -1,7 +1,6 @@
 import {
   aiUsage,
-  recordAiUsage,
-  claimAiExerciseSlot,
+  claimAiUsage,
   settleAiUsage,
   refundAiUsage,
   tenancyEnabled,
@@ -9,7 +8,6 @@ import {
 import {
   planOf,
   limitsFor,
-  allowsFeature,
   monthStart,
   AI_FEATURE_LABELS,
   type AiFeature,
@@ -24,13 +22,18 @@ import {
  * mean a new AI feature is unmetered by default, which is exactly the failure
  * mode worth designing out.
  *
- * The check runs before the call and the charge is recorded after it, so a
- * single generation can overshoot the monthly token budget by its own size.
- * That is deliberate: refusing to start work that might exceed the cap would
- * mean predicting the token count of a response nobody has generated yet.
- * Under concurrency the token overshoot is bounded by parallel calls, not
- * one; the count-based exercise limit has no such window, because its slot
- * is claimed atomically before any provider spend (see below).
+ * Every generation claims a ledger row before the provider is called. The
+ * row carries a token reservation (AI_RESERVE_TOKENS) that counts against
+ * the monthly allowance while the call is in flight, so simultaneous
+ * requests cannot all pass against the same remaining balance, and it is
+ * replaced by the real usage when the call returns. The allowance can
+ * still be overshot, but by a bounded amount: the calls admitted while any
+ * balance remained, each by its own size.
+ *
+ * What the provider billed is what gets charged, whether or not the output
+ * was usable. A generation that stops at the output-token limit or is
+ * refused has been paid for; leaving it uncharged would let a member spend
+ * without limit by asking for output that cannot fit.
  */
 
 export interface TokenUsage {
@@ -42,6 +45,33 @@ export interface TokenUsage {
 export interface AiResult<T> {
   value: T;
   usage: TokenUsage;
+}
+
+/**
+ * Tokens held against the allowance for each generation in flight. Sized to
+ * a typical call (a workspace brief plus up to 16,000 output tokens); the
+ * free plan therefore admits at most eight generations at once.
+ */
+export const AI_RESERVE_TOKENS = 40_000;
+
+/**
+ * A generation the provider billed for but that produced nothing usable
+ * (output-token limit reached, refusal, output that failed the schema).
+ * Carries the usage so the spend is still charged.
+ */
+export class BilledGenerationError extends Error {
+  constructor(
+    message: string,
+    public readonly usage: TokenUsage
+  ) {
+    super(message);
+    this.name = 'BilledGenerationError';
+  }
+}
+
+/** The provider gave up waiting; by then it had usually been generating. */
+function isProviderTimeout(e: unknown): boolean {
+  return e instanceof Error && e.name === 'APIConnectionTimeoutError';
 }
 
 /** Raised when a plan limit blocks the call, with wording meant for the user. */
@@ -131,14 +161,20 @@ export function blockedReason(a: AiAllowance, feature: AiFeature): string | null
   return null;
 }
 
+/** Shown when only reservations held by running generations block a call. */
+const IN_FLIGHT_MESSAGE =
+  "Other AI generations for this organization are still running and hold the rest of this month's allowance. Try again when they finish.";
+
 /**
  * Run a metered generation. Throws before spending anything if the plan does
- * not allow it, and records the spend once the call succeeds. A failed
- * generation is not charged, since no usable output was produced.
+ * not allow it, claims a reserved ledger row, and settles that row with the
+ * real usage once the call returns.
  *
- * Count-limited features claim their slot first, under a per-organization
- * advisory lock: without that, several simultaneous starts would each see
- * the same "one remaining" and all proceed.
+ * On failure the row is settled with whatever the provider billed
+ * (BilledGenerationError), kept at the reservation when the provider timed
+ * out mid-generation, and removed only when nothing was billed. A failed
+ * exercise keeps its token charge but is re-labelled, so it does not use up
+ * the plan's exercise count.
  */
 export async function withAiQuota<T>(
   ctx: { orgId: string; userId: string },
@@ -149,40 +185,40 @@ export async function withAiQuota<T>(
   const blocked = blockedReason(allowance, feature);
   if (blocked) throw new QuotaExceededError(blocked, feature, allowance.plan);
 
-  let claimId: number | null = null;
-  if (tenancyEnabled() && feature === 'exercise') {
-    claimId = await claimAiExerciseSlot(ctx.orgId, ctx.userId, allowance.exercisesLimit);
-    if (claimId == null) {
-      const fresh = await allowanceFor(ctx.orgId);
-      throw new QuotaExceededError(
-        blockedReason(fresh, feature) ?? 'The AI exercise limit for this plan has been reached.',
-        feature,
-        fresh.plan
-      );
-    }
+  // Demo mode: nobody to meter and nowhere to record it.
+  if (!tenancyEnabled()) return (await run()).value;
+
+  const claimId = await claimAiUsage({
+    orgId: ctx.orgId,
+    actorUserId: ctx.userId,
+    feature,
+    reserveTokens: AI_RESERVE_TOKENS,
+    tokenLimit: allowance.tokensLimit,
+    since: monthStart(),
+    exerciseLimit: feature === 'exercise' ? allowance.exercisesLimit : null,
+  });
+  if (claimId == null) {
+    const fresh = await allowanceFor(ctx.orgId);
+    throw new QuotaExceededError(
+      blockedReason(fresh, feature) ?? IN_FLIGHT_MESSAGE,
+      feature,
+      fresh.plan
+    );
   }
 
+  const failedLabel = feature === 'exercise' ? 'exercise_failed' : undefined;
   try {
     const { value, usage } = await run();
-
-    if (!tenancyEnabled()) return value;
-
-    if (claimId != null) {
-      // The claimed ledger row becomes the usage record; no second row.
-      await settleAiUsage(claimId, usage.input, usage.output);
-    } else {
-      await recordAiUsage({
-        orgId: ctx.orgId,
-        actorUserId: ctx.userId,
-        feature,
-        inputTokens: usage.input,
-        outputTokens: usage.output,
-      });
-    }
-
+    await settleAiUsage(claimId, usage.input, usage.output);
     return value;
   } catch (e) {
-    if (claimId != null) await refundAiUsage(claimId).catch(() => {});
+    if (e instanceof BilledGenerationError) {
+      await settleAiUsage(claimId, e.usage.input, e.usage.output, failedLabel).catch(() => {});
+    } else if (isProviderTimeout(e)) {
+      await settleAiUsage(claimId, 0, AI_RESERVE_TOKENS, failedLabel).catch(() => {});
+    } else {
+      await refundAiUsage(claimId).catch(() => {});
+    }
     throw e;
   }
 }

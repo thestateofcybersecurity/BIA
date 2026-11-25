@@ -27,6 +27,12 @@ export const INVITE_COOKIE = 'bia_invite';
 export interface AuthContext {
   userId: string;
   email: string;
+  /**
+   * Whether the identity provider has confirmed the address. Anything that
+   * grants access on the strength of an email address (invitations, the
+   * owner-email contributor match, outbound mail) requires this to be true.
+   */
+  emailVerified: boolean;
   organization: Organization;
   membership: Membership;
   /** Shorthand for the permission helpers in domain/authz. */
@@ -81,6 +87,17 @@ async function currentUser(): Promise<SessionUser> {
 }
 
 /**
+ * A signed-in caller, and nothing more. Server actions call this before
+ * they parse their arguments, so an anonymous request is turned away at the
+ * cost of one session check rather than after the validator has walked a
+ * megabyte of attacker-chosen input. The role check still happens where it
+ * always did, against the organization getAuthContext resolves.
+ */
+export async function requireSession(): Promise<void> {
+  await currentUser();
+}
+
+/**
  * The caller's organization and role. Resolves the active organization from
  * the cookie when the user is a member of it, and otherwise falls back to
  * claiming or joining by email domain.
@@ -112,8 +129,12 @@ export async function getAuthContext(): Promise<AuthContext> {
     // so that creating an account lands them in the organization that
     // invited them, rather than in a private workspace of their own with
     // the invitation left pending.
+    // An unverified account never consumes the invitation: until the
+    // provider confirms the address, the match between the invited email and
+    // the signed-in one proves nothing. The cookie stays put, so the same
+    // sign-in picks it up as soon as verification completes.
     const jar = await cookies();
-    const inviteToken = jar.get(INVITE_COOKIE)?.value ?? null;
+    const inviteToken = user.emailVerified ? (jar.get(INVITE_COOKIE)?.value ?? null) : null;
     const resolved = await resolveOrgForUser(user, inviteToken);
     organization = resolved.organization;
     membership = resolved.membership;
@@ -122,12 +143,14 @@ export async function getAuthContext(): Promise<AuthContext> {
   return {
     userId: user.userId,
     email: user.email,
+    emailVerified: user.emailVerified,
     organization,
     membership,
     role: membership.role,
     member: {
       userId: user.userId,
       email: user.email,
+      emailVerified: user.emailVerified,
       role: membership.role,
       scopedProcessIds: membership.scopedProcessIds,
     },

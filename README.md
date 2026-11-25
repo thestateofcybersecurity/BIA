@@ -38,19 +38,39 @@ Open http://localhost:3000. Without any configuration the app runs in single-wor
 | `RESEND_API_KEY` | Enables email notifications via Resend: sign-off requests when an assessment becomes complete, after-action report announcements, and weekly review reminders; without it no emails are sent |
 | `EMAIL_FROM` | Sender for notification emails, defaults to `BIA <bia@cybersecurityalphabetsoup.com>` (the domain must be verified in Resend) |
 | `CRON_SECRET` | Bearer token guarding `/api/cron/review-reminders`; Vercel Cron sends it automatically once set. The weekly reminder job (Mondays 13:00 UTC, see `vercel.json`) refuses to run without it |
-| `CONTRIBUTION_SECRET` | Signing key for delegated assessment links (`/contribute/<token>`), falling back to `NEON_AUTH_COOKIE_SECRET`. Without either, the request-from-owner feature is hidden |
-| `NEXT_PUBLIC_APP_URL` | Base URL used for links inside emails, defaults to `https://bia.cybersecurityalphabetsoup.com` |
+| `CONTRIBUTION_SECRET` | Dedicated signing key for delegated assessment links (`/contribute/<token>`), generate with `openssl rand -base64 32`. Without it the app signs links with a key derived (HKDF) from `NEON_AUTH_COOKIE_SECRET` and logs a startup warning: the raw session key is never used for links, but both surfaces then hang off one root secret. Changing the key invalidates outstanding links. Without either, the request-from-owner feature is hidden |
+| `EMAIL_DAILY_CAP` | Outbound emails each organization may send per rolling day across invitations, assessment requests, and notifications; defaults to `50`. The counter lives in the `usage_events` table so it holds across serverless instances |
+| `HEALTH_DETAIL_TOKEN` | Bearer token that unlocks the configuration presence flags on `/api/health`; without it (or without the header) the route answers `{"ok":true}` only |
+| `NEXT_PUBLIC_APP_URL` | Canonical base URL, defaults to `https://bia.cybersecurityalphabetsoup.com`. Used for links inside emails, and requests that arrive on a `*.vercel.app` alias are redirected (308) to this host so the Cloudflare layer cannot be bypassed |
 | `BIA_WORKSPACE_ID` | Workspace id used in demo mode, defaults to `default` |
 
-Multi-tenancy: the organization is the tenant. The first person to sign in from a verified work domain claims it and becomes owner; later arrivals from that domain join automatically at the lowest role. Owners can rename the organization, claim further domains by publishing a DNS TXT record, and invite people outside their domains by email at a chosen role. Every capability maps to a minimum role in `src/lib/domain/authz.ts`, mutations are gated by it, and data a role cannot read is stripped server-side rather than hidden in the UI. Membership and role changes, domain claims, and workspace mutations are written to an append-only audit trail visible on People & access.
+The image optimizer (`/_next/image`) is switched off in `next.config.js` (`images.unoptimized`), because nothing in the app uses `next/image` and the endpoint is reachable without a session.
+
+AI metering: every generation reserves 40,000 tokens against the organization's monthly allowance before Claude is called and settles to the real usage afterwards, so parallel requests cannot all pass against the same balance; a generation that was billed but unusable (output limit reached, refusal) is still charged. Rate-limit, email-cap, and AI claims run under a per-key Postgres advisory lock, because a conditional insert alone is not atomic under concurrency.
+
+The PDF export is refused (413) for a workspace past about 1,000 table rows across processes, dependencies, risks, and recovery steps, because the render is synchronous and would otherwise hold the server for minutes; the on-screen report with "Browser print" covers larger programs.
+
+Rate limits that need no configuration: PDF report export is limited to 3 per user per minute, and CSV/Excel and JSON workspace imports to 5 per user per minute; JSON imports are validated against the same schemas as the editing forms and capped at 5 MB. CSV and Excel imports apply the same field caps per cell and accept at most 2,000 rows per import; an import that changes signed-off figures clears the sign-off.
+
+Multi-tenancy: the organization is the tenant. The first person to sign in from a verified work domain claims it and becomes owner; later arrivals from that domain join automatically at the lowest role. Owners can rename the organization, claim further domains by publishing a DNS TXT record, and invite people outside their domains by email at a chosen role. A claim that has not been proven by DNS is inert: it admits nobody, it yields to the first verified arrival from that domain, and after seven days unproven another organization may claim the name instead. Removing a member is remembered, so joining by domain does not readmit them; an invitation does. Every capability maps to a minimum role in `src/lib/domain/authz.ts`, mutations are gated by it, and data a role cannot read is stripped server-side rather than hidden in the UI. Membership and role changes, domain claims, and workspace mutations are written to an append-only audit trail visible on People & access.
 
 Notification emails go to each user's Neon Auth account email and respect the per-workspace preferences on the Organization page. In demo mode (no auth) there is no recipient, so nothing is sent.
 
 `DATABASE_URL` and `NEON_AUTH_BASE_URL` come from the Neon integration; add `NEON_AUTH_COOKIE_SECRET` yourself. With both auth variables set, users sign in via `/auth/sign-in` (email and password through Neon Auth) and each user gets an isolated workspace; without them, the app runs in single-workspace demo mode.
 
+### Neon Auth settings that the code relies on
+
+Neon Auth is managed Better Auth, so these live in the Neon console (project > Auth > Settings), not in the repo:
+
+- **Verify at sign-up: on.** Email verification is off by default in Neon Auth. The app refuses to let an unverified account accept an invitation, consume a remembered invitation after sign-up, claim a work domain, act as the owner of a process by email match, invite people, or send any email, so with verification off those features are unavailable to new accounts. Turning it on means a session is only issued once the address is confirmed. Accounts created before the switch keep `emailVerified = false` until they verify; Neon's "send verification email" flow covers them.
+- **Sign-up rate limiting.** Public sign-up is open and the app has no CAPTCHA, so enable Neon's rate limits on the sign-up and sign-in endpoints (or put Cloudflare Turnstile in front of `/auth/sign-in`) to blunt account flooding.
+- **Trusted origins** should list only `https://bia.cybersecurityalphabetsoup.com`.
+
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS · Recharts · Neon Postgres + Neon Auth (`@neondatabase/auth`) · server actions with a pluggable JSON-file/Postgres store · Zod validation.
+
+`npm run lint`, `npm run typecheck`, and `npm test` (vitest, tests under `tests/`) are the checks to run before a pull request; `npm run build` must also pass.
 
 ## Project layout
 

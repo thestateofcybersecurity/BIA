@@ -1,5 +1,6 @@
 import { getStore } from '@/lib/data/store';
-import { verifyContributionToken } from '@/lib/contribution/token';
+import { decodeTokenSegment } from '@/lib/safe-decode';
+import { tokenIssuedTo, verifyContributionToken } from '@/lib/contribution/token';
 import { DEPENDENCY_CLASSES, DEPENDENCY_LABELS } from '@/lib/domain/constants';
 import { ContributeForm } from './contribute-form';
 
@@ -29,8 +30,9 @@ export default async function ContributePage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
-  const verified = verifyContributionToken(decodeURIComponent(token));
+  const { token: rawToken } = await params;
+  const token = decodeTokenSegment(rawToken);
+  const verified = verifyContributionToken(token);
 
   if (!verified.ok) {
     return (
@@ -55,6 +57,17 @@ export default async function ContributePage({
         <p>
           The process this link refers to may have been removed. Ask the continuity coordinator
           who sent it to confirm.
+        </p>
+      </Shell>
+    );
+  }
+
+  if (!tokenIssuedTo(verified.claims, request.email)) {
+    return (
+      <Shell title="This link is not valid">
+        <p>
+          This link was issued to a different recipient than the current request names. Ask the
+          continuity coordinator who sent it to issue a new one.
         </p>
       </Shell>
     );
@@ -132,7 +145,7 @@ export default async function ContributePage({
 
       <div className="mt-6">
         <ContributeForm
-          token={decodeURIComponent(token)}
+          token={token}
           process={{
             id: process.id,
             name: process.name,
